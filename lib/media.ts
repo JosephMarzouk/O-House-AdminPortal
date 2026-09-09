@@ -13,8 +13,14 @@
  * renders broken — hence the branch below.
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? 'checklist-media';
+// Read lazily and fail loudly: a missing URL used to yield "undefined/storage/..."
+// — a broken <img> on every screen instead of one clear error.
+function base(): string {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
+  const bucket = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? 'checklist-media';
+  return `${url}/storage/v1/object/public/${bucket}`;
+}
 
 export function mediaUrl(pathOrUrl: string | null | undefined): string | null {
   if (!pathOrUrl) return null;
@@ -23,7 +29,7 @@ export function mediaUrl(pathOrUrl: string | null | undefined): string | null {
   // Encode each segment: '/' separates, but spaces and '#' in a name would
   // otherwise truncate the URL. Storage.upload never encoded, so tolerate it.
   const encoded = clean.split('/').map(encodeURIComponent).join('/');
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encoded}`;
+  return `${base()}/${encoded}`;
 }
 
 /**
