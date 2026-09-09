@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { listAssignments, itemCountsFor } from '@/lib/db/assignments';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtWindow } from '@/lib/format';
@@ -18,7 +20,15 @@ export default async function AssignmentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{dict.navAssignments}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">{dict.navAssignments}</h1>
+        {/* nativeButton={false}: Base UI defaults to expecting a real
+            <button>, and this renders an <a>. */}
+        <Button nativeButton={false} render={<Link href="/assignments/new" />}>
+          <Plus className="size-4" />
+          {dict.newAssignment}
+        </Button>
+      </div>
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground">{dict.noData}</p>

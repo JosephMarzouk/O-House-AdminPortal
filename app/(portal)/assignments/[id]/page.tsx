@@ -6,6 +6,7 @@ import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtDateTime, fmtWindow } from '@/lib/format';
 import { mediaUrl, mediaUrls } from '@/lib/media';
 import { StatusBadge } from '@/components/status-badge';
+import { ReviewBar } from '@/components/assignments/review-bar';
 
 export default async function AssignmentDetailPage({
   params,
@@ -148,6 +149,14 @@ export default async function AssignmentDetailPage({
           />
         </section>
       )}
+
+      <ReviewBar
+        assignmentId={a.id!}
+        status={a.effective_status}
+        items={a.items}
+        dict={dict}
+        locale={locale}
+      />
     </div>
   );
 }

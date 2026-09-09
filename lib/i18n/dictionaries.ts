@@ -1,11 +1,13 @@
 /**
  * Arabic is the default — the club's staff work in it, and the old portal
- * shipped ar-first. Keys are added as screens land rather than ported
- * wholesale; the old portal's 165-key table is the reference for wording.
+ * shipped ar-first.
  *
- * Register note: the Flutter app's Arabic is fairly standard MSA, while the
- * old web portal used Egyptian colloquial. This follows the app, since staff
- * see both and the app is the one they use daily.
+ * Register follows the Flutter app (fairly standard MSA) rather than the old
+ * web portal's Egyptian colloquial, since staff see both and the app is the
+ * one they use daily.
+ *
+ * Adding a key to `en` and forgetting it in `ar` is a build error — see the
+ * exhaustiveness assertion below.
  */
 
 export const locales = ['ar', 'en'] as const;
@@ -33,7 +35,7 @@ export const dictionaries = {
     navUsers: 'المستخدمون',
     navDepartments: 'الأقسام',
 
-    // assignment statuses (assignments_v.effective_status)
+    // statuses (assignments_v.effective_status)
     statusPending: 'قيد الانتظار',
     statusInProgress: 'قيد التنفيذ',
     statusSubmitted: 'تم الإرسال',
@@ -41,12 +43,10 @@ export const dictionaries = {
     statusRejected: 'مرفوضة',
     statusExpired: 'منتهية',
 
-    // item statuses
     itemPending: 'لم تُنفَّذ',
     itemDone: 'تم',
     itemRejected: 'مرفوضة',
 
-    // roles
     roleAdmin: 'مدير',
     roleManager: 'مشرف',
     roleInspector: 'مفتش',
@@ -71,6 +71,88 @@ export const dictionaries = {
     requiresPhoto: 'صورة مطلوبة',
     extended: 'تم التمديد',
     language: 'English',
+    save: 'حفظ',
+    cancel: 'إلغاء',
+    create: 'إنشاء',
+    edit: 'تعديل',
+    remove: 'حذف',
+    confirmDelete: 'هل أنت متأكد من الحذف؟',
+    saved: 'تم الحفظ',
+    errorGeneric: 'حدث خطأ. حاول مرة أخرى.',
+    optional: 'اختياري',
+    none: '—',
+    actions: 'إجراءات',
+
+    // assignment creation + review
+    newAssignment: 'مهمة جديدة',
+    assignmentTitleAr: 'عنوان المهمة (عربي)',
+    assignmentTitleEn: 'عنوان المهمة (إنجليزي)',
+    scheduledDate: 'تاريخ التنفيذ',
+    windowStart: 'من',
+    windowEnd: 'إلى',
+    selectPlace: 'اختر المكان',
+    selectAssignee: 'اختر المسؤول',
+    subtasksFromPlace: 'المهام الفرعية مأخوذة من المكان — عدّلها كما تريد.',
+    addSubtask: 'إضافة مهمة فرعية',
+    subtaskAr: 'النص (عربي)',
+    subtaskEn: 'النص (إنجليزي)',
+    critical: 'حرجة',
+    assignmentCreated: 'تم إنشاء المهمة',
+    fieldsRequired: 'أكمل الحقول المطلوبة.',
+    needAtLeastOneSubtask: 'أضف مهمة فرعية واحدة على الأقل.',
+
+    approve: 'اعتماد',
+    reject: 'رفض مهام',
+    extend: 'تمديد',
+    newDeadline: 'الموعد النهائي الجديد',
+    extensionNote: 'سبب التمديد',
+    selectItemsToReject: 'اختر المهام المرفوضة',
+    reasonRequired: 'اكتب سبب الرفض.',
+    noItemsSelected: 'لم تختر أي مهمة.',
+    notInSubmittedState: 'المهمة ليست في حالة "تم الإرسال".',
+    alreadyClosed: 'المهمة مغلقة ولا يمكن تمديدها.',
+    deadlineMustBeFuture: 'الموعد النهائي يجب أن يكون في المستقبل.',
+    reviewNote: 'ملاحظة المراجعة',
+
+    // places (templates)
+    newPlace: 'مكان جديد',
+    placeNameAr: 'الاسم (عربي)',
+    placeNameEn: 'الاسم (إنجليزي)',
+    defaultSubtasks: 'المهام الفرعية الافتراضية',
+    itemsCount: 'عدد المهام',
+    department: 'القسم',
+    allDepartments: 'كل الأقسام',
+    itemType: 'النوع',
+    typePassFail: 'ناجح / راسب',
+    typeYesno: 'نعم / لا',
+    typeText: 'نص حر',
+    typeNumber: 'رقم',
+    placeCreated: 'تم إنشاء المكان',
+    placeSaved: 'تم حفظ المكان',
+
+    // departments
+    newDepartment: 'قسم جديد',
+    departmentNameAr: 'الاسم (عربي)',
+    departmentNameEn: 'الاسم (إنجليزي)',
+
+    // users
+    newStaff: 'موظف جديد',
+    name: 'الاسم',
+    phone: 'رقم الهاتف',
+    phoneHint: '١٠ أرقام بدون الصفر — مثال 1012345678',
+    phoneInvalid: 'رقم الهاتف يجب أن يكون ١٠ أرقام.',
+    role: 'الدور',
+    changeRole: 'تغيير الدور',
+    changeDepartment: 'تغيير القسم',
+    manager: 'المشرف',
+    changeManager: 'تغيير المشرف',
+    noManager: 'بدون مشرف',
+    noDepartment: 'بدون قسم',
+    staffCreated: 'تم إنشاء الحساب',
+    passwordTooShort: 'كلمة المرور ٨ أحرف على الأقل.',
+    adminOnly: 'هذه الصفحة للمديرين فقط.',
+    serviceKeyMissing: 'مفتاح الخدمة غير مضبوط — أضف SUPABASE_SERVICE_ROLE_KEY في .env.local.',
+    loginEmailPreview: 'بريد الدخول',
   },
 
   en: {
@@ -125,6 +207,84 @@ export const dictionaries = {
     requiresPhoto: 'Photo required',
     extended: 'Extended',
     language: 'عربي',
+    save: 'Save',
+    cancel: 'Cancel',
+    create: 'Create',
+    edit: 'Edit',
+    remove: 'Delete',
+    confirmDelete: 'Delete this?',
+    saved: 'Saved',
+    errorGeneric: 'Something went wrong. Try again.',
+    optional: 'optional',
+    none: '—',
+    actions: 'Actions',
+
+    newAssignment: 'New assignment',
+    assignmentTitleAr: 'Title (Arabic)',
+    assignmentTitleEn: 'Title (English)',
+    scheduledDate: 'Date',
+    windowStart: 'From',
+    windowEnd: 'To',
+    selectPlace: 'Select a place',
+    selectAssignee: 'Select a staff member',
+    subtasksFromPlace: "Subtasks come from the place — edit them as you like.",
+    addSubtask: 'Add subtask',
+    subtaskAr: 'Text (Arabic)',
+    subtaskEn: 'Text (English)',
+    critical: 'Critical',
+    assignmentCreated: 'Assignment created',
+    fieldsRequired: 'Fill in the required fields.',
+    needAtLeastOneSubtask: 'Add at least one subtask.',
+
+    approve: 'Approve',
+    reject: 'Reject items',
+    extend: 'Extend',
+    newDeadline: 'New deadline',
+    extensionNote: 'Reason for extension',
+    selectItemsToReject: 'Select the items to reject',
+    reasonRequired: 'Give a reason for the rejection.',
+    noItemsSelected: 'No items selected.',
+    notInSubmittedState: 'This assignment is not awaiting review.',
+    alreadyClosed: 'This assignment is closed and cannot be extended.',
+    deadlineMustBeFuture: 'The new deadline must be in the future.',
+    reviewNote: 'Review note',
+
+    newPlace: 'New place',
+    placeNameAr: 'Name (Arabic)',
+    placeNameEn: 'Name (English)',
+    defaultSubtasks: 'Default subtasks',
+    itemsCount: 'Subtasks',
+    department: 'Department',
+    allDepartments: 'All departments',
+    itemType: 'Type',
+    typePassFail: 'Pass / Fail',
+    typeYesno: 'Yes / No',
+    typeText: 'Free text',
+    typeNumber: 'Number',
+    placeCreated: 'Place created',
+    placeSaved: 'Place saved',
+
+    newDepartment: 'New department',
+    departmentNameAr: 'Name (Arabic)',
+    departmentNameEn: 'Name (English)',
+
+    newStaff: 'New staff member',
+    name: 'Name',
+    phone: 'Phone number',
+    phoneHint: '10 digits, no leading zero — e.g. 1012345678',
+    phoneInvalid: 'The phone number must be exactly 10 digits.',
+    role: 'Role',
+    changeRole: 'Change role',
+    changeDepartment: 'Change department',
+    manager: 'Manager',
+    changeManager: 'Change manager',
+    noManager: 'No manager',
+    noDepartment: 'No department',
+    staffCreated: 'Account created',
+    passwordTooShort: 'Password must be at least 8 characters.',
+    adminOnly: 'This page is for admins only.',
+    serviceKeyMissing: 'Service key not set — add SUPABASE_SERVICE_ROLE_KEY to .env.local.',
+    loginEmailPreview: 'Login email',
   },
 } as const;
 
@@ -132,8 +292,7 @@ export const dictionaries = {
  *  every Arabic string a literal type that no English literal accepts. */
 export type Dictionary = { readonly [K in keyof (typeof dictionaries)['en']]: string };
 
-/** Compile-time assertion that every locale defines every key. Adding a key
- *  to `en` and forgetting it in `ar` is a build error, not a runtime blank. */
+/** Compile-time assertion that every locale defines every key. */
 const _exhaustive: Record<Locale, Dictionary> = dictionaries;
 void _exhaustive;
 
@@ -143,4 +302,22 @@ export function isLocale(v: string | undefined | null): v is Locale {
 
 export function dir(locale: Locale): 'rtl' | 'ltr' {
   return locale === 'ar' ? 'rtl' : 'ltr';
+}
+
+/**
+ * Pick a bilingual column pair, falling back across languages. Mirrors
+ * pickLocalized() in the Flutter app: rendering an empty string because the
+ * Arabic column was never filled is worse than showing English.
+ *
+ * Lives here rather than in ./index because that module imports next/headers
+ * and so cannot be pulled into a client component.
+ */
+export function bilingual(
+  locale: Locale,
+  ar: string | null | undefined,
+  en: string | null | undefined,
+): string {
+  const preferred = locale === 'ar' ? ar : en;
+  if (preferred) return preferred;
+  return (locale === 'ar' ? en : ar) ?? '';
 }

@@ -21,6 +21,61 @@ function friendly(message: string): string {
   return message;
 }
 
+export type NewAssignmentInput = {
+  templateId: string; // the place
+  siteId: string; // its twin in `sites` — what the phone actually renders
+  assigneeId: string;
+  titleAr: string;
+  titleEn: string;
+  scheduledDate: string; // YYYY-MM-DD
+  windowStart: string; // HH:MM
+  windowEnd: string; // HH:MM
+  items: { text_ar: string; text_en: string; type: string; critical: boolean; requires_photo: boolean }[];
+};
+
+/**
+ * create_assignment has NO defaults on the date or either window bound — every
+ * assignment must be scheduled. That is also what makes assignments_v.deadline
+ * and effective_status compute at all; both go NULL without them.
+ *
+ * p_items becomes assignment_items, with sort_order taken from array position.
+ */
+export async function createAssignment(
+  input: NewAssignmentInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (
+    !input.templateId ||
+    !input.siteId ||
+    !input.assigneeId ||
+    !input.scheduledDate ||
+    !input.windowStart ||
+    !input.windowEnd ||
+    !(input.titleAr.trim() || input.titleEn.trim())
+  ) {
+    return { ok: false, error: 'fields_required' };
+  }
+  if (input.items.length === 0) return { ok: false, error: 'need_at_least_one_subtask' };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('create_assignment', {
+    p_title_ar: input.titleAr.trim(),
+    p_title_en: input.titleEn.trim(),
+    p_site_id: input.siteId,
+    p_assignee_id: input.assigneeId,
+    p_scheduled_date: input.scheduledDate,
+    p_window_start: input.windowStart,
+    p_window_end: input.windowEnd,
+    p_items: input.items.map((i) => ({ ...i, id: crypto.randomUUID() })),
+    p_source_template_id: input.templateId,
+    p_client_id: crypto.randomUUID(), // idempotency key for a retried submit
+  });
+
+  if (error) return { ok: false, error: friendly(error.message) };
+
+  revalidatePath('/assignments');
+  return { ok: true, id: data as unknown as string };
+}
+
 export async function approveAssignment(id: string, score?: number): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.rpc('approve_assignment', {
