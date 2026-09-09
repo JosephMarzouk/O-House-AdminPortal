@@ -1,26 +1,188 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ===================================================================
+   Broadsheet — the O House design system, inherited from the Flutter
+   staff app so portal and app read as one product.
+
+   Source of truth: o_house/lib/theme.dart and the styles.css under
+   o_house/.design-preview-tmp/_ds/broadsheet-<id>/
+
+   Two deliberate desktop adaptations, both noted inline below:
+     1. Cards are white rather than Broadsheet's #EAE9E9 surface —
+        dense tables need the contrast. #EAE9E9 still fills inputs.
+     2. Controls use the 2px radius like everything else. theme.dart
+        marks its 16px control radius as a break from spec "sized for
+        gloves"; a desktop mouse doesn't need it, and the spec's own
+        rule is "2px everywhere — there are no rounded cards".
+
+   No dark mode: Broadsheet is a single light palette and the app
+   ships none, so there is no .dark block to drift out of sync.
+   =================================================================== */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 2);
+  --radius-xl: calc(var(--radius) * 3);
+  --radius-2xl: calc(var(--radius) * 4);
+  --radius-3xl: calc(var(--radius) * 5);
+  --radius-4xl: calc(var(--radius) * 6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* --- Broadsheet ramps, verbatim from styles.css --- */
+  --paper: #f3f2f2;
+  --surface: #eae9e9;
+  --ink: #0e213f; /* NB: theme.dart's ink, not accent-900 (#0a303e) */
+
+  --neutral-100: #f8f4f4;
+  --neutral-300: #d7d3d3;
+  --neutral-600: #605d5d;
+  --neutral-900: #2d2b2b;
+
+  --accent-100: #e9f8ff;
+  --accent-300: #99e0ff;
+  --accent-500: #0088b0; /* the accent — every primary action */
+  --accent-700: #006786; /* link text, pressed primaries */
+  --accent-900: #0a303e;
+
+  --magenta-100: #fff1f4;
+  --magenta-700: #aa0b56; /* rejected and overdue ONLY — nothing else */
+  --magenta-900: #4b1528;
+
+  /* --- shadcn surface --- */
+  --background: var(--paper);
+  --foreground: #201e1d;
+  --card: #ffffff; /* adaptation 1 */
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--accent-500);
+  --primary-foreground: var(--paper);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface);
+  --muted-foreground: var(--neutral-600);
+  --accent: var(--accent-100);
+  --accent-foreground: var(--accent-700);
+  --destructive: var(--magenta-700);
+
+  --border: rgb(32 30 29 / 0.16); /* text @ 16% — the Broadsheet divider */
+  --input: var(--surface);
+  --ring: var(--accent-500);
+
+  --chart-1: var(--accent-500);
+  --chart-2: var(--accent-700);
+  --chart-3: var(--accent-300);
+  --chart-4: var(--neutral-600);
+  --chart-5: var(--magenta-700);
+
+  --radius: 2px; /* adaptation 2 */
+
+  /* Sidebar is the app's ink header block, carried across. */
+  --sidebar: var(--ink);
+  --sidebar-foreground: var(--paper);
+  --sidebar-primary: var(--accent-500);
+  --sidebar-primary-foreground: var(--paper);
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.12);
+  --sidebar-ring: var(--accent-300);
+
+  /* Source Serif 4 carries no Arabic glyphs; Noto Naskh sits behind it
+     and the browser picks per glyph. One stack, both locales. */
+  --font-sans: var(--font-serif), var(--font-naskh), Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --shadow-broadsheet: 0 3px 10px rgb(45 43 43 / 0.16); /* --shadow-md */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+  }
+  /* Broadsheet's uppercase tracked section label (kSectionLabel). */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgb(32 30 29 / 0.5);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* One class per effective_status. Magenta is reserved for expired and
+     rejected — the app uses it as its only alarm colour and nothing else
+     may borrow it. Approved is solid accent-700: the positive terminal
+     state, and Broadsheet has no green. */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-semibold;
+    border-radius: var(--radius);
+  }
+  .status-pending {
+    background: var(--neutral-300);
+    color: var(--neutral-900);
+  }
+  .status-in_progress {
+    background: var(--accent-100);
+    color: var(--accent-700);
+  }
+  .status-submitted {
+    background: var(--accent-300);
+    color: var(--accent-900);
+  }
+  .status-approved {
+    background: var(--accent-700);
+    color: var(--paper);
+  }
+  .status-rejected {
+    background: var(--magenta-100);
+    color: var(--magenta-900);
+  }
+  .status-expired {
+    background: var(--magenta-700);
+    color: var(--paper);
+  }
 }
