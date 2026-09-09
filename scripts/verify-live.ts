@@ -14,9 +14,12 @@
  *
  * Run: pnpm verify:live
  */
+import { installNodeWebSocket } from '../lib/node-ws';
 import { createClient } from '@supabase/supabase-js';
 import { mediaUrl, mediaUrls } from '../lib/media';
 import type { Database } from '../lib/types/database';
+
+installNodeWebSocket(); // must run before createClient — see lib/node-ws.ts
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
