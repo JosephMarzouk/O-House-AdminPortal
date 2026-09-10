@@ -34,6 +34,8 @@ export const dictionaries = {
     navPlaces: 'الأماكن',
     navUsers: 'المستخدمون',
     navDepartments: 'الأقسام',
+    collapseSidebar: 'طي القائمة',
+    expandSidebar: 'توسيع القائمة',
 
     // statuses (assignments_v.effective_status)
     statusPending: 'قيد الانتظار',
@@ -99,7 +101,11 @@ export const dictionaries = {
     critical: 'حرجة',
     assignmentCreated: 'تم إنشاء المهمة',
     fieldsRequired: 'أكمل الحقول المطلوبة.',
+    missingFields: 'حقول ناقصة:',
+    required: 'مطلوب',
+    placeHasNoSite: 'هذا المكان غير مرتبط بموقع، ولا يمكن إسناد مهمة له. عدّله وأعد حفظه.',
     needAtLeastOneSubtask: 'أضف مهمة فرعية واحدة على الأقل.',
+    subtaskNeedsText: 'كل مهمة فرعية تحتاج نصاً بالعربية أو الإنجليزية.',
 
     approve: 'اعتماد',
     reject: 'رفض مهام',
@@ -172,6 +178,8 @@ export const dictionaries = {
     navPlaces: 'Places',
     navUsers: 'Users',
     navDepartments: 'Departments',
+    collapseSidebar: 'Collapse menu',
+    expandSidebar: 'Expand menu',
 
     statusPending: 'Pending',
     statusInProgress: 'In progress',
@@ -234,7 +242,11 @@ export const dictionaries = {
     critical: 'Critical',
     assignmentCreated: 'Assignment created',
     fieldsRequired: 'Fill in the required fields.',
+    missingFields: 'Missing:',
+    required: 'Required',
+    placeHasNoSite: 'This place has no linked site, so it cannot be assigned. Edit and save it again.',
     needAtLeastOneSubtask: 'Add at least one subtask.',
+    subtaskNeedsText: 'Every subtask needs text in Arabic or English.',
 
     approve: 'Approve',
     reject: 'Reject items',

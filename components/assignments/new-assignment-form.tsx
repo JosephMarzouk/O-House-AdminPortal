@@ -21,6 +21,8 @@ export type PlaceOption = {
 
 export type StaffOption = { id: string; name: string };
 
+type FieldKey = 'place' | 'assignee' | 'title' | 'date' | 'from' | 'to' | 'items';
+
 export function NewAssignmentForm({
   places,
   staff,
@@ -43,6 +45,7 @@ export function NewAssignmentForm({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [items, setItems] = useState<TemplateItem[]>([]);
+  const [errors, setErrors] = useState<Set<FieldKey>>(new Set());
 
   const place = places.find((p) => p.id === placeId);
 
@@ -57,13 +60,56 @@ export function NewAssignmentForm({
     if (!titleEn) setTitleEn(p.nameEn);
   }
 
+  /** Names the exact fields that are missing. The old version toasted a
+   *  generic "fill in the required fields", which left you hunting. */
+  function validate(): Set<FieldKey> {
+    const bad = new Set<FieldKey>();
+    if (!placeId) bad.add('place');
+    if (!assigneeId) bad.add('assignee');
+    if (!titleAr.trim() && !titleEn.trim()) bad.add('title');
+    if (!date) bad.add('date');
+    if (!from) bad.add('from');
+    if (!to) bad.add('to');
+    // create_assignment happily accepts an empty p_items, but an assignment
+    // with no subtasks renders 0/0 on the phone with Submit permanently
+    // disabled — so it is a dead end, not a valid state.
+    if (items.length === 0 || items.every((i) => !i.text_ar.trim() && !i.text_en.trim())) {
+      bad.add('items');
+    }
+    return bad;
+  }
+
+  const LABELS: Record<FieldKey, string> = {
+    place: dict.place,
+    assignee: dict.assignee,
+    title: dict.assignmentTitleAr,
+    date: dict.scheduledDate,
+    from: dict.windowStart,
+    to: dict.windowEnd,
+    items: dict.subtasks,
+  };
+
   function submit() {
-    // create_assignment requires p_site_id, and the phone reads the place name
-    // from the sites row it copies across — a place with no twin cannot be used.
-    if (!place?.siteId) {
-      toast.error(dict.fieldsRequired);
+    const bad = validate();
+    setErrors(bad);
+
+    if (bad.size > 0) {
+      const names = [...bad].map((k) => LABELS[k]).join('، ');
+      toast.error(`${dict.missingFields} ${names}`);
+      // Put the first offending field on screen — the form is tall enough
+      // that the culprit is often scrolled out of view.
+      document.getElementById(bad.has('items') && bad.size === 1 ? 'subtasks' : [...bad][0])
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
     }
+
+    // Every template carries a site_id, but a hand-made row might not, and
+    // create_assignment requires p_site_id — say so rather than blaming the form.
+    if (!place?.siteId) {
+      toast.error(dict.placeHasNoSite);
+      return;
+    }
+
     startTransition(async () => {
       const res = await createAssignment({
         templateId: place.id,
@@ -74,13 +120,15 @@ export function NewAssignmentForm({
         scheduledDate: date,
         windowStart: from,
         windowEnd: to,
-        items: items.map(({ text_ar, text_en, type, critical, requires_photo }) => ({
-          text_ar,
-          text_en,
-          type,
-          critical,
-          requires_photo,
-        })),
+        items: items
+          .filter((i) => i.text_ar.trim() || i.text_en.trim())
+          .map(({ text_ar, text_en, type, critical, requires_photo }) => ({
+            text_ar,
+            text_en,
+            type,
+            critical,
+            requires_photo,
+          })),
       });
 
       if (res.ok) {
@@ -96,10 +144,14 @@ export function NewAssignmentForm({
             ? dict.needAtLeastOneSubtask
             : res.error === 'not_authorized'
               ? dict.notAuthorized
-              : dict.errorGeneric,
+              : res.error,
       );
     });
   }
+
+  const err = (k: FieldKey) =>
+    errors.has(k) ? <p className="text-xs text-destructive">{dict.required}</p> : null;
+  const ring = (k: FieldKey) => (errors.has(k) ? 'border-destructive' : '');
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -108,7 +160,7 @@ export function NewAssignmentForm({
           <Label htmlFor="place">{dict.place}</Label>
           <select
             id="place"
-            className={SELECT_CLASS}
+            className={`${SELECT_CLASS} ${ring('place')}`}
             value={placeId}
             onChange={(e) => onPlaceChange(e.target.value)}
           >
@@ -119,13 +171,14 @@ export function NewAssignmentForm({
               </option>
             ))}
           </select>
+          {err('place')}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="assignee">{dict.assignee}</Label>
           <select
             id="assignee"
-            className={SELECT_CLASS}
+            className={`${SELECT_CLASS} ${ring('assignee')}`}
             value={assigneeId}
             onChange={(e) => setAssigneeId(e.target.value)}
           >
@@ -136,11 +189,18 @@ export function NewAssignmentForm({
               </option>
             ))}
           </select>
+          {err('assignee')}
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="title-ar">{dict.assignmentTitleAr}</Label>
-          <Input id="title-ar" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} />
+          <Label htmlFor="title">{dict.assignmentTitleAr}</Label>
+          <Input
+            id="title"
+            className={ring('title')}
+            value={titleAr}
+            onChange={(e) => setTitleAr(e.target.value)}
+          />
+          {err('title')}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="title-en">{dict.assignmentTitleEn}</Label>
@@ -158,9 +218,11 @@ export function NewAssignmentForm({
             id="date"
             type="date"
             dir="ltr"
+            className={ring('date')}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
+          {err('date')}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
@@ -169,9 +231,11 @@ export function NewAssignmentForm({
               id="from"
               type="time"
               dir="ltr"
+              className={ring('from')}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
+            {err('from')}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="to">{dict.windowEnd}</Label>
@@ -179,17 +243,22 @@ export function NewAssignmentForm({
               id="to"
               type="time"
               dir="ltr"
+              className={ring('to')}
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
+            {err('to')}
           </div>
         </div>
       </div>
 
-      <section className="space-y-3">
+      <section id="subtasks" className="space-y-3">
         <div>
           <h2 className="section-label">{dict.subtasks}</h2>
           <p className="text-sm text-muted-foreground">{dict.subtasksFromPlace}</p>
+          {errors.has('items') && (
+            <p className="text-xs text-destructive">{dict.needAtLeastOneSubtask}</p>
+          )}
         </div>
         <SubtaskEditor items={items} onChange={setItems} dict={dict} />
       </section>
