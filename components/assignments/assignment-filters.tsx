@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { SELECT_CLASS } from '@/components/subtask-editor';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 
 export type FilterValues = {
   status?: string;
@@ -16,6 +17,9 @@ export type Option = { value: string; label: string };
 /**
  * Place / assignee / date filters. Status is handled by the chip links in the
  * page itself — those enumerate cleanly, these do not.
+ *
+ * Lives inside the ink header block, so the labels are paper-on-ink; the
+ * controls keep their surface fill, which is what lifts them off the ink.
  *
  * The URL is the state. Current values arrive as props rather than through
  * useSearchParams: the page is already a Server Component reading
@@ -57,56 +61,51 @@ export function AssignmentFilters({
   };
 
   const hasAny = Boolean(values.status || values.site || values.who || values.from || values.to);
+  const labelClass = 'text-label uppercase text-paper/60';
 
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className="flex min-w-44 flex-col gap-1">
-        <span className="section-label">{labels.place}</span>
-        <select
-          className={SELECT_CLASS}
-          value={values.site ?? ''}
-          onChange={(e) => set('site', e.target.value)}
-        >
+        <span className={labelClass}>{labels.place}</span>
+        <Select compact value={values.site ?? ''} onChange={(e) => set('site', e.target.value)}>
           <option value="">{labels.all}</option>
           {sites.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <label className="flex min-w-44 flex-col gap-1">
-        <span className="section-label">{labels.assignee}</span>
-        <select
-          className={SELECT_CLASS}
-          value={values.who ?? ''}
-          onChange={(e) => set('who', e.target.value)}
-        >
+        <span className={labelClass}>{labels.assignee}</span>
+        <Select compact value={values.who ?? ''} onChange={(e) => set('who', e.target.value)}>
           <option value="">{labels.all}</option>
           {staff.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="section-label">{labels.from}</span>
-        <input
+        <span className={labelClass}>{labels.from}</span>
+        <Input
+          compact
           type="date"
-          className={SELECT_CLASS}
+          dir="ltr"
           value={values.from ?? ''}
           onChange={(e) => set('from', e.target.value)}
         />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="section-label">{labels.to}</span>
-        <input
+        <span className={labelClass}>{labels.to}</span>
+        <Input
+          compact
           type="date"
-          className={SELECT_CLASS}
+          dir="ltr"
           value={values.to ?? ''}
           onChange={(e) => set('to', e.target.value)}
         />
@@ -116,7 +115,7 @@ export function AssignmentFilters({
         <button
           type="button"
           onClick={() => router.replace('/assignments', { scroll: false })}
-          className="h-9 px-3 text-sm underline underline-offset-4 hover:text-[var(--accent-700)]"
+          className="h-control rounded-control px-3 text-sm text-paper/80 underline underline-offset-4 transition-colors hover:text-paper"
         >
           {labels.reset}
         </button>

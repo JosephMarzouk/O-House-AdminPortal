@@ -7,7 +7,8 @@ import { createAssignment } from '@/lib/actions/assignments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SubtaskEditor, SELECT_CLASS } from '@/components/subtask-editor';
+import { Select } from '@/components/ui/select';
+import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
 
@@ -98,7 +99,8 @@ export function NewAssignmentForm({
       toast.error(`${dict.missingFields} ${names}`);
       // Put the first offending field on screen — the form is tall enough
       // that the culprit is often scrolled out of view.
-      document.getElementById(bad.has('items') && bad.size === 1 ? 'subtasks' : [...bad][0])
+      document
+        .getElementById(bad.has('items') && bad.size === 1 ? 'subtasks' : [...bad][0])
         ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
     }
@@ -150,17 +152,17 @@ export function NewAssignmentForm({
   }
 
   const err = (k: FieldKey) =>
-    errors.has(k) ? <p className="text-xs text-destructive">{dict.required}</p> : null;
-  const ring = (k: FieldKey) => (errors.has(k) ? 'border-destructive' : '');
+    errors.has(k) ? <p className="text-caption text-magenta">{dict.required}</p> : null;
+  const invalid = (k: FieldKey) => errors.has(k) || undefined;
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-8">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="place">{dict.place}</Label>
-          <select
+          <Select
             id="place"
-            className={`${SELECT_CLASS} ${ring('place')}`}
+            aria-invalid={invalid('place')}
             value={placeId}
             onChange={(e) => onPlaceChange(e.target.value)}
           >
@@ -170,15 +172,15 @@ export function NewAssignmentForm({
                 {bilingual(locale, p.nameAr, p.nameEn)}
               </option>
             ))}
-          </select>
+          </Select>
           {err('place')}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="assignee">{dict.assignee}</Label>
-          <select
+          <Select
             id="assignee"
-            className={`${SELECT_CLASS} ${ring('assignee')}`}
+            aria-invalid={invalid('assignee')}
             value={assigneeId}
             onChange={(e) => setAssigneeId(e.target.value)}
           >
@@ -188,21 +190,21 @@ export function NewAssignmentForm({
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
           {err('assignee')}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="title">{dict.assignmentTitleAr}</Label>
           <Input
             id="title"
-            className={ring('title')}
+            aria-invalid={invalid('title')}
             value={titleAr}
             onChange={(e) => setTitleAr(e.target.value)}
           />
           {err('title')}
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="title-en">{dict.assignmentTitleEn}</Label>
           <Input
             id="title-en"
@@ -212,38 +214,38 @@ export function NewAssignmentForm({
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="date">{dict.scheduledDate}</Label>
           <Input
             id="date"
             type="date"
             dir="ltr"
-            className={ring('date')}
+            aria-invalid={invalid('date')}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
           {err('date')}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label htmlFor="from">{dict.windowStart}</Label>
             <Input
               id="from"
               type="time"
               dir="ltr"
-              className={ring('from')}
+              aria-invalid={invalid('from')}
               value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
             {err('from')}
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <Label htmlFor="to">{dict.windowEnd}</Label>
             <Input
               id="to"
               type="time"
               dir="ltr"
-              className={ring('to')}
+              aria-invalid={invalid('to')}
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -252,18 +254,18 @@ export function NewAssignmentForm({
         </div>
       </div>
 
-      <section id="subtasks" className="space-y-3">
-        <div>
-          <h2 className="section-label">{dict.subtasks}</h2>
-          <p className="text-sm text-muted-foreground">{dict.subtasksFromPlace}</p>
-          {errors.has('items') && (
-            <p className="text-xs text-destructive">{dict.needAtLeastOneSubtask}</p>
-          )}
+      <section id="subtasks">
+        <h2 className="text-heading">{dict.subtasks}</h2>
+        <p className="mt-1 text-sm text-text/55">{dict.subtasksFromPlace}</p>
+        {errors.has('items') && (
+          <p className="mt-1 text-caption text-magenta">{dict.needAtLeastOneSubtask}</p>
+        )}
+        <div className="mt-4">
+          <SubtaskEditor items={items} onChange={setItems} dict={dict} />
         </div>
-        <SubtaskEditor items={items} onChange={setItems} dict={dict} />
       </section>
 
-      <div className="flex gap-2 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-2">
         <Button disabled={pending} onClick={submit}>
           {pending ? dict.loading : dict.create}
         </Button>

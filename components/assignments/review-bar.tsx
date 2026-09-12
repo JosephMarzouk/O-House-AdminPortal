@@ -33,6 +33,11 @@ function message(dict: Dictionary, code: string): string {
   return map[code] ?? dict.errorGeneric;
 }
 
+/**
+ * The review actions as a floating bar — paper, 20px radius, the mid shadow —
+ * that sticks to the bottom of the viewport while the checklist scrolls
+ * underneath it, the way the app's bottom bar does.
+ */
 export function ReviewBar({
   assignmentId,
   status,
@@ -79,7 +84,7 @@ export function ReviewBar({
   if (!canReview && !canExtend) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+    <div className="sticky bottom-6 flex flex-wrap items-center gap-2 rounded-tile bg-paper p-4 shadow-md">
       {canReview && (
         <>
           <Button disabled={pending} onClick={() => run(() => approveAssignment(assignmentId))}>
@@ -90,14 +95,14 @@ export function ReviewBar({
             <DialogTrigger render={<Button variant="outline" disabled={pending} />}>
               {dict.reject}
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent closeLabel={dict.cancel}>
               <DialogHeader>
                 <DialogTitle>{dict.selectItemsToReject}</DialogTitle>
               </DialogHeader>
 
-              <ul className="max-h-64 space-y-2 overflow-y-auto">
+              <ul className="max-h-64 overflow-y-auto">
                 {items.map((item) => (
-                  <li key={item.id} className="flex items-start gap-2">
+                  <li key={item.id} className="flex min-h-control items-center gap-3">
                     <Checkbox
                       id={`rej-${item.id}`}
                       checked={selected.has(item.id)}
@@ -110,14 +115,14 @@ export function ReviewBar({
                         })
                       }
                     />
-                    <Label htmlFor={`rej-${item.id}`} className="font-normal leading-snug">
-                      {bilingual(locale, item.text_ar, item.text_en) || '—'}
+                    <Label htmlFor={`rej-${item.id}`} className="text-base text-text">
+                      {bilingual(locale, item.text_ar, item.text_en) || dict.none}
                     </Label>
                   </li>
                 ))}
               </ul>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <Label htmlFor="reject-reason">{dict.rejectReason}</Label>
                 <Textarea
                   id="reject-reason"
@@ -131,7 +136,10 @@ export function ReviewBar({
                 <Button variant="ghost" onClick={() => setRejectOpen(false)}>
                   {dict.cancel}
                 </Button>
+                {/* The one destructive button in the portal: rejecting sends
+                    work back, so it wears magenta. */}
                 <Button
+                  variant="destructive"
                   disabled={pending}
                   onClick={() =>
                     run(() => rejectItems(assignmentId, [...selected], reason), () => {
@@ -154,12 +162,12 @@ export function ReviewBar({
           <DialogTrigger render={<Button variant="outline" disabled={pending} />}>
             {dict.extend}
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent closeLabel={dict.cancel}>
             <DialogHeader>
               <DialogTitle>{dict.extend}</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label htmlFor="new-deadline">{dict.newDeadline}</Label>
               <Input
                 id="new-deadline"
@@ -169,9 +177,9 @@ export function ReviewBar({
                 onChange={(e) => setDeadline(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label htmlFor="ext-note">
-                {dict.extensionNote} <span className="text-muted-foreground">({dict.optional})</span>
+                {dict.extensionNote} <span className="text-text/55">({dict.optional})</span>
               </Label>
               <Textarea
                 id="ext-note"

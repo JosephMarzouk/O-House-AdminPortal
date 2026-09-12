@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   EFFECTIVE_STATUSES,
@@ -12,9 +12,10 @@ import {
 import { listSites } from '@/lib/db/places';
 import { assignableStaff, listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
-import { fmtDate, fmtNum, fmtWindow } from '@/lib/format';
+import { fmtDate, fmtNum, fmtWindow, todayInCairo } from '@/lib/format';
 import { StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
+import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
 import type { Assignment, EffectiveStatus } from '@/lib/types/database';
 import {
@@ -90,36 +91,36 @@ export default async function AssignmentsPage({
     data: { rows: Assignment[]; total: number },
   ) {
     return (
-      <section className="space-y-2">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <h2 className="section-label">{title}</h2>
-          <span className="text-sm font-semibold tabular-nums">{n(data.total)}</span>
+      <section>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h2 className="text-heading">{title}</h2>
+          <span className="text-lg tabular-nums text-text/55">{n(data.total)}</span>
           {data.total > data.rows.length && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-caption text-text/55">
               {dict.showingOf.replace('{n}', n(data.rows.length)).replace('{total}', n(data.total))}
             </span>
           )}
         </div>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-        {data.rows.length === 0 ? (
-          <p className="text-muted-foreground">{dict.noData}</p>
-        ) : (
-          <div className="overflow-x-auto bg-card shadow-[var(--shadow-broadsheet)]">
+        {hint && <p className="mt-1 text-sm text-text/55">{hint}</p>}
+        <div className="mt-4">
+          {data.rows.length === 0 ? (
+            <p className="text-text/55">{dict.noData}</p>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-start">{dict.place}</TableHead>
-                  <TableHead className="text-start">{dict.assignee}</TableHead>
-                  <TableHead className="text-start">{dict.date}</TableHead>
-                  <TableHead className="text-start">{dict.window}</TableHead>
-                  <TableHead className="text-start">{dict.progress}</TableHead>
-                  <TableHead className="text-start">{dict.status}</TableHead>
+                  <TableHead>{dict.place}</TableHead>
+                  <TableHead>{dict.assignee}</TableHead>
+                  <TableHead>{dict.date}</TableHead>
+                  <TableHead>{dict.window}</TableHead>
+                  <TableHead className="text-end">{dict.progress}</TableHead>
+                  <TableHead>{dict.status}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>{data.rows.map((a) => row(a, counts.get(a.id!)))}</TableBody>
             </Table>
-          </div>
-        )}
+          )}
+        </div>
       </section>
     );
   }
@@ -136,27 +137,32 @@ export default async function AssignmentsPage({
 
     return (
       <TableRow key={a.id}>
-        <TableCell className="text-start">
-          <Link href={`/assignments/${a.id}`} className="font-semibold hover:underline">
+        <TableCell>
+          <Link
+            href={`/assignments/${a.id}`}
+            className="font-semibold text-cyan-dark hover:underline"
+          >
             {title || dict.none}
           </Link>
-          {place && <div className="text-xs text-muted-foreground">{place}</div>}
+          {place && <div className="text-caption text-text/55">{place}</div>}
         </TableCell>
-        <TableCell className="text-start">{a.inspector_name || dict.none}</TableCell>
-        <TableCell className="text-start">{fmtDate(a.scheduled_date, locale)}</TableCell>
-        <TableCell className="text-start tabular-nums" dir="ltr">
+        <TableCell>{a.inspector_name || dict.none}</TableCell>
+        <TableCell>{fmtDate(a.scheduled_date, locale)}</TableCell>
+        <TableCell className="tabular-nums" dir="ltr">
           {fmtWindow(a.window_start, a.window_end) ?? dict.none}
         </TableCell>
-        <TableCell className="text-start tabular-nums">
+        <TableCell className="text-end tabular-nums">
           {total === 0 ? (
             // Zero items means the phone shows 0/0 with Submit permanently
             // disabled — worth flagging, not hiding.
-            <span className="text-destructive">{n(0)} / {n(0)}</span>
+            <span className="text-magenta">
+              {n(0)} / {n(0)}
+            </span>
           ) : (
             `${n(done)} / ${n(total)}`
           )}
         </TableCell>
-        <TableCell className="text-start">
+        <TableCell>
           <StatusBadge status={a.effective_status} dict={dict} extended={a.was_extended} />
         </TableCell>
       </TableRow>
@@ -164,62 +170,68 @@ export default async function AssignmentsPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{dict.navAssignments}</h1>
-        {/* nativeButton={false}: Base UI defaults to expecting a real
-            <button>, and this renders an <a>. */}
-        <Button nativeButton={false} render={<Link href="/assignments/new" />}>
-          <Plus className="size-4" />
-          {dict.newAssignment}
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        kicker={fmtDate(todayInCairo(), locale)}
+        title={dict.navAssignments}
+        subtitle={showReview ? `${dict.needsReview} · ${n(review.total)}` : undefined}
+        actions={
+          // nativeButton={false}: Base UI defaults to expecting a real
+          // <button>, and this renders an <a>.
+          <Button nativeButton={false} render={<Link href="/assignments/new" />}>
+            <PlusIcon />
+            {dict.newAssignment}
+          </Button>
+        }
+      >
+        {/* The filter rows belong "inside the ink": status chips, then the
+            place / assignee / date controls. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          {/* Status filters are plain links: they enumerate, so they need no
+              client JS at all, and Next still navigates them client-side. */}
+          <nav className="flex flex-wrap gap-1" aria-label={dict.status}>
+            {(['all', ...EFFECTIVE_STATUSES] as const).map((s) => {
+              const active = (status ?? 'all') === s;
+              return (
+                <Link
+                  key={s}
+                  href={chipHref(s)}
+                  scroll={false}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex h-control items-center rounded-control px-4 text-sm font-semibold transition-colors',
+                    active ? 'bg-cyan text-paper' : 'bg-paper/10 text-paper hover:bg-paper/20',
+                  )}
+                >
+                  {s === 'all' ? dict.filterAll : dict[STATUS_LABEL[s] as keyof typeof dict]}
+                </Link>
+              );
+            })}
+          </nav>
 
-      <div className="space-y-3 bg-card p-4 shadow-[var(--shadow-broadsheet)]">
-        {/* Status filters are plain links: they enumerate, so they need no
-            client JS at all, and Next still navigates them client-side. */}
-        <nav className="flex flex-wrap gap-1" aria-label={dict.status}>
-          {(['all', ...EFFECTIVE_STATUSES] as const).map((s) => {
-            const active = (status ?? 'all') === s;
-            return (
-              <Link
-                key={s}
-                href={chipHref(s)}
-                scroll={false}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'rounded-[var(--radius)] px-2 py-0.5 text-xs font-semibold transition-colors',
-                  active
-                    ? 'bg-[var(--accent-700)] text-[var(--paper)]'
-                    : 'bg-[var(--surface)] text-foreground/70 hover:bg-[var(--neutral-300)]',
-                )}
-              >
-                {s === 'all' ? dict.filterAll : dict[STATUS_LABEL[s] as keyof typeof dict]}
-              </Link>
-            );
-          })}
-        </nav>
+          <AssignmentFilters
+            values={{ status, site, who, from, to }}
+            sites={sites.map((s) => ({
+              value: s.id,
+              label: bilingual(locale, s.name_ar, s.name_en) || s.id,
+            }))}
+            staff={assignableStaff(profiles).map((p) => ({ value: p.id, label: p.name }))}
+            labels={{
+              place: dict.place,
+              assignee: dict.assignee,
+              from: dict.dateFrom,
+              to: dict.dateTo,
+              all: dict.filterAll,
+              reset: dict.filterReset,
+            }}
+          />
+        </div>
+      </PageHeader>
 
-        <AssignmentFilters
-          values={{ status, site, who, from, to }}
-          sites={sites.map((s) => ({
-            value: s.id,
-            label: bilingual(locale, s.name_ar, s.name_en) || s.id,
-          }))}
-          staff={assignableStaff(profiles).map((p) => ({ value: p.id, label: p.name }))}
-          labels={{
-            place: dict.place,
-            assignee: dict.assignee,
-            from: dict.dateFrom,
-            to: dict.dateTo,
-            all: dict.filterAll,
-            reset: dict.filterReset,
-          }}
-        />
-      </div>
-
-      {showReview && section(dict.needsReview, dict.needsReviewHint, review)}
-      {showRest && section(status ? dict.navAssignments : dict.everythingElse, null, rest)}
-    </div>
+      <PageBody>
+        {showReview && section(dict.needsReview, dict.needsReviewHint, review)}
+        {showRest && section(status ? dict.navAssignments : dict.everythingElse, null, rest)}
+      </PageBody>
+    </>
   );
 }
