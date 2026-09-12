@@ -30,12 +30,37 @@ export const dictionaries = {
     notAuthorized: 'هذا الحساب لا يملك صلاحية الدخول إلى لوحة الإدارة.',
 
     // nav
+    navDashboard: 'لوحة المتابعة',
     navAssignments: 'المهام',
     navPlaces: 'الأماكن',
     navUsers: 'المستخدمون',
     navDepartments: 'الأقسام',
     collapseSidebar: 'طي القائمة',
     expandSidebar: 'توسيع القائمة',
+
+    // dashboard
+    dashboardScope: 'الأرقام دي بتغطي الموظفين اللي أنت مسؤول عنهم بس.',
+    last30Days: 'آخر ٣٠ يوم',
+    totalAssignments: 'إجمالي المهام',
+    needsReview: 'محتاجة مراجعة',
+    onTimeRate: 'نسبة التسليم في الميعاد',
+    rejectionRate: 'نسبة الرفض',
+    onTime: 'في الميعاد',
+    late: 'متأخرة',
+    trendTitle: 'التسليمات — آخر ٣٠ يوم',
+    byPlace: 'المهام حسب المكان',
+    byDepartment: 'المهام حسب القسم',
+    byUser: 'أداء كل مستخدم',
+    extendedCount: 'مهام تم تمديدها',
+
+    // assignments filters
+    everythingElse: 'باقي المهام',
+    needsReviewHint: 'مهام اتسلّمت ومستنية مراجعتك.',
+    filterAll: 'الكل',
+    filterReset: 'مسح الفلاتر',
+    dateFrom: 'من تاريخ',
+    dateTo: 'إلى تاريخ',
+    showingOf: 'معروض {n} من {total}',
 
     // statuses (assignments_v.effective_status)
     statusPending: 'قيد الانتظار',
@@ -174,12 +199,35 @@ export const dictionaries = {
     signInMissingFields: 'Enter your email and password.',
     notAuthorized: 'This account does not have access to the admin portal.',
 
+    navDashboard: 'Dashboard',
     navAssignments: 'Assignments',
     navPlaces: 'Places',
     navUsers: 'Users',
     navDepartments: 'Departments',
     collapseSidebar: 'Collapse menu',
     expandSidebar: 'Expand menu',
+
+    dashboardScope: 'These figures cover only the staff you manage.',
+    last30Days: 'Last 30 days',
+    totalAssignments: 'Total assignments',
+    needsReview: 'Needs review',
+    onTimeRate: 'On-time rate',
+    rejectionRate: 'Rejection rate',
+    onTime: 'On time',
+    late: 'Late',
+    trendTitle: 'Submissions — last 30 days',
+    byPlace: 'Assignments by place',
+    byDepartment: 'Assignments by department',
+    byUser: 'Performance by user',
+    extendedCount: 'Extended',
+
+    everythingElse: 'Everything else',
+    needsReviewHint: 'Submitted and waiting on your review.',
+    filterAll: 'All',
+    filterReset: 'Clear filters',
+    dateFrom: 'From',
+    dateTo: 'To',
+    showingOf: 'Showing {n} of {total}',
 
     statusPending: 'Pending',
     statusInProgress: 'In progress',

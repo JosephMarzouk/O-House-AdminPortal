@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ClipboardList,
+  LayoutDashboard,
   MapPin,
   Users,
   Building2,
@@ -53,6 +54,7 @@ export function PortalSidebar({
   }
 
   const items = [
+    { href: '/', label: dict.navDashboard, Icon: LayoutDashboard },
     { href: '/assignments', label: dict.navAssignments, Icon: ClipboardList },
     { href: '/places', label: dict.navPlaces, Icon: MapPin },
     { href: '/departments', label: dict.navDepartments, Icon: Building2 },
@@ -101,7 +103,13 @@ export function PortalSidebar({
 
       <nav className="flex flex-col gap-0.5">
         {items.map(({ href, label, Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          // '/' needs its own case: every pathname startsWith('/'), so the
+          // prefix rule would light up the dashboard on every route — and
+          // alongside whichever row is genuinely active.
+          const active =
+            href === '/'
+              ? pathname === '/'
+              : pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}

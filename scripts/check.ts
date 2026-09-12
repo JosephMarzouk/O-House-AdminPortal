@@ -1,11 +1,15 @@
 /**
- * Self-check for the two pure rules the portal cannot get wrong:
- * storage path resolution and the phone -> login-email transform.
+ * Self-check for the pure rules the portal cannot get wrong: storage path
+ * resolution, the phone -> login-email transform, and the dashboard's
+ * lateness/date-bucket arithmetic.
  * Run: pnpm check
  */
 import assert from 'node:assert/strict';
 import { mediaUrl, mediaUrls } from '../lib/media';
 import { normalizePhone, isValidPhone, phoneToLoginEmail, phoneToE164 } from '../lib/phone';
+import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
+import { todayInCairo } from '../lib/format';
+import type { Assignment } from '../lib/types/database';
 
 const BASE = 'https://ptonujazlljpkgpfrkpw.supabase.co/storage/v1/object/public/checklist-media';
 
@@ -54,4 +58,49 @@ assert.equal(isValidPhone('101234567'), false); // 9 digits
 assert.equal(isValidPhone(''), false);
 assert.throws(() => phoneToLoginEmail('12345'), /phone_must_be_10_digits/);
 
-console.log('ok — media + phone rules hold');
+// --- dashboard arithmetic -------------------------------------------------
+// Only the fields isLate() reads; the rest of Assignment is irrelevant here.
+const a = (p: Partial<Assignment>) => p as Assignment;
+
+// Delivered before the deadline, and after it.
+assert.equal(
+  isLate(a({ effective_status: 'approved', submitted_at: '2026-09-10T08:00:00Z', deadline: '2026-09-10T20:00:00Z' })),
+  false,
+);
+assert.equal(
+  isLate(a({ effective_status: 'approved', submitted_at: '2026-09-11T08:00:00Z', deadline: '2026-09-10T20:00:00Z' })),
+  true,
+);
+// Expired is late by definition — it never arrived at all.
+assert.equal(isLate(a({ effective_status: 'expired', submitted_at: null, deadline: '2026-09-01T20:00:00Z' })), true);
+// Still open and not yet due: not late, and must not be scored as on-time
+// either (the caller only rates rows that were actually submitted).
+assert.equal(isLate(a({ effective_status: 'pending', submitted_at: null, deadline: '2099-01-01T00:00:00Z' })), false);
+// No schedule at all means no deadline to miss.
+assert.equal(isLate(a({ effective_status: 'pending', submitted_at: null, deadline: null })), false);
+// An assignment with no deadline that WAS submitted cannot be judged late.
+assert.equal(isLate(a({ effective_status: 'approved', submitted_at: '2026-09-11T08:00:00Z', deadline: null })), false);
+
+// pct guards the empty denominator rather than rendering NaN%.
+assert.equal(pct(0, 0), null);
+assert.equal(pct(1, 3), 33);
+assert.equal(pct(3, 3), 100);
+assert.equal(pct(0, 5), 0);
+
+// The trend axis must cover every day in the window, including quiet ones,
+// and must not repeat or skip a day across a DST change.
+const days = windowDays(new Date('2026-09-12T23:30:00Z'));
+assert.equal(days.length, WINDOW_DAYS);
+assert.equal(new Set(days).size, WINDOW_DAYS, 'no duplicated day');
+assert.deepEqual([...days].sort(), days, 'oldest first');
+assert.equal(days.at(-1), '2026-09-13'); // 23:30Z on the 12th is already the 13th in Cairo
+// Egypt observes DST; stepping across the change must still yield 30 distinct days.
+const dst = windowDays(new Date('2026-11-10T12:00:00Z'));
+assert.equal(new Set(dst).size, WINDOW_DAYS, 'no day lost across a DST boundary');
+
+// A late-evening-UTC instant belongs to the NEXT Cairo day — the bug that
+// `iso.slice(0, 10)` and `new Date("YYYY-MM-DD")` both get wrong.
+assert.equal(todayInCairo(new Date('2026-09-11T22:30:00Z')), '2026-09-12');
+assert.equal(todayInCairo(new Date('2026-09-12T09:00:00Z')), '2026-09-12');
+
+console.log('ok — media + phone + dashboard rules hold');

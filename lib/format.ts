@@ -46,7 +46,21 @@ export function fmtWindow(start: string | null, end: string | null): string | nu
 }
 
 /** Today in the club's timezone, as YYYY-MM-DD. en-CA is the trick that
- *  yields ISO ordering. Matches todayCairoDateStr() in the old portal. */
-export function todayInCairo(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TZ }).format(new Date());
+ *  yields ISO ordering. Matches todayCairoDateStr() in the old portal.
+ *
+ *  Pass a Date to get that instant's Cairo day instead of today's — which is
+ *  how the dashboard buckets rows. Doing it any other way is wrong:
+ *  `new Date("2026-09-12")` is UTC midnight and `iso.slice(0, 10)` is
+ *  UTC-truncated, so a late-evening-in-Cairo row lands on the previous day. */
+export function todayInCairo(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TZ }).format(d);
+}
+
+/**
+ * A count in the locale's own numerals. fmtDate/fmtDateTime use ar-EG, whose
+ * default numbering system is arab (٠١٢٣); a chart axis left to its own
+ * devices emits Latin digits, so the same screen would show both.
+ */
+export function fmtNum(n: number, locale: Locale): string {
+  return n.toLocaleString(localeTag(locale));
 }
