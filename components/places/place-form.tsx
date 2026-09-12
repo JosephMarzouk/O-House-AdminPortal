@@ -7,7 +7,8 @@ import { savePlace } from '@/lib/actions/places';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SubtaskEditor, SELECT_CLASS } from '@/components/subtask-editor';
+import { Select } from '@/components/ui/select';
+import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
 
@@ -58,13 +59,13 @@ export function PlaceForm({
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-8">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="name-ar">{dict.placeNameAr}</Label>
           <Input id="name-ar" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="name-en">{dict.placeNameEn}</Label>
           <Input
             id="name-en"
@@ -73,36 +74,31 @@ export function PlaceForm({
             onChange={(e) => setNameEn(e.target.value)}
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <Label htmlFor="dept">{dict.department}</Label>
-          <select
-            id="dept"
-            className={SELECT_CLASS}
-            value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
-          >
+          <Select id="dept" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
             <option value="">{dict.allDepartments}</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>
                 {bilingual(locale, d.nameAr, d.nameEn)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="section-label">{dict.defaultSubtasks}</h2>
-          {/* These seed every new assignment for this place; editing them
-              changes future assignments only. Existing assignment_items rows
-              are copies and are never rewritten. */}
-          <p className="text-sm text-muted-foreground">{dict.subtasksFromPlace}</p>
+      <section>
+        <h2 className="text-heading">{dict.defaultSubtasks}</h2>
+        {/* These seed every new assignment for this place; editing them
+            changes future assignments only. Existing assignment_items rows
+            are copies and are never rewritten. */}
+        <p className="mt-1 text-sm text-text/55">{dict.subtasksFromPlace}</p>
+        <div className="mt-4">
+          <SubtaskEditor items={items} onChange={setItems} dict={dict} />
         </div>
-        <SubtaskEditor items={items} onChange={setItems} dict={dict} />
       </section>
 
-      <div className="flex gap-2 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-2">
         <Button disabled={pending} onClick={submit}>
           {pending ? dict.loading : dict.save}
         </Button>

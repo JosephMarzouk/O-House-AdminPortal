@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { Plus, Pencil } from 'lucide-react';
+import { PencilIcon, PlusIcon } from '@/components/icons';
 import { listPlaces, listDepartments, templateItems } from '@/lib/db/places';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
+import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { DeletePlaceButton } from '@/components/places/delete-place-button';
+import { PageBody, PageHeader } from '@/components/ui/page-header';
 import {
   Table,
   TableBody,
@@ -23,26 +25,30 @@ export default async function PlacesPage() {
   const deptById = new Map(departments.map((d) => [d.id, d]));
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{dict.navPlaces}</h1>
-        <Button nativeButton={false} render={<Link href="/places/new" />}>
-          <Plus className="size-4" />
-          {dict.newPlace}
-        </Button>
-      </div>
+    <>
+      <PageHeader
+        kicker={fmtDate(todayInCairo(), locale)}
+        title={dict.navPlaces}
+        subtitle={`${fmtNum(places.length, locale)} · ${dict.navPlaces}`}
+        actions={
+          <Button nativeButton={false} render={<Link href="/places/new" />}>
+            <PlusIcon />
+            {dict.newPlace}
+          </Button>
+        }
+      />
 
-      {places.length === 0 ? (
-        <p className="text-muted-foreground">{dict.noData}</p>
-      ) : (
-        <div className="overflow-x-auto bg-card shadow-[var(--shadow-broadsheet)]">
+      <PageBody>
+        {places.length === 0 ? (
+          <p className="text-text/55">{dict.noData}</p>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-start">{dict.place}</TableHead>
-                <TableHead className="text-start">{dict.department}</TableHead>
-                <TableHead className="text-start">{dict.itemsCount}</TableHead>
-                <TableHead className="text-start">{dict.actions}</TableHead>
+                <TableHead>{dict.place}</TableHead>
+                <TableHead>{dict.department}</TableHead>
+                <TableHead className="text-end">{dict.itemsCount}</TableHead>
+                <TableHead>{dict.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -51,21 +57,24 @@ export default async function PlacesPage() {
                 const count = templateItems(p.items).length;
                 return (
                   <TableRow key={p.id}>
-                    <TableCell className="text-start">
-                      <Link href={`/places/${p.id}`} className="font-semibold hover:underline">
-                        {bilingual(locale, p.title_ar, p.title_en) || '—'}
+                    <TableCell>
+                      <Link
+                        href={`/places/${p.id}`}
+                        className="font-semibold text-cyan-dark hover:underline"
+                      >
+                        {bilingual(locale, p.title_ar, p.title_en) || dict.none}
                       </Link>
                       {/* A place with no site twin can never be assigned:
                           create_assignment requires p_site_id. */}
                       {!p.site_id && (
-                        <div className="text-xs text-destructive">no site link</div>
+                        <div className="text-caption text-magenta">{dict.placeHasNoSite}</div>
                       )}
                     </TableCell>
-                    <TableCell className="text-start">
+                    <TableCell>
                       {dept ? bilingual(locale, dept.name_ar, dept.name_en) : dict.allDepartments}
                     </TableCell>
-                    <TableCell className="text-start tabular-nums">{count}</TableCell>
-                    <TableCell className="text-start">
+                    <TableCell className="text-end tabular-nums">{fmtNum(count, locale)}</TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
@@ -74,7 +83,7 @@ export default async function PlacesPage() {
                           nativeButton={false}
                           render={<Link href={`/places/${p.id}`} />}
                         >
-                          <Pencil className="size-4" />
+                          <PencilIcon />
                         </Button>
                         <DeletePlaceButton id={p.id} dict={dict} />
                       </div>
@@ -84,8 +93,8 @@ export default async function PlacesPage() {
               })}
             </TableBody>
           </Table>
-        </div>
-      )}
-    </div>
+        )}
+      </PageBody>
+    </>
   );
 }
