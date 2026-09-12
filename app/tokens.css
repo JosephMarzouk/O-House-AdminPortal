@@ -1,0 +1,143 @@
+/* ===================================================================
+   Broadsheet tokens — the ONE place a colour, font, size, radius,
+   shadow or spacing value may be written down in this portal.
+
+   Everything else reads from here through Tailwind utilities
+   (bg-ink, text-cyan-dark, rounded-control, shadow-md, text-display …)
+   or through var(--color-…) in the rare inline style. If you find
+   yourself typing a hex or a px anywhere else, add a token instead.
+
+   Source of truth: the Flutter staff app's theme.dart and the
+   Broadsheet spec (DESIGN.md at the repo root). Keep the two in step.
+
+   `@theme static` rather than `@theme`: the chart module reads
+   var(--color-cyan) from JavaScript strings Tailwind cannot see, so
+   every variable has to be emitted whether or not a utility uses it.
+   =================================================================== */
+
+@theme static {
+  /* ---------- Colour, named by role. Never reach outside this list. ---------- */
+  --color-*: initial;
+
+  --color-ink: #0e213f; /* the brand ground — the only dark surface, header blocks only */
+  --color-cyan: #0088b0; /* every primary action, links, active nav, focus */
+  --color-cyan-dark: #006786; /* link/paragraph text (base cyan is only 3:1 on paper), pressed primaries, "submitted" */
+  --color-cyan-tint: #e9f8ff; /* tinted fills: in-progress, info banners, selected rows */
+  --color-magenta: #aa0b56; /* RESERVED: rejected, overdue/expired, destructive, errors */
+  --color-magenta-tint: #fff1f4; /* ground for the rejected/overdue tile and error banners */
+  --color-magenta-deep: #4b1528; /* label text sitting on magenta-tint */
+  --color-paper: #f3f2f2; /* every page ground; also the text on ink / solid cyan / solid magenta */
+  --color-surface: #eae9e9; /* input fill, cards, table header ground */
+  --color-text: #201e1d; /* body ink — derive tones with an alpha (text-text/60), never a grey hex */
+  --color-divider: rgb(32 30 29 / 0.16); /* hairlines, input borders */
+
+  /* Tonal ramps, for the odd hover/pressed step that the roles above do not
+     cover. 100 = lightest. Prefer a ramp step over an ad-hoc alpha. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b; /* dialog backdrop at 50%, shadow tint */
+
+  --color-accent-100: #e9f8ff;
+  --color-accent-200: #cbeeff;
+  --color-accent-300: #99e0ff;
+  --color-accent-400: #62c5ee;
+  --color-accent-500: #38a6cf;
+  --color-accent-600: #1186ac; /* primary hover */
+  --color-accent-700: #006786;
+  --color-accent-800: #004961;
+  --color-accent-900: #0a303e;
+
+  --color-accent2-100: #fff1f4;
+  --color-accent2-200: #ffdee6;
+  --color-accent2-300: #ffc0d0;
+  --color-accent2-400: #ff90b1;
+  --color-accent2-500: #ff458e;
+  --color-accent2-600: #d82071;
+  --color-accent2-700: #aa0b56;
+  --color-accent2-800: #790e3d; /* destructive hover */
+  --color-accent2-900: #4b1528;
+
+  /* ---------- Type. One family; the serif is the UI chrome. ---------- */
+  --font-*: initial;
+  /* Source Serif 4 carries no Arabic glyphs, so Noto Naskh sits behind it and
+     the browser picks per glyph. The two leading vars are set on <html> by
+     next/font (app/fonts.ts); the names after them are the cold-cache fallback. */
+  --font-serif: var(--font-source-serif), var(--font-noto-naskh), "Source Serif 4",
+    "Noto Naskh Arabic", system-ui, serif;
+
+  --text-*: initial;
+  --text-display: 34px; /* page title */
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 600;
+  --text-heading: 26px; /* section heading */
+  --text-heading--line-height: 1.15;
+  --text-heading--letter-spacing: -0.02em;
+  --text-heading--font-weight: 600;
+  --text-title: 20px; /* card / dialog title */
+  --text-title--line-height: 1.25;
+  --text-title--font-weight: 600;
+  --text-lg: 17px; /* body large, subtitles */
+  --text-lg--line-height: 1.3;
+  --text-base: 15px; /* body, button labels */
+  --text-base--line-height: 1.4;
+  --text-sm: 14px; /* table cells, small */
+  --text-sm--line-height: 1.4;
+  --text-xs: 13px;
+  --text-xs--line-height: 1.4;
+  --text-label: 11px; /* section label / table header: pair with uppercase */
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.09em;
+  --text-label--font-weight: 600;
+  --text-caption: 11px; /* meta text, pair with text-text/50-55 */
+  --text-caption--line-height: 1.4;
+  --text-tag: 11px; /* status tags */
+  --text-tag--line-height: 1.2;
+  --text-tag--letter-spacing: 0.02em;
+  --text-kicker: 10px; /* the cyan kicker above a card title */
+  --text-kicker--line-height: 1.2;
+  --text-kicker--letter-spacing: 0.09em;
+  --text-kicker--font-weight: 600;
+  --text-brand: 18px; /* sidebar wordmark */
+  --text-brand--line-height: 1.2;
+  --text-brand--font-weight: 600;
+  --text-field: 12px; /* form field label, pair with text-text/70 */
+  --text-field--line-height: 1.3;
+
+  /* ---------- Spacing. 5px base: p-1=5 p-2=10 p-3=15 p-4=20 p-6=30 p-8=40. ----------
+     Already 1.25× airy — do not tighten. */
+  --spacing: 5px;
+  --spacing-hairline: 1px;
+  --spacing-focus: 2px;
+  --spacing-tag-y: 3px;
+  --spacing-icon-sm: 12px; /* inside tags */
+  --spacing-icon: 16px; /* everywhere else */
+  --spacing-logo: 32px;
+  --spacing-control: 44px; /* the minimum for anything clickable */
+  --spacing-control-lg: 56px; /* primary buttons and text inputs */
+  --spacing-thumb: 64px; /* photo evidence thumbnails */
+  --spacing-rail: 64px; /* collapsed sidebar */
+  --spacing-header: 140px; /* ink header block min-height */
+  --spacing-sidebar: 240px;
+  --container-dialog: 440px;
+
+  /* ---------- Radius. Flat by default; controls are the one deliberate departure. ---------- */
+  --radius-*: initial;
+  --radius-card: 2px; /* cards, tables, tags — "no rounded cards" */
+  --radius-dialog: 4px;
+  --radius-control: 16px; /* buttons, inputs, selects — matches the staff app */
+  --radius-tile: 20px; /* stat tiles and floating bars: the things that float off the paper */
+  --radius-header: 28px; /* bottom corners of the ink header block only */
+
+  /* ---------- Elevation. Ink-tinted; only these three. ---------- */
+  --shadow-*: initial;
+  --shadow-sm: 0 1px 2px rgb(45 43 43 / 0.14);
+  --shadow-md: 0 3px 10px rgb(45 43 43 / 0.16); /* stat tiles, floating bars */
+  --shadow-lg: 0 12px 32px rgb(45 43 43 / 0.22); /* dialogs only */
+}
