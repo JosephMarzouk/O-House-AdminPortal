@@ -46,7 +46,7 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 text-start">
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <Label htmlFor="email">{dict.email}</Label>
         <Input
           id="email"
@@ -58,7 +58,7 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <Label htmlFor="password">{dict.password}</Label>
         <Input
           id="password"
@@ -71,7 +71,7 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
       </div>
 
       {error && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="rounded-card bg-magenta-tint px-3 py-2 text-sm text-magenta-deep" role="alert">
           {error}
         </p>
       )}

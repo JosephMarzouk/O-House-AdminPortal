@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { SignOutIcon } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 
@@ -19,7 +19,7 @@ export function SignOutButton({ label }: { label: string }) {
         router.push('/login');
       }}
     >
-      <LogOut className="size-4" aria-hidden />
+      <SignOutIcon />
       {label}
     </Button>
   );

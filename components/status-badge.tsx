@@ -1,21 +1,31 @@
 import type { EffectiveStatus } from '@/lib/types/database';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
+import { Tag, TagGroup } from '@/components/ui/tag';
+import {
+  StatusApprovedIcon,
+  StatusExpiredIcon,
+  StatusExtendedIcon,
+  StatusInProgressIcon,
+  StatusPendingIcon,
+  StatusRejectedIcon,
+  StatusSubmittedIcon,
+} from '@/components/icons';
 
-const LABEL: Record<EffectiveStatus, keyof Dictionary> = {
-  pending: 'statusPending',
-  in_progress: 'statusInProgress',
-  submitted: 'statusSubmitted',
-  approved: 'statusApproved',
-  rejected: 'statusRejected',
-  expired: 'statusExpired',
+const STATUS: Record<EffectiveStatus, { label: keyof Dictionary; Icon: typeof StatusPendingIcon }> = {
+  pending: { label: 'statusPending', Icon: StatusPendingIcon },
+  in_progress: { label: 'statusInProgress', Icon: StatusInProgressIcon },
+  submitted: { label: 'statusSubmitted', Icon: StatusSubmittedIcon },
+  approved: { label: 'statusApproved', Icon: StatusApprovedIcon },
+  rejected: { label: 'statusRejected', Icon: StatusRejectedIcon },
+  expired: { label: 'statusExpired', Icon: StatusExpiredIcon },
 };
 
 /**
  * `status` comes from assignments_v.effective_status, never submissions.status
  * — a row past its window still reports 'pending' in the base table.
  *
- * The colour classes live in globals.css @layer components rather than as
- * Tailwind utilities, so a dynamic `status-${s}` is safe from purging.
+ * "Extended" is an independent flag, so it renders as its own tag beside the
+ * status rather than recolouring it.
  */
 export function StatusBadge({
   status,
@@ -27,10 +37,17 @@ export function StatusBadge({
   extended?: boolean | null;
 }) {
   const s: EffectiveStatus = status ?? 'pending';
+  const { label, Icon } = STATUS[s];
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`status-badge status-${s}`}>{dict[LABEL[s]]}</span>
-      {extended && <span className="text-xs text-muted-foreground">{dict.extended}</span>}
-    </span>
+    <TagGroup>
+      <Tag tone={s} icon={<Icon />}>
+        {dict[label]}
+      </Tag>
+      {extended && (
+        <Tag tone="extended" icon={<StatusExtendedIcon />}>
+          {dict.extended}
+        </Tag>
+      )}
+    </TagGroup>
   );
 }

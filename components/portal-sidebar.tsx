@@ -1,20 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  ClipboardList,
-  LayoutDashboard,
-  MapPin,
-  Users,
-  Building2,
-  Languages,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from 'lucide-react';
+  BuildingsIcon,
+  ClipboardIcon,
+  HouseIcon,
+  MapPinIcon,
+  SidebarIcon,
+  SignOutIcon,
+  TranslateIcon,
+  UsersIcon,
+} from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { setLocale } from '@/lib/actions/locale';
 import { cn } from '@/lib/utils';
@@ -22,6 +20,11 @@ import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
 export const SIDEBAR_COOKIE = 'sidebar';
 
+/**
+ * Navigation on paper, in the serif, with the active item in cyan and no
+ * dividers anywhere — the ink is reserved for each page's header block, so
+ * the sidebar stays quiet and the header carries the brand.
+ */
 export function PortalSidebar({
   dict,
   locale,
@@ -54,62 +57,51 @@ export function PortalSidebar({
   }
 
   const items = [
-    { href: '/', label: dict.navDashboard, Icon: LayoutDashboard },
-    { href: '/assignments', label: dict.navAssignments, Icon: ClipboardList },
-    { href: '/places', label: dict.navPlaces, Icon: MapPin },
-    { href: '/departments', label: dict.navDepartments, Icon: Building2 },
+    { href: '/', label: dict.navDashboard, Icon: HouseIcon },
+    { href: '/assignments', label: dict.navAssignments, Icon: ClipboardIcon },
+    { href: '/places', label: dict.navPlaces, Icon: MapPinIcon },
+    { href: '/departments', label: dict.navDepartments, Icon: BuildingsIcon },
     // set_user_role is admin-only and staff creation needs the service key,
     // so a manager would find nothing but disabled controls here.
-    ...(isAdmin ? [{ href: '/users', label: dict.navUsers, Icon: Users }] : []),
+    ...(isAdmin ? [{ href: '/users', label: dict.navUsers, Icon: UsersIcon }] : []),
   ];
 
   const rowClass = (active: boolean) =>
     cn(
-      'flex items-center gap-3 rounded-[var(--radius)] px-3 py-2 text-sm transition-colors',
+      'flex min-h-control items-center gap-3 rounded-control px-3 text-base transition-colors',
+      '[&_svg]:size-icon [&_svg]:shrink-0',
       collapsed && 'justify-center px-0',
-      active
-        ? 'bg-[var(--sidebar-accent)] font-semibold text-[var(--sidebar-accent-foreground)]'
-        : 'text-[var(--sidebar-foreground)]/75 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]',
+      active ? 'font-semibold text-cyan' : 'text-text/70 hover:bg-text/7 hover:text-text',
     );
 
   return (
     <aside
-      // Width is an inline style rather than a w-* class, and there is no
-      // width transition. Animating width here left the element stuck at its
-      // previous size — the labels and icons swapped correctly but the box
-      // never resized. Snapping is honest and has no failure mode; if this
-      // ever wants animation, animate a wrapper's transform, not width.
-      style={{ width: collapsed ? '4rem' : '15rem', minWidth: 0 }}
+      // Width snaps between two token widths with no transition. Animating
+      // width here left the element stuck at its previous size — the labels
+      // and icons swapped correctly but the box never resized. Snapping is
+      // honest and has no failure mode; if this ever wants animation, animate
+      // a wrapper's transform, not width.
       className={cn(
-        'flex shrink-0 flex-col gap-6 overflow-hidden bg-sidebar p-3',
-        'text-sidebar-foreground',
+        'flex shrink-0 flex-col gap-8 overflow-hidden bg-paper px-3 py-6',
+        collapsed ? 'w-rail' : 'w-sidebar',
       )}
     >
-      <div className={cn('flex items-center gap-2.5 px-1', collapsed && 'justify-center px-0')}>
-        <Image
-          src="/owest.png"
-          alt=""
-          width={32}
-          height={32}
-          className="shrink-0 rounded-[var(--radius)]"
-        />
-        {!collapsed && (
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold">{dict.appName}</div>
-            <div className="truncate text-xs text-[var(--accent-300)]">{dict.appSubtitle}</div>
-          </div>
-        )}
-      </div>
+      {/* Wordmark in the serif — the logo itself lives in the ink header. */}
+      <Link
+        href="/"
+        className={cn('block min-w-0 px-3 text-ink', collapsed && 'px-0 text-center')}
+      >
+        <div className="truncate text-brand">{collapsed ? dict.appName.slice(0, 1) : dict.appName}</div>
+        {!collapsed && <div className="truncate text-caption text-text/55">{dict.appSubtitle}</div>}
+      </Link>
 
-      <nav className="flex flex-col gap-0.5">
+      <nav className="flex flex-col">
         {items.map(({ href, label, Icon }) => {
           // '/' needs its own case: every pathname startsWith('/'), so the
           // prefix rule would light up the dashboard on every route — and
           // alongside whichever row is genuinely active.
           const active =
-            href === '/'
-              ? pathname === '/'
-              : pathname === href || pathname.startsWith(`${href}/`);
+            href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}
@@ -121,18 +113,18 @@ export function PortalSidebar({
               aria-label={collapsed ? label : undefined}
               className={rowClass(active)}
             >
-              <Icon className="size-4 shrink-0" aria-hidden />
+              <Icon />
               {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-1 border-t border-[var(--sidebar-border)] pt-3">
+      <div className="mt-auto flex flex-col">
         {!collapsed && (
-          <div className="mb-1 min-w-0 px-3">
+          <div className="mb-2 min-w-0 px-3">
             <div className="truncate text-sm font-semibold">{userName}</div>
-            <div className="truncate text-xs text-[var(--sidebar-foreground)]/60">{roleLabel}</div>
+            <div className="truncate text-caption text-text/55">{roleLabel}</div>
           </div>
         )}
 
@@ -143,7 +135,7 @@ export function PortalSidebar({
           className={rowClass(false)}
           onClick={() => startTransition(() => setLocale(locale === 'ar' ? 'en' : 'ar'))}
         >
-          <Languages className="size-4 shrink-0" aria-hidden />
+          <TranslateIcon />
           {!collapsed && <span className="truncate">{dict.language}</span>}
         </button>
 
@@ -157,7 +149,7 @@ export function PortalSidebar({
             router.push('/login');
           }}
         >
-          <LogOut className="size-4 shrink-0" aria-hidden />
+          <SignOutIcon />
           {!collapsed && <span className="truncate">{dict.signOut}</span>}
         </button>
 
@@ -169,12 +161,8 @@ export function PortalSidebar({
           aria-label={collapsed ? dict.expandSidebar : dict.collapseSidebar}
           className={rowClass(false)}
         >
-          {/* The panel icons are directional, so mirror them under RTL. */}
-          {collapsed ? (
-            <PanelLeftOpen className="size-4 shrink-0 rtl:rotate-180" aria-hidden />
-          ) : (
-            <PanelLeftClose className="size-4 shrink-0 rtl:rotate-180" aria-hidden />
-          )}
+          {/* The panel icon is directional, so mirror it under RTL. */}
+          <SidebarIcon className="rtl:-scale-x-100" />
           {!collapsed && <span className="truncate">{dict.collapseSidebar}</span>}
         </button>
       </div>
