@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { fmtNum } from '@/lib/format';
 import type { Locale } from '@/lib/i18n/dictionaries';
-import { GRID, LATE, SERIES, TICK, TOOLTIP_STYLE } from './chart-theme';
+import { CURSOR, GRID, LATE, SERIES, TICK, TOOLTIP_STYLE } from './chart-theme';
 
 export type CategoryDatum = {
   label: string;
@@ -81,7 +81,7 @@ export function CategoryBars({
           />
           <Tooltip
             isAnimationActive={false}
-            cursor={{ fill: 'rgba(32, 30, 29, 0.06)' }}
+            cursor={{ fill: CURSOR }}
             contentStyle={TOOLTIP_STYLE}
             formatter={(v) => [fmt(Number(v)), valueLabel]}
           />

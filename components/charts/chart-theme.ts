@@ -1,37 +1,39 @@
 /**
- * Chart colours, as literal hex rather than var(--accent-500).
+ * Chart colours, read from the tokens in app/tokens.css.
  *
- * Two reasons. Recharts emits these as SVG presentation attributes
- * (stroke/fill), where var() support is uneven; and Broadsheet is a single
- * light palette with no dark mode, so there is exactly one set of values to
- * keep in step with globals.css rather than a theme to resolve at runtime.
+ * Recharts emits these as SVG presentation attributes (stroke/fill), and
+ * presentation attributes are parsed as CSS values, so var() resolves there
+ * exactly as it does in a stylesheet. tokens.css is `@theme static`, which
+ * guarantees every variable is emitted even though Tailwind cannot see these
+ * string usages.
  *
  * SERIES and LATE are the one pair this dashboard draws together. They were
  * checked with a colour-vision/contrast validator and pass on every count —
  * lightness band, chroma floor, CVD separation (ΔE 14.2 deutan) and contrast
- * against the card. Magenta is also the design system's reserved alarm colour,
- * used for rejected and expired and nothing else, so "late" is exactly the
- * job it is meant for.
+ * against the paper. Magenta is also the design system's reserved alarm
+ * colour, used for rejected and expired and nothing else, so "late" is
+ * exactly the job it is meant for.
  *
- * Do NOT add a third series colour from the blue ramp: #006786/#0088b0/#99e0ff
+ * Do NOT add a third series colour from the blue ramp: accent-700/500/300
  * fail as a categorical set (normal-vision ΔE 10.8 — indistinguishable even
  * with full colour vision). The bar charts are deliberately single-hue and
  * take their identity from the category label instead.
  */
-export const SERIES = '#0088b0'; // --accent-500
-export const LATE = '#aa0b56'; // --magenta-700
-export const AXIS = '#605d5d'; // --neutral-600
-export const GRID = 'rgba(32, 30, 29, 0.16)'; // --border
+export const SERIES = 'var(--color-cyan)';
+export const LATE = 'var(--color-magenta)';
+export const AXIS = 'var(--color-neutral-700)';
+export const GRID = 'var(--color-divider)';
+export const CURSOR = 'color-mix(in oklab, var(--color-text) 6%, transparent)';
 
-/** Matches .bg-card + --shadow-broadsheet + --radius, so a tooltip reads as
- *  part of the page rather than a recharts default. */
+/** Matches a card on the surface fill with the mid shadow, so a tooltip reads
+ *  as part of the page rather than a recharts default. */
 export const TOOLTIP_STYLE = {
-  background: '#ffffff',
-  border: `1px solid ${GRID}`,
-  borderRadius: '2px',
-  boxShadow: '0 3px 10px rgb(45 43 43 / 0.16)',
+  background: 'var(--color-surface)',
+  border: `var(--spacing-hairline) solid ${GRID}`,
+  borderRadius: 'var(--radius-card)',
+  boxShadow: 'var(--shadow-md)',
   fontFamily: 'inherit',
-  fontSize: 12,
+  fontSize: 'var(--text-xs)',
 } as const;
 
-export const TICK = { fill: AXIS, fontSize: 11 } as const;
+export const TICK = { fill: AXIS, fontSize: 'var(--text-caption)' } as const;
