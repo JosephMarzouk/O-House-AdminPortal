@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { PlusIcon, TrashIcon } from '@/components/icons';
 import { createDepartment, deleteDepartment } from '@/lib/actions/departments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,9 +33,11 @@ export function DepartmentsManager({
   const [nameEn, setNameEn] = useState('');
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* The create row sits straight on the paper — whitespace separates it
+          from the list below, not a box. */}
       <form
-        className="flex max-w-2xl flex-wrap items-end gap-3 bg-card p-4 shadow-[var(--shadow-broadsheet)]"
+        className="flex max-w-3xl flex-wrap items-end gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
@@ -51,43 +53,42 @@ export function DepartmentsManager({
           });
         }}
       >
-        <div className="min-w-40 flex-1 space-y-1.5">
+        <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="d-ar">{dict.departmentNameAr}</Label>
           <Input id="d-ar" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
         </div>
-        <div className="min-w-40 flex-1 space-y-1.5">
+        <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="d-en">{dict.departmentNameEn}</Label>
           <Input id="d-en" dir="ltr" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
         </div>
         <Button type="submit" disabled={pending}>
-          <Plus className="size-4" />
+          <PlusIcon />
           {dict.create}
         </Button>
       </form>
 
       {departments.length === 0 ? (
-        <p className="text-muted-foreground">{dict.noData}</p>
+        <p className="text-text/55">{dict.noData}</p>
       ) : (
-        <div className="max-w-2xl overflow-x-auto bg-card shadow-[var(--shadow-broadsheet)]">
+        <div className="max-w-3xl">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-start">{dict.departmentNameAr}</TableHead>
-                <TableHead className="text-start">{dict.departmentNameEn}</TableHead>
-                <TableHead className="text-start">{dict.actions}</TableHead>
+                <TableHead>{dict.departmentNameAr}</TableHead>
+                <TableHead>{dict.departmentNameEn}</TableHead>
+                <TableHead>{dict.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {departments.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="text-start">{d.nameAr || '—'}</TableCell>
-                  <TableCell className="text-start" dir="ltr">
-                    {d.nameEn || '—'}
-                  </TableCell>
-                  <TableCell className="text-start">
+                  <TableCell>{d.nameAr || dict.none}</TableCell>
+                  <TableCell dir="ltr">{d.nameEn || dict.none}</TableCell>
+                  <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="text-magenta hover:bg-magenta/10"
                       aria-label={dict.remove}
                       disabled={pending}
                       onClick={() => {
@@ -105,7 +106,7 @@ export function DepartmentsManager({
                         });
                       }}
                     >
-                      <Trash2 className="size-4" />
+                      <TrashIcon />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -114,6 +115,6 @@ export function DepartmentsManager({
           </Table>
         </div>
       )}
-    </div>
+    </>
   );
 }

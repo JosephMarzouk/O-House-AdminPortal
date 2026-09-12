@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Plus, KeyRound } from 'lucide-react';
+import { KeyIcon, PlusIcon } from '@/components/icons';
 import {
   setUserRole,
   setUserDepartment,
@@ -15,7 +15,7 @@ import { normalizePhone, phoneToLoginEmail } from '@/lib/phone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SELECT_CLASS } from '@/components/subtask-editor';
+import { Select } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -91,9 +91,9 @@ export function UsersManager({
   }
 
   return (
-    <div className="space-y-8">
+    <>
       <form
-        className="flex max-w-4xl flex-wrap items-end gap-3 bg-card p-4 shadow-[var(--shadow-broadsheet)]"
+        className="flex max-w-4xl flex-wrap items-start gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
@@ -110,11 +110,11 @@ export function UsersManager({
           });
         }}
       >
-        <div className="min-w-40 flex-1 space-y-1.5">
+        <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-name">{dict.name}</Label>
           <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="min-w-44 flex-1 space-y-1.5">
+        <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-phone">{dict.phone}</Label>
           <Input
             id="s-phone"
@@ -127,11 +127,11 @@ export function UsersManager({
           {/* Show the exact address the account will be created under. The app
               builds this same string at login and validates nothing, so a
               wrong digit here is an account that simply never signs in. */}
-          <p className="text-xs text-muted-foreground" dir="ltr">
+          <p className="text-caption text-text/55" dir="ltr">
             {preview ? `${dict.loginEmailPreview}: ${preview}` : dict.phoneHint}
           </p>
         </div>
-        <div className="min-w-40 flex-1 space-y-1.5">
+        <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-pass">{dict.password}</Label>
           <Input
             id="s-pass"
@@ -141,121 +141,124 @@ export function UsersManager({
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" disabled={pending}>
-          <Plus className="size-4" />
+        {/* pt aligns the 56px button with the 56px inputs under their labels. */}
+        <Button type="submit" disabled={pending} className="mt-4">
+          <PlusIcon />
           {dict.newStaff}
         </Button>
       </form>
 
-      <div className="overflow-x-auto bg-card shadow-[var(--shadow-broadsheet)]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-start">{dict.name}</TableHead>
-              <TableHead className="text-start">{dict.phone} / {dict.email}</TableHead>
-              <TableHead className="text-start">{dict.role}</TableHead>
-              <TableHead className="text-start">{dict.department}</TableHead>
-              <TableHead className="text-start">{dict.manager}</TableHead>
-              <TableHead className="text-start">{dict.password}</TableHead>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{dict.name}</TableHead>
+            <TableHead>
+              {dict.phone} / {dict.email}
+            </TableHead>
+            <TableHead>{dict.role}</TableHead>
+            <TableHead>{dict.department}</TableHead>
+            <TableHead>{dict.manager}</TableHead>
+            <TableHead>{dict.password}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.map((u) => (
+            <TableRow key={u.id}>
+              <TableCell className="font-semibold">{u.name || dict.none}</TableCell>
+              <TableCell dir="ltr">
+                {/* profiles.email is deliberately '' for phone accounts —
+                    handle_new_user never stores the synthetic address. */}
+                {u.phone || u.email || dict.none}
+              </TableCell>
+
+              <TableCell>
+                <Select
+                  compact
+                  className="min-w-32"
+                  aria-label={dict.changeRole}
+                  defaultValue={u.role}
+                  // An admin demoting themselves would lock the whole org
+                  // out of role changes; set_user_role does not guard this.
+                  disabled={pending || u.id === currentUserId}
+                  onChange={(e) =>
+                    startTransition(async () =>
+                      report(await setUserRole(u.id, e.target.value as Role)),
+                    )
+                  }
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {roleLabel(r)}
+                    </option>
+                  ))}
+                </Select>
+              </TableCell>
+
+              <TableCell>
+                <Select
+                  compact
+                  className="min-w-36"
+                  aria-label={dict.changeDepartment}
+                  defaultValue={u.departmentId ?? ''}
+                  disabled={pending}
+                  onChange={(e) =>
+                    startTransition(async () =>
+                      report(await setUserDepartment(u.id, e.target.value || null)),
+                    )
+                  }
+                >
+                  <option value="">{dict.noDepartment}</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {bilingual(locale, d.nameAr, d.nameEn)}
+                    </option>
+                  ))}
+                </Select>
+              </TableCell>
+
+              <TableCell>
+                <Select
+                  compact
+                  className="min-w-36"
+                  aria-label={dict.changeManager}
+                  defaultValue={u.managerId ?? ''}
+                  disabled={pending}
+                  onChange={(e) =>
+                    startTransition(async () =>
+                      report(await setUserManager(u.id, e.target.value || null)),
+                    )
+                  }
+                >
+                  <option value="">{dict.noManager}</option>
+                  {users
+                    .filter((m) => m.id !== u.id && (m.role === 'admin' || m.role === 'manager'))
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                </Select>
+              </TableCell>
+
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={dict.password}
+                  disabled={pending}
+                  onClick={() => {
+                    const next = prompt(dict.password);
+                    if (!next) return;
+                    startTransition(async () => report(await resetStaffPassword(u.id, next)));
+                  }}
+                >
+                  <KeyIcon />
+                </Button>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell className="text-start font-semibold">{u.name || '—'}</TableCell>
-                <TableCell className="text-start text-sm" dir="ltr">
-                  {/* profiles.email is deliberately '' for phone accounts —
-                      handle_new_user never stores the synthetic address. */}
-                  {u.phone || u.email || '—'}
-                </TableCell>
-
-                <TableCell className="text-start">
-                  <select
-                    aria-label={dict.changeRole}
-                    className={SELECT_CLASS + ' min-w-28'}
-                    defaultValue={u.role}
-                    // An admin demoting themselves would lock the whole org
-                    // out of role changes; set_user_role does not guard this.
-                    disabled={pending || u.id === currentUserId}
-                    onChange={(e) =>
-                      startTransition(async () =>
-                        report(await setUserRole(u.id, e.target.value as Role)),
-                      )
-                    }
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {roleLabel(r)}
-                      </option>
-                    ))}
-                  </select>
-                </TableCell>
-
-                <TableCell className="text-start">
-                  <select
-                    aria-label={dict.changeDepartment}
-                    className={SELECT_CLASS + ' min-w-32'}
-                    defaultValue={u.departmentId ?? ''}
-                    disabled={pending}
-                    onChange={(e) =>
-                      startTransition(async () =>
-                        report(await setUserDepartment(u.id, e.target.value || null)),
-                      )
-                    }
-                  >
-                    <option value="">{dict.noDepartment}</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {bilingual(locale, d.nameAr, d.nameEn)}
-                      </option>
-                    ))}
-                  </select>
-                </TableCell>
-
-                <TableCell className="text-start">
-                  <select
-                    aria-label={dict.changeManager}
-                    className={SELECT_CLASS + ' min-w-32'}
-                    defaultValue={u.managerId ?? ''}
-                    disabled={pending}
-                    onChange={(e) =>
-                      startTransition(async () =>
-                        report(await setUserManager(u.id, e.target.value || null)),
-                      )
-                    }
-                  >
-                    <option value="">{dict.noManager}</option>
-                    {users
-                      .filter((m) => m.id !== u.id && (m.role === 'admin' || m.role === 'manager'))
-                      .map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                  </select>
-                </TableCell>
-
-                <TableCell className="text-start">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => {
-                      const next = prompt(dict.password);
-                      if (!next) return;
-                      startTransition(async () =>
-                        report(await resetStaffPassword(u.id, next)),
-                      );
-                    }}
-                  >
-                    <KeyRound className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+          ))}
+        </TableBody>
+      </Table>
+    </>
   );
 }
