@@ -78,8 +78,8 @@ export function PortalSidebar({
       '[&_svg]:size-icon [&_svg]:shrink-0',
       collapsed && 'justify-center px-0',
       active
-        ? 'bg-paper/10 font-semibold text-accent-300'
-        : 'text-paper/70 hover:bg-paper/7 hover:text-paper',
+        ? 'bg-on-brand/10 font-semibold text-accent-300'
+        : 'text-on-brand/70 hover:bg-on-brand/7 hover:text-on-brand',
     );
 
   return (
@@ -117,7 +117,7 @@ export function PortalSidebar({
       // stays square against the viewport.
       className={cn(
         'sticky top-0 flex h-dvh shrink-0 flex-col gap-8 self-start overflow-x-hidden overflow-y-auto',
-        'rounded-e-tile bg-ink px-3 py-6 text-paper',
+        'rounded-e-tile bg-ink px-3 py-6 text-on-brand',
         collapsed ? 'w-rail' : 'w-sidebar',
       )}
     >
@@ -143,7 +143,7 @@ export function PortalSidebar({
         {!collapsed && (
           <div className="min-w-0">
             <div className="truncate text-brand">{dict.appName}</div>
-            <div className="truncate text-caption text-paper/55">{dict.appSubtitle}</div>
+            <div className="truncate text-caption text-on-brand/55">{dict.appSubtitle}</div>
           </div>
         )}
       </Link>
@@ -177,7 +177,7 @@ export function PortalSidebar({
         {!collapsed && (
           <div className="mb-2 min-w-0 px-3">
             <div className="truncate text-sm font-semibold">{userName}</div>
-            <div className="truncate text-caption text-paper/55">{roleLabel}</div>
+            <div className="truncate text-caption text-on-brand/55">{roleLabel}</div>
           </div>
         )}
 

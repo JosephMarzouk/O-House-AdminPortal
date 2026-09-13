@@ -202,7 +202,7 @@ export default async function AssignmentsPage({
                     // surface is the system's quiet fill — a toggle that needs
                     // no border, so it stays inside the "no boxes" rule.
                     active
-                      ? 'bg-cyan text-paper'
+                      ? 'bg-cyan text-on-brand'
                       : 'bg-surface text-text/70 hover:bg-text/7 hover:text-text',
                   )}
                 >

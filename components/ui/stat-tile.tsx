@@ -13,7 +13,7 @@ function StatTile({ label, value, alarm }: { label: string; value: string; alarm
     <div
       className={cn(
         'rounded-tile p-4 shadow-md',
-        alarm ? 'bg-magenta-tint text-magenta-deep' : 'bg-paper text-text',
+        alarm ? 'bg-magenta-tint text-magenta-deep' : 'bg-raised text-text',
       )}
     >
       <div className="text-display tabular-nums">{value}</div>

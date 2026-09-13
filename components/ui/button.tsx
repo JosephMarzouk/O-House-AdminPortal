@@ -21,11 +21,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-cyan text-paper hover:bg-accent-600 active:bg-accent-700',
+        primary: 'bg-cyan text-on-brand hover:bg-accent-600 active:bg-accent-700',
         outline:
           'border border-divider bg-transparent text-cyan-dark hover:bg-text/7 active:bg-text/14',
         ghost: 'bg-transparent text-cyan hover:bg-cyan/10 active:bg-cyan/20',
-        destructive: 'bg-magenta text-paper hover:bg-accent2-800 active:bg-accent2-900',
+        destructive: 'bg-accent2-700 text-on-brand hover:bg-accent2-800 active:bg-accent2-900',
       },
       size: {
         md: 'h-control',

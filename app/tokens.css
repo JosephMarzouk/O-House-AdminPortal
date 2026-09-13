@@ -26,10 +26,24 @@
   --color-magenta: #aa0b56; /* RESERVED: rejected, overdue/expired, destructive, errors */
   --color-magenta-tint: #fff1f4; /* ground for the rejected/overdue tile and error banners */
   --color-magenta-deep: #4b1528; /* label text sitting on magenta-tint */
-  --color-paper: #f3f2f2; /* every page ground; also the text on ink / solid cyan / solid magenta */
+  --color-paper: #f3f2f2; /* the page ground */
   --color-surface: #eae9e9; /* input fill, cards, table header ground */
   --color-text: #201e1d; /* body ink — derive tones with an alpha (text-text/60), never a grey hex */
   --color-divider: rgb(32 30 29 / 0.16); /* hairlines, input borders */
+
+  /* Two roles that paper used to cover on its own. They are identical to it in
+     the light theme, which is why the split was invisible until dark mode:
+       on-brand — text and icons ON a coloured or ink fill. Theme-INVARIANT,
+                  because the surfaces it sits on (ink, cyan, magenta) are.
+       raised   — a panel floating ABOVE the page ground. Flips, and in dark it
+                  has to, since a shadow alone cannot separate two dark greys. */
+  --color-on-brand: #f3f2f2;
+  --color-raised: #f3f2f2;
+
+  /* The shadow tint. Not merely --shadow-*'s colour: those tokens are inlined
+     into the utility at build time and cannot be re-pointed, so this is fed in
+     through shadow-(color:…) at the few places elevation carries weight. */
+  --color-shade: rgb(45 43 43 / 0.22);
 
   /* Tonal ramps, for the odd hover/pressed step that the roles above do not
      cover. 100 = lightest. Prefer a ramp step over an ad-hoc alpha. */
