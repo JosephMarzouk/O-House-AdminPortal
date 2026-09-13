@@ -28,7 +28,7 @@ export const cn = createCn({
         'brand',
         'field',
       ],
-      radius: ['card', 'dialog', 'control', 'tile', 'header'],
+      radius: ['card', 'dialog', 'control', 'tile'],
       spacing: [
         'hairline',
         'focus',
@@ -40,7 +40,6 @@ export const cn = createCn({
         'control-lg',
         'thumb',
         'rail',
-        'header',
         'sidebar',
       ],
       container: ['dialog'],

@@ -29,7 +29,6 @@ export default async function PlacesPage() {
       <PageHeader
         kicker={fmtDate(todayInCairo(), locale)}
         title={dict.navPlaces}
-        subtitle={`${fmtNum(places.length, locale)} · ${dict.navPlaces}`}
         actions={
           <Button nativeButton={false} render={<Link href="/places/new" />}>
             <PlusIcon />

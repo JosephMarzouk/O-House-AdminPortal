@@ -1,6 +1,6 @@
 import { listDepartments } from '@/lib/db/places';
 import { getDictionary, getLocale } from '@/lib/i18n';
-import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
+import { fmtDate, todayInCairo } from '@/lib/format';
 import { DepartmentsManager } from '@/components/departments/departments-manager';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 
@@ -16,7 +16,6 @@ export default async function DepartmentsPage() {
       <PageHeader
         kicker={fmtDate(todayInCairo(), locale)}
         title={dict.navDepartments}
-        subtitle={`${fmtNum(departments.length, locale)} · ${dict.navDepartments}`}
       />
       <PageBody>
         <DepartmentsManager

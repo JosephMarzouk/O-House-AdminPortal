@@ -174,7 +174,6 @@ export default async function AssignmentsPage({
       <PageHeader
         kicker={fmtDate(todayInCairo(), locale)}
         title={dict.navAssignments}
-        subtitle={showReview ? `${dict.needsReview} · ${n(review.total)}` : undefined}
         actions={
           // nativeButton={false}: Base UI defaults to expecting a real
           // <button>, and this renders an <a>.
@@ -184,8 +183,8 @@ export default async function AssignmentsPage({
           </Button>
         }
       >
-        {/* The filter rows belong "inside the ink": status chips, then the
-            place / assignee / date controls. */}
+        {/* The filter rows belong with the title rather than in the body:
+            status chips, then the place / assignee / date controls. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           {/* Status filters are plain links: they enumerate, so they need no
               client JS at all, and Next still navigates them client-side. */}
@@ -200,7 +199,11 @@ export default async function AssignmentsPage({
                   aria-current={active ? 'page' : undefined}
                   className={cn(
                     'inline-flex h-control items-center rounded-control px-4 text-sm font-semibold transition-colors',
-                    active ? 'bg-cyan text-paper' : 'bg-paper/10 text-paper hover:bg-paper/20',
+                    // surface is the system's quiet fill — a toggle that needs
+                    // no border, so it stays inside the "no boxes" rule.
+                    active
+                      ? 'bg-cyan text-paper'
+                      : 'bg-surface text-text/70 hover:bg-text/7 hover:text-text',
                   )}
                 >
                   {s === 'all' ? dict.filterAll : dict[STATUS_LABEL[s] as keyof typeof dict]}

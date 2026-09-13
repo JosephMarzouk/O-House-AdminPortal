@@ -44,9 +44,10 @@ export default async function PortalLayout({ children }: { children: React.React
         roleLabel={isAdmin ? dict.roleAdmin : dict.roleManager}
         initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
       />
-      {/* No padding here: every page opens with the ink header block, which
-          must sit flush with the top of the viewport. The paper body brings
-          its own margins (PageBody). */}
+      {/* No padding here: PageHeader and PageBody bring their own gutters, so
+          they stay the single place the page's left edge is decided — the
+          not-authorized branch above renders them inside a different <main>
+          and has to line up with the rest. */}
       <main className="min-w-0 flex-1">{children}</main>
     </div>
   );

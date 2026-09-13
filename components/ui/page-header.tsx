@@ -1,19 +1,23 @@
 import * as React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 /**
- * The ink header block every portal page starts with — the one dark surface
- * in the system. Flush with the top of the viewport, 28px bottom corners,
- * paper text; the brand logo sits in the top-end corner, then an 11px
- * tracked kicker, the display-size title and one subtitle line.
+ * The block that opens a page: a kicker line, then the title.
  *
- * Anything that belongs "inside the ink" — a filter row, a status chip row,
- * a search field — is passed as children and sits at the bottom of the
- * block rather than below it. `actions` (a New… button) sits at the end of
- * that same row.
+ * It used to be a 140px ink slab with the logo in its top-end corner, which
+ * cost a screenful of height before any content and put the brand on every
+ * page. The brand now lives in the drawer, so this is plain paper — the same
+ * ground as the body — and the page starts at its title.
+ *
+ * The kicker carries the date on list pages and a <BackLink> on detail and
+ * create pages. A subtitle is only passed where it says something the title
+ * does not; "12 · Places" under "Places" is not that.
+ *
+ * Anything that belongs with the title rather than in the body — a filter
+ * row, a status chip — is passed as children and sits under it. `actions`
+ * (a page's one New… button) sits at the end of that same row.
  */
 function PageHeader({
   kicker,
@@ -22,7 +26,7 @@ function PageHeader({
   actions,
   children,
 }: {
-  /** A date, a section name, or a back link. */
+  /** A date, a section name, or a <BackLink>. */
   kicker: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -30,24 +34,12 @@ function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="relative flex min-h-header flex-col rounded-b-header bg-ink px-8 pt-6 pb-6 text-paper">
-      {/* width/height are next/image's intrinsic size, not a style — the
-          rendered box is size-logo from the tokens. */}
-      <Image
-        src="/owest.png"
-        alt=""
-        width={32}
-        height={32}
-        priority
-        className="absolute end-8 top-6 size-logo rounded-card"
-      />
-      <div className="pe-12">
-        <p className="text-label uppercase text-paper/60">{kicker}</p>
-        <h1 className="mt-1 text-display">{title}</h1>
-        {subtitle && <p className="mt-1 text-lg text-paper/70">{subtitle}</p>}
-      </div>
+    <header className="px-8 pt-8">
+      <p className="section-label">{kicker}</p>
+      <h1 className="mt-1 text-display">{title}</h1>
+      {subtitle && <p className="mt-1 text-lg text-text/55">{subtitle}</p>}
       {(children || actions) && (
-        <div className="mt-auto flex flex-wrap items-end gap-3 pt-6">
+        <div className="mt-6 flex flex-wrap items-end gap-3">
           {children}
           {actions && <div className="ms-auto">{actions}</div>}
         </div>
@@ -56,13 +48,14 @@ function PageHeader({
   );
 }
 
-/** A back link for the kicker slot of a detail or create page. The negative
+/** A back link for the kicker slot of a detail or create page. Cyan-dark
+ *  because it is a link on paper, where base cyan is only 3:1. The negative
  *  margin widens the hit area to the 44px minimum without moving the text. */
 function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="-my-4 inline-flex min-h-control items-center gap-1 py-4 text-label uppercase text-paper/60 transition-colors hover:text-paper"
+      className="-my-4 inline-flex min-h-control items-center gap-1 py-4 text-label uppercase text-cyan-dark transition-colors hover:text-cyan"
     >
       <ArrowLeftIcon className="size-icon-sm rtl:-scale-x-100" />
       {label}
@@ -70,7 +63,7 @@ function BackLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** The paper body under the ink block. Sections inside are separated by
+/** The body under the title block. Sections inside are separated by
  *  whitespace alone — no rules, borders or boxes. */
 function PageBody({ className, ...props }: React.ComponentProps<'div'>) {
   return <div className={cn('space-y-8 px-8 py-8', className)} {...props} />;

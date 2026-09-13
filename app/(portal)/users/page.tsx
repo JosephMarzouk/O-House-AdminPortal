@@ -2,7 +2,7 @@ import { listProfiles } from '@/lib/db/users';
 import { listDepartments } from '@/lib/db/places';
 import { getProfile } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
-import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
+import { fmtDate, todayInCairo } from '@/lib/format';
 import { UsersManager } from '@/components/users/users-manager';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import type { Role } from '@/lib/types/database';
@@ -26,11 +26,7 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader
-        kicker={kicker}
-        title={dict.navUsers}
-        subtitle={`${fmtNum(users.length, locale)} · ${dict.navUsers}`}
-      />
+      <PageHeader kicker={kicker} title={dict.navUsers} />
       <PageBody>
         <UsersManager
           dict={dict}

@@ -18,8 +18,8 @@ export type Option = { value: string; label: string };
  * Place / assignee / date filters. Status is handled by the chip links in the
  * page itself — those enumerate cleanly, these do not.
  *
- * Lives inside the ink header block, so the labels are paper-on-ink; the
- * controls keep their surface fill, which is what lifts them off the ink.
+ * Sits under the page title rather than in the body, so the labels are the
+ * same section-label as everywhere else and the controls keep their surface fill.
  *
  * The URL is the state. Current values arrive as props rather than through
  * useSearchParams: the page is already a Server Component reading
@@ -61,12 +61,11 @@ export function AssignmentFilters({
   };
 
   const hasAny = Boolean(values.status || values.site || values.who || values.from || values.to);
-  const labelClass = 'text-label uppercase text-paper/60';
 
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className="flex min-w-44 flex-col gap-1">
-        <span className={labelClass}>{labels.place}</span>
+        <span className="section-label">{labels.place}</span>
         <Select compact value={values.site ?? ''} onChange={(e) => set('site', e.target.value)}>
           <option value="">{labels.all}</option>
           {sites.map((o) => (
@@ -78,7 +77,7 @@ export function AssignmentFilters({
       </label>
 
       <label className="flex min-w-44 flex-col gap-1">
-        <span className={labelClass}>{labels.assignee}</span>
+        <span className="section-label">{labels.assignee}</span>
         <Select compact value={values.who ?? ''} onChange={(e) => set('who', e.target.value)}>
           <option value="">{labels.all}</option>
           {staff.map((o) => (
@@ -90,7 +89,7 @@ export function AssignmentFilters({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className={labelClass}>{labels.from}</span>
+        <span className="section-label">{labels.from}</span>
         <Input
           compact
           type="date"
@@ -101,7 +100,7 @@ export function AssignmentFilters({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className={labelClass}>{labels.to}</span>
+        <span className="section-label">{labels.to}</span>
         <Input
           compact
           type="date"
@@ -115,7 +114,7 @@ export function AssignmentFilters({
         <button
           type="button"
           onClick={() => router.replace('/assignments', { scroll: false })}
-          className="h-control rounded-control px-3 text-sm text-paper/80 underline underline-offset-4 transition-colors hover:text-paper"
+          className="h-control rounded-control px-3 text-sm text-cyan-dark underline underline-offset-4 transition-colors hover:text-cyan"
         >
           {labels.reset}
         </button>

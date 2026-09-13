@@ -19,7 +19,7 @@
   /* ---------- Colour, named by role. Never reach outside this list. ---------- */
   --color-*: initial;
 
-  --color-ink: #0e213f; /* the brand ground — the only dark surface, header blocks only */
+  --color-ink: #0e213f; /* the brand ground — the only dark surface: the drawer, and the login gradient */
   --color-cyan: #0088b0; /* every primary action, links, active nav, focus */
   --color-cyan-dark: #006786; /* link/paragraph text (base cyan is only 3:1 on paper), pressed primaries, "submitted" */
   --color-cyan-tint: #e9f8ff; /* tinted fills: in-progress, info banners, selected rows */
@@ -123,7 +123,6 @@
   --spacing-control-lg: 56px; /* primary buttons and text inputs */
   --spacing-thumb: 64px; /* photo evidence thumbnails */
   --spacing-rail: 64px; /* collapsed sidebar */
-  --spacing-header: 140px; /* ink header block min-height */
   --spacing-sidebar: 240px;
   --container-dialog: 440px;
 
@@ -133,7 +132,6 @@
   --radius-dialog: 4px;
   --radius-control: 16px; /* buttons, inputs, selects — matches the staff app */
   --radius-tile: 20px; /* stat tiles and floating bars: the things that float off the paper */
-  --radius-header: 28px; /* bottom corners of the ink header block only */
 
   /* ---------- The one gradient in the system. ----------
      The login ground, graded down the blue ramp from the brand ink to the
