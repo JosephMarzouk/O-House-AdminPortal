@@ -111,9 +111,13 @@ export function PortalSidebar({
       // labels and icons swapped correctly but the box never resized. Snapping
       // is honest and has no failure mode; if this ever wants animation,
       // animate a wrapper's transform, not width.
+      // rounded-e-tile rounds the edge that faces the content — the right side
+      // in English, mirrored to the left in Arabic, because `e` is the logical
+      // inline end and this codebase mirrors on `dir` alone. The outer edge
+      // stays square against the viewport.
       className={cn(
         'sticky top-0 flex h-dvh shrink-0 flex-col gap-8 self-start overflow-x-hidden overflow-y-auto',
-        'bg-ink px-3 py-6 text-paper',
+        'rounded-e-tile bg-ink px-3 py-6 text-paper',
         collapsed ? 'w-rail' : 'w-sidebar',
       )}
     >

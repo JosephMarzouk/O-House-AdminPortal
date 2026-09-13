@@ -38,7 +38,10 @@ function Tag({
     <span
       data-slot="tag"
       className={cn(
-        'inline-flex items-center gap-1 rounded-card px-2 py-tag-y text-tag whitespace-nowrap',
+        // rounded-control, not rounded-card: CSS clamps a radius to half the
+        // box, and a tag is ~19px tall, so 16px renders as a true pill while
+        // the same token stays 16px on the taller controls it was made for.
+        'inline-flex items-center gap-1 rounded-control px-2 py-tag-y text-tag whitespace-nowrap',
         '[&_svg]:size-icon-sm [&_svg]:shrink-0',
         TONES[tone],
         className,
