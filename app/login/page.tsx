@@ -22,16 +22,21 @@ export default async function LoginPage() {
           rounded-tile is the system's "floats off the paper" radius, and
           shadow-lg its heaviest — this is a modal-weight surface. */}
       <div className="w-full max-w-dialog rounded-tile bg-paper p-8 shadow-lg">
-        <Image
-          src="/owest.png"
-          alt=""
-          width={32}
-          height={32}
-          priority
-          className="size-logo rounded-card"
-        />
-        <h1 className="mt-4 text-display">{dict.appName}</h1>
-        <p className="mt-1 text-lg text-text/55">{dict.signIn}</p>
+        {/* The brand block is centred; the form below stays start-aligned,
+            because its labels sit above their fields and centring those would
+            break the reading line. */}
+        <div className="text-center">
+          <Image
+            src="/owest.png"
+            alt=""
+            width={32}
+            height={32}
+            priority
+            className="mx-auto size-logo rounded-card"
+          />
+          <h1 className="mt-4 text-display">{dict.appName}</h1>
+          <p className="mt-1 text-lg text-text/55">{dict.signIn}</p>
+        </div>
 
         <div className="mt-8">
           <LoginForm dict={dict} />

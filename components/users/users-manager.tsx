@@ -116,9 +116,13 @@ export function UsersManager({
         </div>
         <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-phone">{dict.phone}</Label>
+          {/* "+20" is decoration, exactly as the staff app shows it — the field
+              holds the 10 national digits and normalizePhone strips a pasted
+              country code anyway, so nothing downstream changes. */}
           <Input
             id="s-phone"
             dir="ltr"
+            prefix="+20"
             inputMode="numeric"
             placeholder="1012345678"
             value={phone}
