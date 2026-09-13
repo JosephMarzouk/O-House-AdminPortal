@@ -20,7 +20,7 @@ should return nothing but comments in `globals.css`.
 
 | Token | Utility | Hex | Role |
 |---|---|---|---|
-| ink | `bg-ink` | `#0E213F` | Page header block. **The only dark surface.** |
+| ink | `bg-ink` | `#0E213F` | The drawer, and the top of the login gradient. **The only dark surface.** |
 | cyan | `bg-cyan` / `text-cyan` | `#0088B0` | Every primary action, active nav, focus rings, selection. |
 | cyan-dark | `text-cyan-dark` | `#006786` | Link and accent *paragraph* text (base cyan is only 3:1 on paper), pressed primaries, "submitted". |
 | cyan-tint | `bg-cyan-tint` | `#E9F8FF` | Tinted fills: in-progress tag, info banners, selected rows. |
@@ -39,15 +39,30 @@ captions · `/50` section labels · `bg-text/8` row rules · `bg-text/4` row hov
 Full ramps (`neutral-*`, `accent-*`, `accent2-*`, 100–900) exist for the odd
 hover or pressed step; prefer a ramp step over an ad-hoc alpha.
 
+**On ink the tones invert and cyan stops working.** Measured against `#0E213F`:
+`cyan` is 3.9:1 and must never be a label there; `accent-300` is 11:1 and is the
+accent step for dark surfaces; `paper/70` is 7.6:1 and is the resting text tone.
+A solid cyan pill is not a way round it either — `paper` on `cyan` is 3.6:1.
+
 Rules: light theme only, no dark mode. Never both accents in one small
 component. No amber, orange, green or yellow — "approved" is cyan, "warning"
 is a neutral tag, "rejected/overdue" is magenta. That is the whole vocabulary.
 
 ## Type — one family
 
-Source Serif 4 (400, 600, 400 italic) with Noto Naskh Arabic behind it for
-Arabic glyphs, self-hosted from `app/fonts/`. The serif *is* the UI chrome.
-**Never add a sans-serif.**
+Cairo, the variable build (`wght` 200–1000), loaded through `next/font/google`
+in `app/fonts.ts` and self-hosted from there. One face covers Arabic, Latin and
+the Arabic-Indic digits `fmtNum` emits under `ar-EG`, so there is no fallback
+stack and no second family to keep in step. **Never add a second family.**
+
+Cairo ships no italic, and nothing in the portal sets italic. If a design ever
+wants emphasis, it is weight or colour, not a synthesised oblique.
+
+This replaced a Source Serif 4 + Noto Naskh Arabic pair that worked by per-glyph
+fallback. That pair set one mixed line in two typefaces with different weight
+axes — Latin 400/600, Arabic 400/700 — so Arabic at 600 silently resolved to
+700. A single variable axis is what fixes that, and is why the build is variable
+rather than two static weights.
 
 | Utility | Size / line / weight / tracking | Use |
 |---|---|---|
@@ -66,33 +81,37 @@ Arabic glyphs, self-hosted from `app/fonts/`. The serif *is* the UI chrome.
 | `text-field` | 12 | Form field labels, at `text/70` |
 
 Headings are flush-left. Layouts hug the left with whitespace on the right.
-Never centre a page.
+Never centre a page — login is the sole exception, and it earns it by having
+no drawer to sit beside and nothing to read down.
 
 ## Spacing, radius, elevation
 
 - **Spacing** is a 5px base: `p-1`=5, `p-2`=10, `p-3`=15, `p-4`=20, `p-6`=30,
   `p-8`=40. Already 1.25× airy — do not tighten. Named sizes: `size-icon`
   (16), `size-icon-sm` (12), `h-control` (44), `h-control-lg` (56),
-  `min-h-header` (140), `w-sidebar` (240), `w-rail` (64), `size-thumb` (64),
-  `max-w-dialog` (440).
+  `w-sidebar` (240), `w-rail` (64), `size-thumb` (64), `max-w-dialog` (440 —
+  the floating-surface width, used by dialogs *and* the login card).
 - **Radius:** `rounded-card` 2px on cards, tables, tags; `rounded-dialog` 4px;
   `rounded-control` 16px on buttons, inputs, selects, chips — the staff app's
-  one deliberate departure from flat; `rounded-tile` 20px on stat tiles and
-  floating bars; `rounded-b-header` 28px on the ink block's bottom corners only.
+  one deliberate departure from flat; `rounded-tile` 20px on the things that
+  float off the ground: stat tiles, floating bars, the login card.
 - **Shadows**, ink-tinted, only these three: `shadow-sm` (hairline lift),
-  `shadow-md` (stat tiles, floating bars), `shadow-lg` (dialogs only).
+  `shadow-md` (stat tiles, floating bars), `shadow-lg` (dialogs and the login
+  card — the two modal-weight surfaces).
 - **Control heights:** 44px minimum for anything clickable; 56px for primary
   buttons and text inputs. Inputs and selects take `compact` for 44px inside
   filter rows and table cells.
 
 ## Layout grammar — how a page is built
 
-1. **Ink header block** (`<PageHeader>`): full-width `ink`, min 140px, 28px
-   bottom corners, paper text, logo top-end. Kicker (date, section, or a
-   `<BackLink>`), display title, one subtitle line. Anything that belongs
-   "inside the ink" — filters, status chips, a search field — is passed as
-   children and sits at the bottom of the block. A page's one New… button is
-   `actions`.
+1. **Page header** (`<PageHeader>`): on the paper ground, same colour as the
+   body — the page starts at its title, with no block above it. A
+   `.section-label` kicker (today's date on list pages, a `<BackLink>` on
+   detail and create pages), then the display title. A subtitle **only when it
+   says something the title does not**: "12 · Places" under "Places" is not
+   that, but an assignment's `place · date · window` is. Anything that belongs
+   with the title rather than in the body — filters, status chips — is passed
+   as children and sits under it; a page's one New… button is `actions`.
 2. **Paper body** (`<PageBody>`): sections separated by **whitespace only**
    (`space-y-8`), never rules, borders or boxes. Section headings are
    `text-heading`; hierarchy comes from the scale and negative space.
@@ -105,13 +124,24 @@ Never centre a page.
    divider, row rules at `text/8`, hover `text/4`, selected `cyan-tint`.
    Text starts left; numbers use `text-end tabular-nums`. No zebra, no
    outer border, no fill.
-6. **Navigation**: left sidebar on paper, serif labels, active item cyan,
-   no dividers. Wordmark in serif at 18px; the logo lives in the header.
+6. **The drawer**: the portal's one dark surface, carrying the brand now that
+   the header is on paper. `ink` ground, logo and 18px wordmark at the top, no
+   dividers between items. Active row is `accent-300` on a `paper/10` wash —
+   **not** `cyan`, which is 3.9:1 there; resting rows are `paper/70`. It is
+   `sticky top-0 h-dvh`, so every icon stays on screen however far the page
+   scrolls, and `overflow-y-auto` so it scrolls itself rather than clipping on
+   a short viewport. Collapsing snaps between `w-sidebar` and `w-rail` with no
+   transition — see the comment in the component for why width is not animated.
 7. **Dialogs**: surface, 4px, `shadow-lg`, 440px, backdrop `neutral-900/50`,
    actions at the end.
 8. **Forms**: `<Label>` (12px, `text/70`) above a `<Input>`/`<Select>`
    (surface, divider border, 16px, 56px). Hover border `text/45`, focus
    border cyan, invalid via `aria-invalid` → magenta border.
+9. **Login**, the one screen with its own grammar: the system's only gradient,
+   `--gradient-login`, running down the blue ramp from `ink` through
+   `accent-900` and `accent-800` to `cyan-dark`, with a centred `max-w-dialog`
+   paper card on it at `rounded-tile` and `shadow-lg`. The card carries the
+   logo and app name, because there is no drawer here to carry them.
 
 ## Component states — themed, never browser default
 
@@ -157,12 +187,14 @@ the label, in a `<TagGroup>` so status and extended wrap together.
 
 ## Do / Don't
 
-**Do** separate sections with whitespace; set everything in the serif; use
-cyan for every interactive element and magenta only for rejected, overdue and
-destructive; keep every target ≥ 44px; write comments that say *why*.
+**Do** separate sections with whitespace; set everything in Cairo; use cyan for
+every interactive element on paper and `accent-300` for one on ink; keep magenta
+for rejected, overdue and destructive only; keep every target ≥ 44px; write
+comments that say *why*.
 
 **Don't** structure pages with boxes, borders, rules or nested cards; add a
-sans-serif, a second icon set, a dark mode, gradients, or a colour outside
-the table above; round cards past 2px or controls past 16px; tighten the
+second family, a second icon set, a dark mode, or a colour outside the table
+above; add a gradient anywhere but the login ground; centre a page other than
+login; round cards past 2px or controls past 16px; tighten the
 spacing scale; use both accents in one small component; add a dependency for
 something CSS or the existing stack already does; touch queries, RPCs or auth.
