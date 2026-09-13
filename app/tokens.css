@@ -63,13 +63,13 @@
   --color-accent2-800: #790e3d; /* destructive hover */
   --color-accent2-900: #4b1528;
 
-  /* ---------- Type. One family; the serif is the UI chrome. ---------- */
+  /* ---------- Type. One family, both scripts. ---------- */
   --font-*: initial;
-  /* Source Serif 4 carries no Arabic glyphs, so Noto Naskh sits behind it and
-     the browser picks per glyph. The two leading vars are set on <html> by
-     next/font (app/fonts.ts); the names after them are the cold-cache fallback. */
-  --font-serif: var(--font-source-serif), var(--font-noto-naskh), "Source Serif 4",
-    "Noto Naskh Arabic", system-ui, serif;
+  /* Cairo covers Arabic, Latin and Arabic-Indic digits in a single variable
+     face, so there is no per-glyph fallback and no second family to keep in
+     step. The leading var is set on <html> by next/font (app/fonts.ts); the
+     names after it are the cold-cache fallback. */
+  --font-ui: var(--font-cairo), "Cairo", system-ui, sans-serif;
 
   --text-*: initial;
   --text-display: 34px; /* page title */

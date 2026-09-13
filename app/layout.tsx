@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { sourceSerif, notoNaskh } from './fonts';
+import { cairo } from './fonts';
 import { getLocale, dir } from '@/lib/i18n';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
@@ -20,7 +20,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang={locale}
       dir={dir(locale)}
-      className={`${sourceSerif.variable} ${notoNaskh.variable} h-full antialiased`}
+      className={`${cairo.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         {children}

@@ -25,7 +25,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          fontFamily: 'var(--font-serif)',
+          fontFamily: 'var(--font-ui)',
           '--normal-bg': 'var(--color-surface)',
           '--normal-text': 'var(--color-text)',
           '--normal-border': 'var(--color-divider)',

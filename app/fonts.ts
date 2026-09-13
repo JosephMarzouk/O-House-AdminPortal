@@ -1,35 +1,22 @@
-import localFont from 'next/font/local';
+import { Cairo } from 'next/font/google';
 
 /**
- * Broadsheet's voice, self-hosted from the same TTFs the Flutter app ships
- * (plus the true italic, which the app does not carry).
+ * Cairo is the portal's only family, for both scripts.
  *
- * Source Serif 4 has no Arabic glyphs, so Noto Naskh Arabic sits behind it in
- * one stack — see --font-serif in app/tokens.css. The browser picks per glyph,
- * which is the CSS equivalent of the app's `fontFamilyFallback`. One stack
- * serves both locales; there is no per-locale branch anywhere.
+ * It replaced a Source Serif 4 + Noto Naskh Arabic pair. That pair worked by
+ * per-glyph fallback — Latin from the serif, Arabic from the Naskh — which
+ * meant a single line mixing a name and a count was set in two typefaces with
+ * different weight axes (Latin shipped 400/600, Arabic 400/700, so Arabic at
+ * 600 silently resolved to 700). Cairo covers Arabic, Latin and the
+ * Arabic-Indic digits `fmtNum` emits under ar-EG, so there is one face, one
+ * weight axis, and nothing to fall through to.
  *
- * Note the weight asymmetry carried over from the app: Latin ships 400/600,
- * Arabic ships 400/700. Arabic at 600 resolves to 700.
+ * The variable build is deliberate: every weight from one file, so 400 body
+ * and 600 headings cost no extra request. Cairo has no italic — nothing in
+ * the portal sets italic, so there is no face to miss.
  */
-
-export const sourceSerif = localFont({
-  src: [
-    { path: './fonts/SourceSerif4-Regular.ttf', weight: '400', style: 'normal' },
-    { path: './fonts/SourceSerif4-Semibold.ttf', weight: '600', style: 'normal' },
-    // Google's variable italic build (opsz, wght axes). The browser only
-    // fetches a face when something on the page is actually set in it.
-    { path: './fonts/SourceSerif4-Italic.ttf', weight: '400', style: 'italic' },
-  ],
-  variable: '--font-source-serif',
+export const cairo = Cairo({
+  subsets: ['arabic', 'latin'],
   display: 'swap',
-});
-
-export const notoNaskh = localFont({
-  src: [
-    { path: './fonts/NotoNaskhArabic-Regular.ttf', weight: '400', style: 'normal' },
-    { path: './fonts/NotoNaskhArabic-Bold.ttf', weight: '700', style: 'normal' },
-  ],
-  variable: '--font-noto-naskh',
-  display: 'swap',
+  variable: '--font-cairo',
 });
