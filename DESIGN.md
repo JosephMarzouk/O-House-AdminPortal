@@ -91,10 +91,13 @@ no drawer to sit beside and nothing to read down.
   (16), `size-icon-sm` (12), `h-control` (44), `h-control-lg` (56),
   `w-sidebar` (240), `w-rail` (64), `size-thumb` (64), `max-w-dialog` (440 —
   the floating-surface width, used by dialogs *and* the login card).
-- **Radius:** `rounded-card` 2px on cards, tables, tags; `rounded-dialog` 4px;
-  `rounded-control` 16px on buttons, inputs, selects, chips — the staff app's
-  one deliberate departure from flat; `rounded-tile` 20px on the things that
-  float off the ground: stat tiles, floating bars, the login card.
+- **Radius:** `rounded-card` 2px on cards and tables; `rounded-dialog` 4px;
+  `rounded-control` 16px on buttons, inputs, selects, chips **and status tags**
+  — the staff app's one deliberate departure from flat. CSS clamps a radius to
+  half the box, so on a ~19px tag that same 16px renders as a true pill; there
+  is no separate pill token and there should not be one. `rounded-tile` 20px on
+  the things that float off the ground: stat tiles, floating bars, the login
+  card, and the drawer's inner edge.
 - **Shadows**, ink-tinted, only these three: `shadow-sm` (hairline lift),
   `shadow-md` (stat tiles, floating bars), `shadow-lg` (dialogs and the login
   card — the two modal-weight surfaces).
@@ -125,8 +128,10 @@ no drawer to sit beside and nothing to read down.
    Text starts left; numbers use `text-end tabular-nums`. No zebra, no
    outer border, no fill.
 6. **The drawer**: the portal's one dark surface, carrying the brand now that
-   the header is on paper. `ink` ground, logo and 18px wordmark at the top, no
-   dividers between items. Active row is `accent-300` on a `paper/10` wash —
+   the header is on paper. `ink` ground, `rounded-e-tile` on the edge facing
+   the content (logical, so it mirrors on `dir`; the outer edge stays square
+   against the viewport), logo and 18px wordmark at the top, no dividers
+   between items. Active row is `accent-300` on a `paper/10` wash —
    **not** `cyan`, which is 3.9:1 there; resting rows are `paper/70`. It is
    `sticky top-0 h-dvh`, so every icon stays on screen however far the page
    scrolls, and `overflow-y-auto` so it scrolls itself rather than clipping on
@@ -171,8 +176,9 @@ its own tag beside the status, never an amber warning icon.
 | expired / overdue | transparent, 1px magenta outline | magenta | ClockCountdown |
 | extended (marker) | surface | `text/60` | ArrowsClockwise |
 
-Tag anatomy: 11px, +0.02em, 3×10px padding, 2px radius, 12px icon before
-the label, in a `<TagGroup>` so status and extended wrap together.
+Tag anatomy: 11px, +0.02em, 3×10px padding, `rounded-control` (which clamps to
+a pill at tag height), 12px icon before the label, in a `<TagGroup>` so status
+and extended wrap together.
 
 ## Vocabulary — do not "fix" these
 
