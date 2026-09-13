@@ -54,7 +54,10 @@ magenta. That is the whole vocabulary.
 ## Two themes
 
 Light and dark, switched from the drawer and stored in a `theme` cookie the
-server reads in `app/layout.tsx` to stamp `data-theme` on `<html>`. Because that
+server reads in `app/layout.tsx` to stamp `data-theme` on `<html>`. The block
+matches any element carrying that attribute, not only `:root`, so a single
+subtree can opt into dark while the document stays light — which is how the
+login screen is dark for everybody. Because that
 is server-rendered, the right theme is in the first byte of HTML: no flash, no
 blocking inline script, and no `next-themes`.
 
@@ -145,8 +148,10 @@ no drawer to sit beside and nothing to read down.
 - **Spacing** is a 5px base: `p-1`=5, `p-2`=10, `p-3`=15, `p-4`=20, `p-6`=30,
   `p-8`=40. Already 1.25× airy — do not tighten. Named sizes: `size-icon`
   (16), `size-icon-sm` (12), `h-control` (44), `h-control-lg` (56),
-  `w-sidebar` (240), `w-rail` (64), `size-thumb` (64), `max-w-dialog` (440 —
-  the floating-surface width, used by dialogs *and* the login card).
+  `w-sidebar` (240), `w-rail` (64), `size-thumb` (64), `size-logo` (32, beside
+  a wordmark), `size-logo-lg` (72, standing alone on the login card),
+  `max-w-dialog` (440 — the floating-surface width, used by dialogs *and* the
+  login card).
 - **Radius:** `rounded-card` 2px on cards and tables; `rounded-dialog` 4px;
   `rounded-control` 16px on buttons, inputs, selects, chips **and status tags**
   — the staff app's one deliberate departure from flat. CSS clamps a radius to
@@ -198,11 +203,16 @@ no drawer to sit beside and nothing to read down.
 8. **Forms**: `<Label>` (12px, `text/70`) above a `<Input>`/`<Select>`
    (surface, divider border, 16px, 56px). Hover border `text/45`, focus
    border cyan, invalid via `aria-invalid` → magenta border.
-9. **Login**, the one screen with its own grammar: the system's only gradient,
-   `--gradient-login`, running down the blue ramp from `ink` through
-   `accent-900` and `accent-800` to `cyan-dark`, with a centred `max-w-dialog`
-   paper card on it at `rounded-tile` and `shadow-lg`. The card carries the
-   logo and app name, because there is no drawer here to carry them.
+9. **Login**, the one screen with its own grammar and the one screen that is
+   **dark for everybody**: the system's only gradient, `--gradient-login`,
+   running down the blue ramp from `ink` through `accent-900` and `accent-800`
+   to `cyan-dark`, with a centred `max-w-dialog` `raised` card on it at
+   `rounded-tile` and `shadow-lg`. The card carries the mark at `size-logo-lg`
+   with the wordmark at `text-title` under it, because there is no drawer here
+   to carry them. It opts in with `data-theme="dark"` on its own `<main>` —
+   plus `text-text` on the same element, because `<body>` sets `color` outside
+   that subtree and inheritance would otherwise carry the root theme's ink in.
+   **Anything set outside a scoped palette has to be set again inside it.**
 
 ## Component states — themed, never browser default
 
