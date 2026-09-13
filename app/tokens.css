@@ -135,6 +135,20 @@
   --radius-tile: 20px; /* stat tiles and floating bars: the things that float off the paper */
   --radius-header: 28px; /* bottom corners of the ink header block only */
 
+  /* ---------- The one gradient in the system. ----------
+     The login ground, graded down the blue ramp from the brand ink to the
+     link cyan. It lives here as a whole value rather than as from-/via-/to-
+     utilities because Tailwind carries a single `via` stop and this needs
+     two. --gradient-* is not a Tailwind namespace so it generates no utility;
+     `@theme static` emits it anyway, the same mechanism the charts rely on. */
+  --gradient-login: linear-gradient(
+    to bottom,
+    var(--color-ink) 0%,
+    var(--color-accent-900) 34%,
+    var(--color-accent-800) 67%,
+    var(--color-cyan-dark) 100%
+  );
+
   /* ---------- Elevation. Ink-tinted; only these three. ---------- */
   --shadow-*: initial;
   --shadow-sm: 0 1px 2px rgb(45 43 43 / 0.14);
