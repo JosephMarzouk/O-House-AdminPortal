@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -21,9 +22,14 @@ import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 export const SIDEBAR_COOKIE = 'sidebar';
 
 /**
- * Navigation on paper, in the serif, with the active item in cyan and no
- * dividers anywhere — the ink is reserved for each page's header block, so
- * the sidebar stays quiet and the header carries the brand.
+ * The drawer carries the brand: it is the one dark surface in the portal,
+ * and the logo sits at its top. Pages used to open with an ink header block
+ * doing that job; this took it over when the header moved onto the paper.
+ *
+ * On ink, base cyan is only 3.9:1 — it cannot be the active label. accent-300
+ * is 11:1 and is a ramp step rather than an ad-hoc alpha, so it is the accent
+ * tone for this surface. The active row also gets a faint paper wash, so the
+ * state does not rest on colour alone.
  */
 export function PortalSidebar({
   dict,
@@ -71,28 +77,71 @@ export function PortalSidebar({
       'flex min-h-control items-center gap-3 rounded-control px-3 text-base transition-colors',
       '[&_svg]:size-icon [&_svg]:shrink-0',
       collapsed && 'justify-center px-0',
-      active ? 'font-semibold text-cyan' : 'text-text/70 hover:bg-text/7 hover:text-text',
+      active
+        ? 'bg-paper/10 font-semibold text-accent-300'
+        : 'text-paper/70 hover:bg-paper/7 hover:text-paper',
     );
 
   return (
     <aside
-      // Width snaps between two token widths with no transition. Animating
-      // width here left the element stuck at its previous size — the labels
-      // and icons swapped correctly but the box never resized. Snapping is
-      // honest and has no failure mode; if this ever wants animation, animate
-      // a wrapper's transform, not width.
+      // Four classes do the pinning, in order:
+      //
+      // h-dvh    — the one that matters. The parent is `flex min-h-dvh`, and
+      //   its default stretch would otherwise give this a height equal to the
+      //   whole page, leaving sticky nothing to pin. Stretch only applies to an
+      //   auto height, so an explicit one releases it. Measured in the browser:
+      //   after scrolling 1500px the aside sits at top 0, bottom 900 on a 900px
+      //   viewport.
+      // self-start — belt and braces. h-dvh already defeats stretch, so this
+      //   changes nothing today; it keeps the pin working if the height is ever
+      //   relaxed to auto or a min-height.
+      // sticky top-0 — so every nav icon stays on screen however far the page
+      //   scrolls, which is the whole point.
+      // overflow-y-auto — replaces a blanket overflow-hidden. The clipping was
+      //   only ever needed horizontally, for labels during the width snap; left
+      //   vertical it would cut off the bottom rows on a short viewport, which
+      //   is exactly the failure this is meant to prevent. Now the drawer
+      //   scrolls itself only when the viewport is genuinely too short for it.
+      //
+      // No ancestor sets overflow (the flex row, body and html are all clean),
+      // so sticky resolves against the viewport. Do not add one.
+      //
+      // Width still snaps between two token widths with no transition.
+      // Animating width here left the element stuck at its previous size — the
+      // labels and icons swapped correctly but the box never resized. Snapping
+      // is honest and has no failure mode; if this ever wants animation,
+      // animate a wrapper's transform, not width.
       className={cn(
-        'flex shrink-0 flex-col gap-8 overflow-hidden bg-paper px-3 py-6',
+        'sticky top-0 flex h-dvh shrink-0 flex-col gap-8 self-start overflow-x-hidden overflow-y-auto',
+        'bg-ink px-3 py-6 text-paper',
         collapsed ? 'w-rail' : 'w-sidebar',
       )}
     >
-      {/* Wordmark in the serif — the logo itself lives in the ink header. */}
+      {/* The logo and the wordmark together are the brand block. Collapsed,
+          the logo stands alone — an initial beside it would be redundant —
+          so the link needs an explicit name to replace the one the wordmark
+          was giving it. */}
       <Link
         href="/"
-        className={cn('block min-w-0 px-3 text-ink', collapsed && 'px-0 text-center')}
+        aria-label={dict.appName}
+        className={cn('flex min-w-0 items-center gap-3 px-3', collapsed && 'justify-center px-0')}
       >
-        <div className="truncate text-brand">{collapsed ? dict.appName.slice(0, 1) : dict.appName}</div>
-        {!collapsed && <div className="truncate text-caption text-text/55">{dict.appSubtitle}</div>}
+        {/* width/height are next/image's intrinsic size, not a style — the
+            rendered box is size-logo from the tokens. */}
+        <Image
+          src="/owest.png"
+          alt=""
+          width={32}
+          height={32}
+          priority
+          className="size-logo shrink-0 rounded-card"
+        />
+        {!collapsed && (
+          <div className="min-w-0">
+            <div className="truncate text-brand">{dict.appName}</div>
+            <div className="truncate text-caption text-paper/55">{dict.appSubtitle}</div>
+          </div>
+        )}
       </Link>
 
       <nav className="flex flex-col">
@@ -124,7 +173,7 @@ export function PortalSidebar({
         {!collapsed && (
           <div className="mb-2 min-w-0 px-3">
             <div className="truncate text-sm font-semibold">{userName}</div>
-            <div className="truncate text-caption text-text/55">{roleLabel}</div>
+            <div className="truncate text-caption text-paper/55">{roleLabel}</div>
           </div>
         )}
 
