@@ -84,7 +84,7 @@ export function ReviewBar({
   if (!canReview && !canExtend) return null;
 
   return (
-    <div className="sticky bottom-6 flex flex-wrap items-center gap-2 rounded-tile bg-raised p-4 shadow-md">
+    <div className="sticky bottom-6 flex flex-wrap items-center gap-2 rounded-tile bg-raised p-4 shadow-md shadow-(color:--color-shade)">
       {canReview && (
         <>
           <Button disabled={pending} onClick={() => run(() => approveAssignment(assignmentId))}>

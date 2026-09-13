@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getProfile, canUsePortal } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
+import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
 import { SignOutButton } from '@/components/sign-out-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
@@ -43,6 +44,7 @@ export default async function PortalLayout({ children }: { children: React.React
         userName={profile.name}
         roleLabel={isAdmin ? dict.roleAdmin : dict.roleManager}
         initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
+        initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
       />
       {/* No padding here: PageHeader and PageBody bring their own gutters, so
           they stay the single place the page's left edge is decided — the

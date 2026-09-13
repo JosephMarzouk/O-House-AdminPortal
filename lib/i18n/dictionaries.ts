@@ -37,6 +37,10 @@ export const dictionaries = {
     navDepartments: 'الأقسام',
     collapseSidebar: 'طي القائمة',
     expandSidebar: 'توسيع القائمة',
+    // The label names where the button takes you, not where you are — the
+    // same rule the language button follows.
+    themeDark: 'الوضع الداكن',
+    themeLight: 'الوضع الفاتح',
 
     // dashboard
     dashboardScope: 'الأرقام دي بتغطي الموظفين اللي أنت مسؤول عنهم بس.',
@@ -206,6 +210,8 @@ export const dictionaries = {
     navDepartments: 'Departments',
     collapseSidebar: 'Collapse menu',
     expandSidebar: 'Expand menu',
+    themeDark: 'Dark mode',
+    themeLight: 'Light mode',
 
     dashboardScope: 'These figures cover only the staff you manage.',
     last30Days: 'Last 30 days',

@@ -9,12 +9,13 @@ import {
   WarningIcon,
 } from '@/components/icons';
 
-/** Toasts on the surface fill, in the serif, with Phosphor icons. Light only —
- *  there is no theme to read. */
+/** Toasts on the surface fill, with Phosphor icons. The ground and text come
+ *  from tokens, so they follow the theme on their own; `theme` is still passed
+ *  through from the root layout because sonner paints its own close button and
+ *  its success/error variants from that flag. */
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="light"
       className="toaster group"
       icons={{
         success: <StatusApprovedIcon className="size-icon" />,

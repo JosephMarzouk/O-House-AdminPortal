@@ -21,7 +21,7 @@ export default async function LoginPage() {
       {/* paper, not surface: the page ground floating above the gradient.
           rounded-tile is the system's "floats off the paper" radius, and
           shadow-lg its heaviest — this is a modal-weight surface. */}
-      <div className="w-full max-w-dialog rounded-tile bg-raised p-8 shadow-lg">
+      <div className="w-full max-w-dialog rounded-tile bg-raised p-8 shadow-lg shadow-(color:--color-shade)">
         {/* The brand block is centred; the form below stays start-aligned,
             because its labels sit above their fields and centring those would
             break the reading line. */}

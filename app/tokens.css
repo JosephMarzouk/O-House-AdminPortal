@@ -165,5 +165,59 @@
   --shadow-*: initial;
   --shadow-sm: 0 1px 2px rgb(45 43 43 / 0.14);
   --shadow-md: 0 3px 10px rgb(45 43 43 / 0.16); /* stat tiles, floating bars */
-  --shadow-lg: 0 12px 32px rgb(45 43 43 / 0.22); /* dialogs only */
+  --shadow-lg: 0 12px 32px rgb(45 43 43 / 0.22); /* dialogs and the login card */
+}
+
+/* ===================================================================
+   The dark theme.
+
+   Plain CSS, not a second @theme block: Tailwind compiles every colour
+   utility to `var(--color-…)` and every alpha to a color-mix over the
+   same var, so redefining the variables here re-skins the entire app —
+   the Recharts strings in components/charts/chart-theme.ts included —
+   without a single `dark:` variant anywhere.
+
+   :root[data-theme='dark'] is (0,2,0) against @theme's :root (0,1,0),
+   so it wins on specificity and source order does not matter.
+
+   WHICH TOKENS APPEAR HERE IS THE WHOLE RULE:
+     a fill is invariant, text on a ground flips.
+   ink, cyan, on-brand and every ramp step are absent on purpose. The
+   drawer is ink in both themes and everything inside it is invariant,
+   so it renders identically either way — that is by design, not an
+   oversight.
+   =================================================================== */
+:root[data-theme='dark'] {
+  /* The elevation ladder. Each rung sits above the last, and the drawer
+     keeps ink, so the page has to go below it:
+       paper #050d1a  →  ink #0e213f  →  surface #16294a  →  raised #1a2f52 */
+  --color-paper: #050d1a; /* the page ground, now the darkest thing on screen */
+  --color-surface: #16294a; /* input fill, cards, table header ground */
+  --color-raised: #1a2f52; /* stat tiles, the review bar, dialogs, the login card */
+  --color-text: #e8ebf0; /* 16.3:1 on the page ground */
+  --color-divider: rgb(232 235 240 / 0.16); /* the same 16% rule, inverted */
+
+  /* Text roles. cyan-dark and magenta exist because base cyan and magenta
+     are unreadable on paper; on a dark ground the problem inverts and the
+     fix is the opposite end of each ramp. */
+  --color-cyan-dark: #99e0ff; /* links and accent text — 13.4:1 (was 2.2:1) */
+  --color-magenta: #ff90b1; /* alarm text — 9.2:1 (was 2.5:1) */
+
+  /* Tints, and the text that sits on them. */
+  --color-cyan-tint: #0d2f42;
+  --color-magenta-tint: #3a1020;
+  --color-magenta-deep: #ffc0d0; /* 10.8:1 on the tint above */
+
+  /* Ink-tinted shadows vanish on a dark ground, so the tint goes to black
+     and deepens. See the note on --color-shade: this variable alone does
+     not reach the shadow utilities. */
+  --color-shade: rgb(0 0 0 / 0.55);
+
+  /* Native <select> popups, date and time pickers, spinners and scrollbars
+     are painted by the browser, not by us. Without this they stay white. */
+  color-scheme: dark;
+}
+
+:root {
+  color-scheme: light;
 }

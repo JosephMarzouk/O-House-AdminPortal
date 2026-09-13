@@ -21,7 +21,10 @@
  */
 export const SERIES = 'var(--color-cyan)';
 export const LATE = 'var(--color-magenta)';
-export const AXIS = 'var(--color-neutral-700)';
+/** Axis ink. A mix of the body text rather than a fixed grey from the ramp:
+ *  a ramp step is an absolute value and would stay dark when the page goes
+ *  dark, where it disappears. This follows the theme, as CURSOR already does. */
+export const AXIS = 'color-mix(in oklab, var(--color-text) 60%, transparent)';
 export const GRID = 'var(--color-divider)';
 export const CURSOR = 'color-mix(in oklab, var(--color-text) 6%, transparent)';
 

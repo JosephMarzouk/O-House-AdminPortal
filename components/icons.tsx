@@ -16,11 +16,13 @@ import {
   Info,
   Key,
   MapPin,
+  Moon,
   PaperPlaneTilt,
   PencilSimple,
   Plus,
   SidebarSimple,
   SignOut,
+  Sun,
   Translate,
   Trash,
   Users,
@@ -54,10 +56,12 @@ export const HouseIcon = duotone(House);
 export const InfoIcon = duotone(Info);
 export const KeyIcon = duotone(Key);
 export const MapPinIcon = duotone(MapPin);
+export const MoonIcon = duotone(Moon);
 export const PencilIcon = duotone(PencilSimple);
 export const PlusIcon = duotone(Plus);
 export const SidebarIcon = duotone(SidebarSimple);
 export const SignOutIcon = duotone(SignOut);
+export const SunIcon = duotone(Sun);
 export const SpinnerIcon = duotone(CircleNotch);
 export const TranslateIcon = duotone(Translate);
 export const TrashIcon = duotone(Trash);

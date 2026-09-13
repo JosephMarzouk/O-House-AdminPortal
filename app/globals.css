@@ -13,9 +13,12 @@
     line-height: var(--text-base--line-height);
   }
 
-  /* Themed focus on every focusable element, never the browser's blue ring. */
+  /* Themed focus on every focusable element, never the browser's blue ring.
+     cyan-dark rather than base cyan: the ring has to work on paper, on the ink
+     drawer and on the dark page, and base cyan is only 3.0:1 on paper and
+     3.9:1 on ink. cyan-dark is 5.7:1 on paper and flips to 13:1 on dark. */
   :focus-visible {
-    outline: var(--spacing-focus) solid var(--color-cyan);
+    outline: var(--spacing-focus) solid var(--color-cyan-dark);
     outline-offset: var(--spacing-focus);
   }
 

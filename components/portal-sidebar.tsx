@@ -16,7 +16,9 @@ import {
 } from '@/components/icons';
 import { createClient } from '@/lib/supabase/client';
 import { setLocale } from '@/lib/actions/locale';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import type { Theme } from '@/lib/theme';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
 export const SIDEBAR_COOKIE = 'sidebar';
@@ -38,6 +40,7 @@ export function PortalSidebar({
   userName,
   roleLabel,
   initialCollapsed,
+  initialTheme,
 }: {
   dict: Dictionary;
   locale: Locale;
@@ -45,6 +48,7 @@ export function PortalSidebar({
   userName: string;
   roleLabel: string;
   initialCollapsed: boolean;
+  initialTheme: Theme;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -191,6 +195,13 @@ export function PortalSidebar({
           <TranslateIcon />
           {!collapsed && <span className="truncate">{dict.language}</span>}
         </button>
+
+        <ThemeToggle
+          initialTheme={initialTheme}
+          collapsed={collapsed}
+          className={rowClass(false)}
+          labels={{ dark: dict.themeDark, light: dict.themeLight }}
+        />
 
         <button
           type="button"

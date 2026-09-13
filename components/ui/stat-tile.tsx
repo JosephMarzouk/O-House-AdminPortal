@@ -12,7 +12,7 @@ function StatTile({ label, value, alarm }: { label: string; value: string; alarm
   return (
     <div
       className={cn(
-        'rounded-tile p-4 shadow-md',
+        'rounded-tile p-4 shadow-md shadow-(color:--color-shade)',
         alarm ? 'bg-magenta-tint text-magenta-deep' : 'bg-raised text-text',
       )}
     >
