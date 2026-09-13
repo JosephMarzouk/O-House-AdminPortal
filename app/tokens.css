@@ -132,7 +132,8 @@
   --spacing-tag-y: 3px;
   --spacing-icon-sm: 12px; /* inside tags */
   --spacing-icon: 16px; /* everywhere else */
-  --spacing-logo: 32px;
+  --spacing-logo: 32px; /* beside a wordmark: the drawer */
+  --spacing-logo-lg: 72px; /* standing alone as the hero: the login card */
   --spacing-control: 44px; /* the minimum for anything clickable */
   --spacing-control-lg: 56px; /* primary buttons and text inputs */
   --spacing-thumb: 64px; /* photo evidence thumbnails */
@@ -177,8 +178,10 @@
    the Recharts strings in components/charts/chart-theme.ts included —
    without a single `dark:` variant anywhere.
 
-   :root[data-theme='dark'] is (0,2,0) against @theme's :root (0,1,0),
-   so it wins on specificity and source order does not matter.
+   Both selectors are (0,2,0) against @theme's :root (0,1,0), so they win
+   on specificity and source order does not matter. The second one is what
+   lets a single subtree opt into dark while the document stays light —
+   the login screen uses it, since it is dark for everybody.
 
    WHICH TOKENS APPEAR HERE IS THE WHOLE RULE:
      a fill is invariant, text on a ground flips.
@@ -187,7 +190,8 @@
    so it renders identically either way — that is by design, not an
    oversight.
    =================================================================== */
-:root[data-theme='dark'] {
+:root[data-theme='dark'],
+[data-theme='dark']:not(:root) {
   /* The elevation ladder. Each rung sits above the last, and the drawer
      keeps ink, so the page has to go below it:
        paper #050d1a  →  ink #0e213f  →  surface #16294a  →  raised #1a2f52 */

@@ -36,6 +36,7 @@ export const cn = createCn({
         'icon-sm',
         'icon',
         'logo',
+        'logo-lg',
         'control',
         'control-lg',
         'thumb',
