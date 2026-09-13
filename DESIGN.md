@@ -27,10 +27,13 @@ should return nothing but comments in `globals.css`.
 | magenta | `bg-magenta` / `text-magenta` | `#AA0B56` | **Reserved.** Rejected, expired/overdue, destructive, errors. Nothing else. |
 | magenta-tint | `bg-magenta-tint` | `#FFF1F4` | Ground for the overdue tile and error banners. |
 | magenta-deep | `text-magenta-deep` | `#4B1528` | Text sitting on magenta-tint. |
-| paper | `bg-paper` / `text-paper` | `#F3F2F2` | Every page ground; also the text on ink and on solid cyan/magenta. |
-| surface | `bg-surface` | `#EAE9E9` | Input fill, cards. |
+| paper | `bg-paper` | `#F3F2F2` | The page ground. |
+| surface | `bg-surface` | `#EAE9E9` | Input fill, cards, table header ground. |
+| raised | `bg-raised` | `#F3F2F2` | A panel floating *above* the page: stat tiles, the review bar, dialogs, the login card. |
+| on-brand | `text-on-brand` | `#F3F2F2` | Text and icons sitting **on** an ink, cyan or magenta fill. |
 | text | `text-text` | `#201E1D` | Body ink. |
 | divider | `border-divider` | text @ 16% | Hairlines, input borders. |
+| shade | `shadow-(color:--color-shade)` | ink @ 22% | The shadow tint. See the shadow note below — it is not optional decoration. |
 
 Derived tones are always `text` at an alpha, never a grey hex:
 `text-text/70` field labels · `/60` table headers, pending tags · `/55`
@@ -44,9 +47,62 @@ hover or pressed step; prefer a ramp step over an ad-hoc alpha.
 accent step for dark surfaces; `paper/70` is 7.6:1 and is the resting text tone.
 A solid cyan pill is not a way round it either — `paper` on `cyan` is 3.6:1.
 
-Rules: light theme only, no dark mode. Never both accents in one small
-component. No amber, orange, green or yellow — "approved" is cyan, "warning"
-is a neutral tag, "rejected/overdue" is magenta. That is the whole vocabulary.
+Rules: never both accents in one small component. No amber, orange, green or
+yellow — "approved" is cyan, "warning" is a neutral tag, "rejected/overdue" is
+magenta. That is the whole vocabulary.
+
+## Two themes
+
+Light and dark, switched from the drawer and stored in a `theme` cookie the
+server reads in `app/layout.tsx` to stamp `data-theme` on `<html>`. Because that
+is server-rendered, the right theme is in the first byte of HTML: no flash, no
+blocking inline script, and no `next-themes`.
+
+Dark is defined in one plain CSS block at the foot of `app/tokens.css`. Nothing
+else was needed, because every colour utility Tailwind emits is a `var()`
+reference and every alpha a `color-mix` over the same var. **There is not a
+single `dark:` variant in this codebase, and there should never be one** — if a
+colour needs to change with the theme, it needs a token, not a variant.
+
+**The rule that decides whether a token belongs in the dark block: a fill is
+invariant, text on a ground flips.** `ink`, `cyan`, `on-brand` and every ramp
+step are deliberately absent from it. That is what makes the drawer render
+identically in both themes — it is ink either way, so everything inside it uses
+invariant tokens.
+
+| Role | Light | Dark | Why |
+|---|---|---|---|
+| `paper` | `#F3F2F2` | `#050D1A` | The page ground goes *below* the drawer so ink still reads as raised. |
+| `surface` | `#EAE9E9` | `#16294A` | |
+| `raised` | `#F3F2F2` | `#1A2F52` | On light a tile floats by shadow alone; on dark a shadow cannot separate two dark blues, so tone has to. |
+| `text` | `#201E1D` | `#E8EBF0` | 16.3:1 on the dark ground. |
+| `divider` | text @ 16% | `#E8EBF0` @ 16% | Same 16% rule, inverted. |
+| `cyan-dark` | `#006786` | `#99E0FF` | Link and accent text. The reason this token exists — base cyan is unreadable on paper — inverts on dark, and the fix is the other end of the ramp. 13.4:1. |
+| `magenta` | `#AA0B56` | `#FF90B1` | Alarm text, same inversion. 9.2:1. |
+| `cyan-tint` | `#E9F8FF` | `#0D2F42` | |
+| `magenta-tint` | `#FFF1F4` | `#3A1020` | |
+| `magenta-deep` | `#4B1528` | `#FFC0D0` | The text on the tint above. |
+| `shade` | ink @ 22% | black @ 55% | |
+
+The dark elevation ladder, darkest first:
+`paper #050D1A` → `ink #0E213F` (the drawer) → `surface #16294A` → `raised #1A2F52`.
+
+Two things the palette alone does not reach:
+
+- **`color-scheme`** is set in both blocks. Native `<select>` popups, date and
+  time pickers, spinners and scrollbars are painted by the browser, not by us,
+  and would otherwise stay white on a dark page.
+- **Shadows do not read their token.** `shadow-md` compiles to
+  `--tw-shadow: 0 3px 10px var(--tw-shadow-color, #2d2b2b29)` with the hex
+  inlined at build time, so redefining `--shadow-md` in the dark block does
+  nothing at all. The `var(--tw-shadow-color, …)` fallback is the way in: pair
+  the shadow with `shadow-(color:--color-shade)`. Done at the four places
+  elevation carries weight — stat tiles, the review bar, dialogs, the login card.
+
+Ramp steps are absolute values and are never themed. That also means a ramp step
+must never stand in for a role: the chart axis used to be
+`var(--color-neutral-700)` and stayed dark on a dark page. It is now a
+`color-mix` of `text`.
 
 ## Type — one family
 
@@ -180,6 +236,12 @@ Tag anatomy: 11px, +0.02em, 3×10px padding, `rounded-control` (which clamps to
 a pill at tag height), 12px icon before the label, in a `<TagGroup>` so status
 and extended wrap together.
 
+The solid tones name their fill by ramp step — `bg-accent-700` for submitted,
+`bg-accent2-700` for rejected — rather than by role. A ramp step is an absolute
+value, so the fill stays put in dark mode while the `cyan-dark` and `magenta`
+*text* roles flip out from under it. Their labels are `text-on-brand`, which is
+invariant for the same reason.
+
 ## Vocabulary — do not "fix" these
 
 - The table is `submissions`; the concept is an **assignment/round**. Label
@@ -195,12 +257,13 @@ and extended wrap together.
 
 **Do** separate sections with whitespace; set everything in Cairo; use cyan for
 every interactive element on paper and `accent-300` for one on ink; keep magenta
-for rejected, overdue and destructive only; keep every target ≥ 44px; write
-comments that say *why*.
+for rejected, overdue and destructive only; reach for a token when a colour has
+to follow the theme; keep every target ≥ 44px; write comments that say *why*.
 
 **Don't** structure pages with boxes, borders, rules or nested cards; add a
-second family, a second icon set, a dark mode, or a colour outside the table
-above; add a gradient anywhere but the login ground; centre a page other than
-login; round cards past 2px or controls past 16px; tighten the
-spacing scale; use both accents in one small component; add a dependency for
-something CSS or the existing stack already does; touch queries, RPCs or auth.
+second family, a second icon set, or a colour outside the table above; write a
+`dark:` variant — the token flips instead; let a ramp step stand in for a role;
+add a gradient anywhere but the login ground; centre a page other than login;
+round cards past 2px or controls past 16px; tighten the spacing scale; use both
+accents in one small component; add a dependency for something CSS or the
+existing stack already does; touch queries, RPCs or auth.
