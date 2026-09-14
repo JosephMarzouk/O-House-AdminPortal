@@ -24,7 +24,7 @@ export async function createClient() {
             );
           } catch {
             // Called from a Server Component, where cookies are read-only.
-            // middleware.ts refreshes the session, so this is safe to ignore.
+            // proxy.ts refreshes the session, so this is safe to ignore.
           }
         },
       },

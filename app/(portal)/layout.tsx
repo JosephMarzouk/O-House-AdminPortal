@@ -15,12 +15,12 @@ export default async function PortalLayout({ children }: { children: React.React
     cookies(),
   ]);
 
-  // middleware already bounced anonymous traffic; this catches the case where
+  // the proxy already bounced anonymous traffic; this catches the case where
   // a session exists but the profiles row does not — the state that
   // current_role() returning 'none' now guards against server-side.
   if (!profile) redirect('/login');
 
-  // Role gate lives here, not in middleware: reading profiles.role on the edge
+  // Role gate lives here, not in the proxy: reading profiles.role on the edge
   // would mean a query per request, including every asset.
   if (!canUsePortal(profile.role)) {
     return (
