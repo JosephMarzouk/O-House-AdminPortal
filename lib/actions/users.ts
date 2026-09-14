@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfile } from '@/lib/auth';
 import { normalizePhone, phoneToLoginEmail, phoneToE164 } from '@/lib/phone';
-import type { Role } from '@/lib/types/database';
+import { isStaffRole, type Role, type StaffRole } from '@/lib/types/database';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -18,6 +18,12 @@ function friendly(message: string): string {
 }
 
 export async function setUserRole(targetUserId: string, newRole: Role): Promise<ActionResult> {
+  // isStaffRole is the real guard, not the <select> that omits 'admin': a
+  // Server Action is reachable by direct POST whatever the UI offers. And it
+  // has to sit on promotion as well as creation — promotion is creation by
+  // another route, so banning one without the other closes nothing.
+  if (!isStaffRole(newRole)) return { ok: false, error: 'role_not_allowed' };
+
   const supabase = await createClient();
   const { error } = await supabase.rpc('set_user_role', {
     target_user_id: targetUserId,
@@ -64,15 +70,18 @@ export async function setUserManager(
  * login_screen.dart caps its field at 10 digits, prepends +20 and strips the
  * '+', so the account must exist as exactly 20<10 digits>@ohouse.internal.
  *
- * Deliberately does NOT write email/role/phone afterwards: handle_new_user()
- * already derives phone from the synthetic address, sets role 'cleaner', and
- * blanks profiles.email ("never store the disguise"). The old edge function
- * overwrote all three, which is why accounts it created could not log in.
+ * Deliberately does NOT write email or phone afterwards: handle_new_user()
+ * already derives phone from the synthetic address and blanks profiles.email
+ * ("never store the disguise"). The old edge function overwrote both, which is
+ * why accounts it created could not log in. The role is the one field we do
+ * set, because the trigger's default ('cleaner') is a guess about a choice the
+ * admin just made explicitly.
  */
 export async function createStaff(input: {
   name: string;
   phone: string;
   password: string;
+  role: StaffRole;
 }): Promise<ActionResult> {
   const caller = await getProfile();
   if (caller?.role !== 'admin') return { ok: false, error: 'not_authorized' };
@@ -81,6 +90,7 @@ export async function createStaff(input: {
   if (digits.length !== 10) return { ok: false, error: 'phone_invalid' };
   if (input.password.length < MIN_PASSWORD) return { ok: false, error: 'password_too_short' };
   if (!input.name.trim()) return { ok: false, error: 'fields_required' };
+  if (!isStaffRole(input.role)) return { ok: false, error: 'role_not_allowed' };
 
   let admin;
   try {
@@ -114,19 +124,26 @@ export async function createStaff(input: {
       name: input.name.trim(),
       email: '',
       phone: phoneToE164(digits),
-      role: 'cleaner',
+      role: input.role,
     });
   }
 
+  // Role rides along with the must_change_password write rather than in a
+  // second round trip — the trigger has already set 'cleaner' by now either
+  // way, so this is a correction in both the trigger-fired and fallback paths.
+  //
   // ponytail: must_change_password defaults true, but the app's forced-change
   // screen only started calling complete_password_change() in an unreleased
   // build — on the shipped build it raises 42501 and traps the user in a loop.
   // Ceiling: the admin's chosen password persists until the user changes it.
   // Flip this to leave the flag true once that app build is deployed.
-  await admin
+  const { error: roleErr } = await admin
     .from('profiles')
-    .update({ must_change_password: false })
+    .update({ must_change_password: false, role: input.role })
     .eq('id', created.user.id);
+  // The account exists at this point; reporting success while it carries the
+  // wrong role would leave an inspector quietly filed as a cleaner.
+  if (roleErr) return { ok: false, error: friendly(roleErr.message) };
 
   revalidatePath('/users');
   return { ok: true };

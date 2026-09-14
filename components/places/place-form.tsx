@@ -53,7 +53,13 @@ export function PlaceForm({
         router.push('/places');
         router.refresh();
       } else {
-        toast.error(res.error === 'fields_required' ? dict.fieldsRequired : dict.errorGeneric);
+        toast.error(
+          res.error === 'fields_required'
+            ? dict.fieldsRequired
+            : res.error === 'nothing_changed'
+              ? dict.nothingChanged
+              : dict.errorGeneric,
+        );
       }
     });
   }

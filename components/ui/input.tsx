@@ -38,6 +38,7 @@ function Input({
   className,
   compact,
   prefix,
+  suffix,
   dir,
   ...props
 }: Omit<React.ComponentProps<'input'>, 'prefix'> & {
@@ -48,10 +49,16 @@ function Input({
    * Decoration only: it never becomes part of the input's value.
    */
   prefix?: React.ReactNode;
+  /**
+   * The same slot after the value. Unlike `prefix` this is NOT aria-hidden,
+   * because the only thing that has ever wanted to sit here is a control — a
+   * reveal toggle — and hiding it would put it out of reach of a screen reader.
+   */
+  suffix?: React.ReactNode;
 }) {
   const height = compact ? 'h-control' : 'h-control-lg';
 
-  if (prefix === undefined) {
+  if (prefix === undefined && suffix === undefined) {
     return (
       <InputPrimitive
         data-slot="input"
@@ -71,15 +78,18 @@ function Input({
       dir={dir}
       className={cn(fieldClass, wrappedStateClass, height, 'flex items-center gap-1', className)}
     >
-      <span aria-hidden className="shrink-0 select-none text-text/55">
-        {prefix}
-      </span>
+      {prefix !== undefined && (
+        <span aria-hidden className="shrink-0 select-none text-text/55">
+          {prefix}
+        </span>
+      )}
       <InputPrimitive
         data-slot="input"
         dir={dir}
         className="h-full w-full min-w-0 border-0 bg-transparent p-0 text-base text-text outline-none placeholder:text-text/65 disabled:cursor-not-allowed"
         {...props}
       />
+      {suffix !== undefined && <span className="shrink-0">{suffix}</span>}
     </span>
   );
 }

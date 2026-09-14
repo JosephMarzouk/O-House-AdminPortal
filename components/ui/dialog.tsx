@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 
 /**
  * Broadsheet dialog: surface ground, 4px radius, the large shadow (its only
- * use), 440px wide, over an ink-tinted 50% backdrop. Actions sit at the end
- * of the footer with no rule or fill above them — whitespace does the work.
+ * use), 440px wide, over an ink-tinted 50% backdrop that blurs the page behind
+ * it. Actions sit at the end of the footer with no rule or fill above them —
+ * whitespace does the work.
  */
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
@@ -28,7 +29,11 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-neutral-900/50 duration-100',
+        // The blur is the tint's partner, not decoration: a dialog that holds
+        // a password should leave nothing legible behind it to shoulder-surf.
+        // Backdrop-filter is not universal — where it is unsupported the 50%
+        // tint alone still carries the separation, so nothing is lost.
+        'fixed inset-0 z-50 bg-neutral-900/50 backdrop-blur-sm duration-100',
         'data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
         className,
       )}

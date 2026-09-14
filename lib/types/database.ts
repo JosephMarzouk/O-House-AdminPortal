@@ -295,6 +295,24 @@ export type Database = {
 /** profiles.role. `cleaner` and `inspector` are identical at the DB level. */
 export type Role = 'admin' | 'manager' | 'inspector' | 'cleaner';
 
+/**
+ * The roles the portal may hand out. `admin` is deliberately absent: an admin
+ * is the account that can mint accounts, so minting one from inside the portal
+ * would let a single compromised session escalate itself permanently. New
+ * admins are made in the Supabase dashboard, by someone holding the project
+ * keys — a deliberately slower, better-witnessed path.
+ *
+ * Lives here rather than in lib/actions/users.ts because a 'use server' module
+ * may export nothing but async functions, and both the guard and the <select>
+ * need to read the same list.
+ */
+export const STAFF_ROLES = ['manager', 'inspector', 'cleaner'] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export function isStaffRole(role: string): role is StaffRole {
+  return (STAFF_ROLES as readonly string[]).includes(role);
+}
+
 /** submissions.status — the five CHECK-legal stored values. */
 export type AssignmentStatus = 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
 

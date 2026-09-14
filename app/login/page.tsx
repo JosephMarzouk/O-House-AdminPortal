@@ -1,4 +1,4 @@
-import Image from 'next/image';
+import { BrandMark } from '@/components/brand-mark';
 import { getDictionary } from '@/lib/i18n';
 import { LoginForm } from '@/components/login-form';
 
@@ -40,19 +40,10 @@ export default async function LoginPage() {
             stays start-aligned, because its labels sit above their fields and
             centring those would break the reading line. */}
         <div className="text-center">
-          {/* width/height are next/image's intrinsic size — the source is
-              292×267, so passing its real ratio stops next/image squashing it.
-              The rendered box is size-logo-lg from the tokens, and
-              object-contain keeps the mark's own proportions inside it.
-              No rounded-card: the artwork carries its own silhouette. */}
-          <Image
-            src="/owest.png"
-            alt=""
-            width={292}
-            height={267}
-            priority
-            className="mx-auto size-logo-lg object-contain"
-          />
+          {/* Drawn, not loaded: the PNG this replaced had the navy ground
+              baked in, which showed as a square against the card. The mark
+              takes its colour from text-text on the main above. */}
+          <BrandMark className="mx-auto size-logo-lg" />
           <h1 className="mt-4 text-title">{dict.appName}</h1>
           <p className="mt-1 text-base text-text/55">{dict.signIn}</p>
         </div>

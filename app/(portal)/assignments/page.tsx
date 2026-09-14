@@ -16,6 +16,7 @@ import { fmtDate, fmtNum, fmtWindow, todayInCairo } from '@/lib/format';
 import { StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
+import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
 import type { Assignment, EffectiveStatus } from '@/lib/types/database';
 import {
@@ -140,9 +141,10 @@ export default async function AssignmentsPage({
         <TableCell>
           <Link
             href={`/assignments/${a.id}`}
-            className="font-semibold text-cyan-dark hover:underline"
+            className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
           >
             {title || dict.none}
+            <LinkPending />
           </Link>
           {place && <div className="text-caption text-text/55">{place}</div>}
         </TableCell>
@@ -177,9 +179,14 @@ export default async function AssignmentsPage({
         actions={
           // nativeButton={false}: Base UI defaults to expecting a real
           // <button>, and this renders an <a>.
-          <Button nativeButton={false} render={<Link href="/assignments/new" />}>
+          <Button
+            className="relative"
+            nativeButton={false}
+            render={<Link href="/assignments/new" />}
+          >
             <PlusIcon />
             {dict.newAssignment}
+            <LinkPending />
           </Button>
         }
       >
@@ -198,7 +205,7 @@ export default async function AssignmentsPage({
                   scroll={false}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-control items-center rounded-control px-4 text-sm font-semibold transition-colors',
+                    'relative inline-flex h-control items-center rounded-control px-4 text-sm font-semibold transition-colors',
                     // surface is the system's quiet fill — a toggle that needs
                     // no border, so it stays inside the "no boxes" rule.
                     active
@@ -207,6 +214,7 @@ export default async function AssignmentsPage({
                   )}
                 >
                   {s === 'all' ? dict.filterAll : dict[STATUS_LABEL[s] as keyof typeof dict]}
+                  <LinkPending />
                 </Link>
               );
             })}

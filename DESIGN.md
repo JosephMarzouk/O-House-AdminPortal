@@ -198,8 +198,12 @@ no drawer to sit beside and nothing to read down.
    scrolls, and `overflow-y-auto` so it scrolls itself rather than clipping on
    a short viewport. Collapsing snaps between `w-sidebar` and `w-rail` with no
    transition — see the comment in the component for why width is not animated.
-7. **Dialogs**: surface, 4px, `shadow-lg`, 440px, backdrop `neutral-900/50`,
-   actions at the end.
+7. **Dialogs**: surface, 4px, `shadow-lg`, 440px, backdrop `neutral-900/50`
+   plus `backdrop-blur-sm`, actions at the end. The blur is the one place
+   Broadsheet asks the browser for an effect rather than a colour: a dialog can
+   hold a password, and a tint alone still leaves the page behind it legible.
+   Where `backdrop-filter` is unsupported the tint carries the separation on
+   its own, so nothing depends on it.
 8. **Forms**: `<Label>` (12px, `text/70`) above a `<Input>`/`<Select>`
    (surface, divider border, 16px, 56px). Hover border `text/45`, focus
    border cyan, invalid via `aria-invalid` → magenta border.

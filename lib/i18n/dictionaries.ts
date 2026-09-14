@@ -108,6 +108,9 @@ export const dictionaries = {
     edit: 'تعديل',
     remove: 'حذف',
     confirmDelete: 'هل أنت متأكد من الحذف؟',
+    // A write that reported success having touched zero rows — almost always
+    // a permission the account lost, or a row someone else already removed.
+    nothingChanged: 'لم يتم تغيير أي شيء. حدّث الصفحة وحاول مرة أخرى.',
     saved: 'تم الحفظ',
     errorGeneric: 'حدث خطأ. حاول مرة أخرى.',
     optional: 'اختياري',
@@ -185,6 +188,18 @@ export const dictionaries = {
     noDepartment: 'بدون قسم',
     staffCreated: 'تم إنشاء الحساب',
     passwordTooShort: 'كلمة المرور ٨ أحرف على الأقل.',
+    showPassword: 'إظهار كلمة المرور',
+    hidePassword: 'إخفاء كلمة المرور',
+    // The portal never creates admins — see STAFF_ROLES in lib/types/database.
+    roleNotAllowed: 'لا يمكن منح صلاحية المدير من لوحة الإدارة.',
+    resetPassword: 'تعيين كلمة مرور جديدة',
+    newPassword: 'كلمة المرور الجديدة',
+    // Names the person, because the key icon sits in a long row of identical
+    // icons and the wrong row is the whole risk.
+    resetPasswordFor: 'تعيين كلمة مرور جديدة لـ {name}',
+    resetPasswordConfirm: 'هل تريد تعيين كلمة المرور الجديدة لـ {name}؟ لن يستطيع الدخول إلا بها.',
+    passwordReset: 'تم تغيير كلمة المرور',
+    confirm: 'تأكيد',
     adminOnly: 'هذه الصفحة للمديرين فقط.',
     serviceKeyMissing: 'مفتاح الخدمة غير مضبوط — أضف SUPABASE_SERVICE_ROLE_KEY في .env.local.',
     loginEmailPreview: 'بريد الدخول',
@@ -275,6 +290,9 @@ export const dictionaries = {
     edit: 'Edit',
     remove: 'Delete',
     confirmDelete: 'Delete this?',
+    // A write that reported success having touched zero rows — almost always
+    // a permission the account lost, or a row someone else already removed.
+    nothingChanged: 'Nothing was changed. Refresh the page and try again.',
     saved: 'Saved',
     errorGeneric: 'Something went wrong. Try again.',
     optional: 'optional',
@@ -348,6 +366,18 @@ export const dictionaries = {
     noDepartment: 'No department',
     staffCreated: 'Account created',
     passwordTooShort: 'Password must be at least 8 characters.',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    // The portal never creates admins — see STAFF_ROLES in lib/types/database.
+    roleNotAllowed: 'The admin role cannot be granted from the portal.',
+    resetPassword: 'Set a new password',
+    newPassword: 'New password',
+    // Names the person, because the key icon sits in a long row of identical
+    // icons and the wrong row is the whole risk.
+    resetPasswordFor: 'Set a new password for {name}',
+    resetPasswordConfirm: 'Set this new password for {name}? They will only be able to sign in with it.',
+    passwordReset: 'Password changed',
+    confirm: 'Confirm',
     adminOnly: 'This page is for admins only.',
     serviceKeyMissing: 'Service key not set — add SUPABASE_SERVICE_ROLE_KEY to .env.local.',
     loginEmailPreview: 'Login email',

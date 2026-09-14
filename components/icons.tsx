@@ -12,6 +12,8 @@ import {
   Clock,
   ClockCountdown,
   DotsThree,
+  Eye,
+  EyeSlash,
   House,
   Info,
   Key,
@@ -52,6 +54,8 @@ export const CameraIcon = duotone(Camera);
 export const CaretDownIcon = duotone(CaretDown);
 export const CheckIcon = duotone(Check);
 export const ClipboardIcon = duotone(ClipboardText);
+export const EyeIcon = duotone(Eye);
+export const EyeSlashIcon = duotone(EyeSlash);
 export const HouseIcon = duotone(House);
 export const InfoIcon = duotone(Info);
 export const KeyIcon = duotone(Key);

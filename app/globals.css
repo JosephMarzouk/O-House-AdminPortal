@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 @import "./tokens.css";
 
-/* Broadsheet base. Light theme only — the staff app ships one palette and
-   the portal follows it, so there is no dark block to drift out of sync. */
+/* Broadsheet base. Two themes: the light palette is the @theme block in
+   tokens.css, the dark one the [data-theme='dark'] block under it. */
 @layer base {
   body {
     background: var(--color-paper);
@@ -31,5 +31,61 @@
   /* The 11px uppercase tracked label that names a section or a table column. */
   .section-label {
     @apply text-label uppercase text-text/50;
+  }
+
+  /* The navigation-pending dot, rendered by <LinkPending /> inside a <Link>.
+     Plain CSS rather than utilities because the whole trick is the 100ms
+     animation-delay, which no utility expresses: the dot starts invisible and
+     only fades in if the navigation is actually slow, so an instant one never
+     flashes. Straight from Next's useLinkStatus docs.
+
+     One deviation from that recipe: absolute, not inline-block. An inline dot
+     would reserve width, and the sidebar rail is 64px with a centred icon —
+     visibility:hidden still takes the space and would shove it off centre. */
+  .link-hint {
+    position: absolute;
+    inset-inline-end: 8px;
+    top: 50%;
+    translate: 0 -50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .link-hint.is-pending {
+    visibility: visible;
+    animation-name: link-hint-in, link-hint-pulse;
+    animation-duration: 200ms, 1s;
+    animation-delay: 100ms, 100ms;
+    animation-timing-function: ease, ease-in-out;
+    animation-iteration-count: 1, infinite;
+    animation-fill-mode: forwards, none;
+  }
+
+  @keyframes link-hint-in {
+    to {
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes link-hint-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  /* The dot still has to appear — it is the information, not decoration — but
+     the part that repeats forever is what reduced-motion is asking about. */
+  @media (prefers-reduced-motion: reduce) {
+    .link-hint.is-pending {
+      animation-name: link-hint-in;
+      animation-duration: 200ms;
+      animation-delay: 100ms;
+      animation-iteration-count: 1;
+      animation-fill-mode: forwards;
+    }
   }
 }

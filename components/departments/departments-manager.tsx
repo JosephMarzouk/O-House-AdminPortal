@@ -101,7 +101,11 @@ export function DepartmentsManager({
                           } else {
                             // Postgres refuses while staff or places still
                             // reference this department — show why.
-                            toast.error(res.error);
+                            toast.error(
+                              res.error === 'nothing_changed'
+                                ? dict.nothingChanged
+                                : res.error,
+                            );
                           }
                         });
                       }}

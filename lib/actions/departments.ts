@@ -21,8 +21,16 @@ export async function deleteDepartment(id: string): Promise<ActionResult> {
   // profiles.department_id and templates.department_id are plain references
   // with no ON DELETE, so Postgres refuses while anything still points here.
   // Surfacing that beats silently orphaning a department's staff.
-  const { error } = await supabase.from('departments').delete().eq('id', id);
+  //
+  // The .select() catches the quieter failure: an RLS-blocked DELETE comes
+  // back as zero rows and no error, which would otherwise read as success.
+  const { data: deleted, error } = await supabase
+    .from('departments')
+    .delete()
+    .eq('id', id)
+    .select('id');
   if (error) return { ok: false, error: error.message };
+  if (!deleted?.length) return { ok: false, error: 'nothing_changed' };
   revalidatePath('/departments');
   return { ok: true };
 }

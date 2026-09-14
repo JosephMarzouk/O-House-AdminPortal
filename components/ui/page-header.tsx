@@ -1,6 +1,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@/components/icons';
+import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
 
 /**
@@ -55,10 +56,14 @@ function BackLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="-my-4 inline-flex min-h-control items-center gap-1 py-4 text-label uppercase text-cyan-dark transition-colors hover:text-cyan"
+      // relative anchors <LinkPending />'s dot; the negative end inset puts it
+      // just past the label rather than inside it, so no padding is needed and
+      // nothing about the existing hit area moves.
+      className="relative -my-4 inline-flex min-h-control items-center gap-1 py-4 text-label uppercase text-cyan-dark transition-colors [&_.link-hint]:-end-2 hover:text-cyan"
     >
       <ArrowLeftIcon className="size-icon-sm rtl:-scale-x-100" />
       {label}
+      <LinkPending />
     </Link>
   );
 }

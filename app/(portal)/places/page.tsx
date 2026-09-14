@@ -6,6 +6,7 @@ import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { DeletePlaceButton } from '@/components/places/delete-place-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
+import { LinkPending } from '@/components/ui/link-pending';
 import {
   Table,
   TableBody,
@@ -30,9 +31,10 @@ export default async function PlacesPage() {
         kicker={fmtDate(todayInCairo(), locale)}
         title={dict.navPlaces}
         actions={
-          <Button nativeButton={false} render={<Link href="/places/new" />}>
+          <Button className="relative" nativeButton={false} render={<Link href="/places/new" />}>
             <PlusIcon />
             {dict.newPlace}
+            <LinkPending />
           </Button>
         }
       />
@@ -59,9 +61,10 @@ export default async function PlacesPage() {
                     <TableCell>
                       <Link
                         href={`/places/${p.id}`}
-                        className="font-semibold text-cyan-dark hover:underline"
+                        className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
                       >
                         {bilingual(locale, p.title_ar, p.title_en) || dict.none}
+                        <LinkPending />
                       </Link>
                       {/* A place with no site twin can never be assigned:
                           create_assignment requires p_site_id. */}

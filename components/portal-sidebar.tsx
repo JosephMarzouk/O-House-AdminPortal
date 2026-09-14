@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -17,6 +16,8 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { setLocale } from '@/lib/actions/locale';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { BrandMark } from '@/components/brand-mark';
+import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
 import type { Theme } from '@/lib/theme';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
@@ -78,7 +79,9 @@ export function PortalSidebar({
 
   const rowClass = (active: boolean) =>
     cn(
-      'flex min-h-control items-center gap-3 rounded-control px-3 text-base transition-colors',
+      // relative anchors <LinkPending />'s dot, which is absolute so it costs
+      // no width in the collapsed rail.
+      'relative flex min-h-control items-center gap-3 rounded-control px-3 text-base transition-colors',
       '[&_svg]:size-icon [&_svg]:shrink-0',
       collapsed && 'justify-center px-0',
       active
@@ -134,16 +137,9 @@ export function PortalSidebar({
         aria-label={dict.appName}
         className={cn('flex min-w-0 items-center gap-3 px-3', collapsed && 'justify-center px-0')}
       >
-        {/* width/height are next/image's intrinsic size, not a style — the
-            rendered box is size-logo from the tokens. */}
-        <Image
-          src="/owest.png"
-          alt=""
-          width={32}
-          height={32}
-          priority
-          className="size-logo shrink-0 rounded-card"
-        />
+        {/* No rounded-card any more: the mark is drawn in currentColor, so
+            there is no longer a box to round off. */}
+        <BrandMark className="size-logo shrink-0" />
         {!collapsed && (
           <div className="min-w-0">
             <div className="truncate text-brand">{dict.appName}</div>
@@ -172,6 +168,7 @@ export function PortalSidebar({
             >
               <Icon />
               {!collapsed && <span className="truncate">{label}</span>}
+              <LinkPending />
             </Link>
           );
         })}

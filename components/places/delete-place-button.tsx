@@ -29,7 +29,7 @@ export function DeletePlaceButton({ id, dict }: { id: string; dict: Dictionary }
             toast.success(dict.saved);
             router.refresh();
           } else {
-            toast.error(res.error);
+            toast.error(res.error === 'nothing_changed' ? dict.nothingChanged : res.error);
           }
         });
       }}
