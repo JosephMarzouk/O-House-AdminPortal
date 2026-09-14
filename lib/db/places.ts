@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import type { Department, Site, Template, TemplateItem } from '@/lib/types/database';
+import type { Department, Site, Template } from '@/lib/types/database';
 
 /**
  * A "place" is a row in `templates`: the location staff get assigned to, plus
@@ -13,28 +13,10 @@ import type { Department, Site, Template, TemplateItem } from '@/lib/types/datab
  * place means passing BOTH ids through.
  */
 
-/** templates.items is jsonb with its shape documented only in a comment.
- *  Parse defensively: a malformed row should cost one item, not the page. */
-export function templateItems(items: unknown): TemplateItem[] {
-  if (!Array.isArray(items)) return [];
-  return items.flatMap((raw): TemplateItem[] => {
-    if (!raw || typeof raw !== 'object') return [];
-    const o = raw as Record<string, unknown>;
-    return [
-      {
-        id: typeof o.id === 'string' ? o.id : crypto.randomUUID(),
-        text_en: typeof o.text_en === 'string' ? o.text_en : '',
-        text_ar: typeof o.text_ar === 'string' ? o.text_ar : '',
-        type:
-          o.type === 'pass_fail' || o.type === 'yesno' || o.type === 'text' || o.type === 'number'
-            ? o.type
-            : 'yesno',
-        critical: o.critical === true,
-        requires_photo: o.requires_photo === true,
-      },
-    ];
-  });
-}
+// templateItems moved to lib/template-items.ts — a pure parser that needs to
+// be importable without the server Supabase client this module creates.
+// Re-exported so the five existing import sites did not have to move.
+export { templateItems } from '@/lib/template-items';
 
 export async function listPlaces(): Promise<Template[]> {
   const supabase = await createClient();

@@ -1,7 +1,8 @@
 /**
  * Self-check for the pure rules the portal cannot get wrong: storage path
- * resolution, the phone -> login-email transform, and the dashboard's
- * lateness/date-bucket arithmetic.
+ * resolution, the phone -> login-email transform, the dashboard's
+ * lateness/date-bucket arithmetic, and the template-item parser that guards
+ * what savePlace is allowed to store.
  * Run: pnpm check
  */
 import assert from 'node:assert/strict';
@@ -9,6 +10,7 @@ import { mediaUrl, mediaUrls } from '../lib/media';
 import { normalizePhone, isValidPhone, phoneToLoginEmail, phoneToE164 } from '../lib/phone';
 import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
 import { todayInCairo } from '../lib/format';
+import { templateItems } from '../lib/template-items';
 import type { Assignment } from '../lib/types/database';
 
 const BASE = 'https://ptonujazlljpkgpfrkpw.supabase.co/storage/v1/object/public/checklist-media';
@@ -103,4 +105,43 @@ assert.equal(new Set(dst).size, WINDOW_DAYS, 'no day lost across a DST boundary'
 assert.equal(todayInCairo(new Date('2026-09-11T22:30:00Z')), '2026-09-12');
 assert.equal(todayInCairo(new Date('2026-09-12T09:00:00Z')), '2026-09-12');
 
-console.log('ok — media + phone + dashboard rules hold');
+// --- template items ------------------------------------------------------
+// This parser guards a write as well as a read: savePlace runs caller input
+// through it before storing, so it is the whitelist standing between an HTTP
+// endpoint and a jsonb column the phone app reads unguarded.
+
+// Junk in the array costs the item, not the page.
+assert.deepEqual(templateItems(null), []);
+assert.deepEqual(templateItems('nope'), []);
+assert.deepEqual(templateItems([null, 'x', 42]), []);
+
+// An id that is already a uuid survives — assignment_items and actions store
+// itemId references against it, so regenerating one orphans past work.
+const keep = templateItems([{ id: 'b2e1c0de-0000-4000-8000-000000000000', text_ar: 'س' }]);
+assert.equal(keep[0].id, 'b2e1c0de-0000-4000-8000-000000000000');
+
+// A NEW subtask arrives from emptyItem() with id '' and must be given a real
+// one. The obvious `typeof o.id === 'string'` test passes an empty string
+// through, which would store several items all sharing an id of ''.
+const fresh = templateItems([{ id: '' }, { id: '' }]);
+assert.notEqual(fresh[0].id, '', 'a blank id must be replaced, not kept');
+assert.notEqual(fresh[0].id, fresh[1].id, 'two new items must not share an id');
+
+// Unknown keys are dropped and unknown types fall back — the whole point of
+// running writes through this rather than spreading the caller's object.
+const [clean] = templateItems([
+  { id: 'x', text_en: 'Mop', type: 'sql-injection', critical: 'yes', evil: { deep: [1, 2] } },
+]);
+assert.deepEqual(Object.keys(clean).sort(), [
+  'critical',
+  'id',
+  'requires_photo',
+  'text_ar',
+  'text_en',
+  'type',
+]);
+assert.equal(clean.type, 'yesno', 'an unrecognised type falls back');
+assert.equal(clean.critical, false, "the string 'yes' is not true");
+assert.equal(clean.text_ar, '');
+
+console.log('ok — media + phone + dashboard + template-item rules hold');
