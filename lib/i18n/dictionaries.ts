@@ -111,6 +111,8 @@ export const dictionaries = {
     // A write that reported success having touched zero rows — almost always
     // a permission the account lost, or a row someone else already removed.
     nothingChanged: 'لم يتم تغيير أي شيء. حدّث الصفحة وحاول مرة أخرى.',
+    // Postgres refuses the delete while staff or places still point here.
+    stillReferenced: 'لا يمكن الحذف: ما زال مستخدمًا من قبل موظفين أو أماكن.',
     saved: 'تم الحفظ',
     errorGeneric: 'حدث خطأ. حاول مرة أخرى.',
     optional: 'اختياري',
@@ -179,6 +181,7 @@ export const dictionaries = {
     phone: 'رقم الهاتف',
     phoneHint: '١٠ أرقام بدون الصفر — مثال 1012345678',
     phoneInvalid: 'رقم الهاتف يجب أن يكون ١٠ أرقام.',
+    phoneTaken: 'هذا الرقم مسجل بالفعل على حساب آخر.',
     role: 'الدور',
     changeRole: 'تغيير الدور',
     changeDepartment: 'تغيير القسم',
@@ -293,6 +296,8 @@ export const dictionaries = {
     // A write that reported success having touched zero rows — almost always
     // a permission the account lost, or a row someone else already removed.
     nothingChanged: 'Nothing was changed. Refresh the page and try again.',
+    // Postgres refuses the delete while staff or places still point here.
+    stillReferenced: 'Cannot delete: staff or places still use this.',
     saved: 'Saved',
     errorGeneric: 'Something went wrong. Try again.',
     optional: 'optional',
@@ -357,6 +362,7 @@ export const dictionaries = {
     phone: 'Phone number',
     phoneHint: '10 digits, no leading zero — e.g. 1012345678',
     phoneInvalid: 'The phone number must be exactly 10 digits.',
+    phoneTaken: 'That number already belongs to another account.',
     role: 'Role',
     changeRole: 'Change role',
     changeDepartment: 'Change department',

@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { templateItems } from '@/lib/db/places';
 import type { TemplateItem } from '@/lib/types/database';
+import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type { ActionResult };
 
 export type PlaceInput = {
   id?: string;
@@ -36,7 +38,13 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
   const supabase = await createClient();
   const nameAr = input.nameAr.trim();
   const nameEn = input.nameEn.trim();
-  const items = input.items.map((i) => ({ ...i, id: i.id || crypto.randomUUID() }));
+  // templateItems, not a spread of `input.items`. The parameter is typed
+  // TemplateItem[], but a Server Action is an HTTP endpoint and TypeScript is
+  // gone by the time this runs — a spread persists whatever keys the caller
+  // sent, verbatim, into a jsonb column the phone app reads without a guard of
+  // its own. The read-side parser is already the whitelist; run writes through
+  // it too, so only the six known fields can ever land in the column.
+  const items = templateItems(input.items);
 
   if (input.id) {
     const { data: existing, error: readErr } = await supabase
@@ -44,7 +52,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       .select('site_id')
       .eq('id', input.id)
       .maybeSingle();
-    if (readErr) return { ok: false, error: readErr.message };
+    if (readErr) return { ok: false, error: toErrorCode(readErr.message) };
 
     const { data: updated, error } = await supabase
       .from('templates')
@@ -56,7 +64,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       })
       .eq('id', input.id)
       .select('id');
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: toErrorCode(error.message) };
     if (!updated?.length) return { ok: false, error: 'nothing_changed' };
 
     if (existing?.site_id) {
@@ -65,7 +73,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
         .update({ name_ar: nameAr, name_en: nameEn })
         .eq('id', existing.site_id)
         .select('id');
-      if (siteErr) return { ok: false, error: siteErr.message };
+      if (siteErr) return { ok: false, error: toErrorCode(siteErr.message) };
       // A template that renamed while its twin site did not is the exact drift
       // migration 0007 had to clean up — surface it rather than bank it.
       if (!site?.length) return { ok: false, error: 'nothing_changed' };
@@ -78,7 +86,9 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       .insert({ name_ar: nameAr, name_en: nameEn })
       .select('id')
       .single();
-    if (siteErr || !site) return { ok: false, error: siteErr?.message ?? 'site_insert_failed' };
+    if (siteErr || !site) {
+      return { ok: false, error: toErrorCode(siteErr?.message ?? 'site_insert_failed') };
+    }
 
     const { error } = await supabase.from('templates').insert({
       title_ar: nameAr,
@@ -87,7 +97,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       site_id: site.id,
       items,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: toErrorCode(error.message) };
   }
 
   revalidatePath('/places');
@@ -103,7 +113,7 @@ export async function deletePlace(id: string): Promise<ActionResult> {
     .delete()
     .eq('id', id)
     .select('id');
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   if (!deleted?.length) return { ok: false, error: 'nothing_changed' };
   revalidatePath('/places');
   return { ok: true };

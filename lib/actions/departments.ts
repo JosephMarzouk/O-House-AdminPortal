@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type { ActionResult };
 
 export async function createDepartment(nameAr: string, nameEn: string): Promise<ActionResult> {
   if (!nameAr.trim() && !nameEn.trim()) return { ok: false, error: 'fields_required' };
@@ -11,7 +12,7 @@ export async function createDepartment(nameAr: string, nameEn: string): Promise<
   const { error } = await supabase
     .from('departments')
     .insert({ name_ar: nameAr.trim(), name_en: nameEn.trim() });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   revalidatePath('/departments');
   return { ok: true };
 }
@@ -29,7 +30,7 @@ export async function deleteDepartment(id: string): Promise<ActionResult> {
     .delete()
     .eq('id', id)
     .select('id');
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   if (!deleted?.length) return { ok: false, error: 'nothing_changed' };
   revalidatePath('/departments');
   return { ok: true };

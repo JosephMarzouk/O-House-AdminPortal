@@ -7,6 +7,7 @@ import { TrashIcon } from '@/components/icons';
 import { deletePlace } from '@/lib/actions/places';
 import { Button } from '@/components/ui/button';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
+import { errorMessage } from '@/lib/errors';
 
 /** Ghost in the row so the table stays quiet; the magenta text is the
  *  destructive marker, and confirm() is the gate. */
@@ -29,7 +30,7 @@ export function DeletePlaceButton({ id, dict }: { id: string; dict: Dictionary }
             toast.success(dict.saved);
             router.refresh();
           } else {
-            toast.error(res.error === 'nothing_changed' ? dict.nothingChanged : res.error);
+            toast.error(errorMessage(dict, res.error));
           }
         });
       }}

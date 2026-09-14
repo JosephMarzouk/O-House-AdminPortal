@@ -19,19 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { AssignmentItem, EffectiveStatus } from '@/lib/types/database';
-
-/** Server actions return short codes; turn them into the user's language. */
-function message(dict: Dictionary, code: string): string {
-  const map: Record<string, string> = {
-    not_authorized: dict.notAuthorized,
-    reason_required: dict.reasonRequired,
-    no_items_selected: dict.noItemsSelected,
-    not_in_submitted_state: dict.notInSubmittedState,
-    already_closed: dict.alreadyClosed,
-    deadline_must_be_future: dict.deadlineMustBeFuture,
-  };
-  return map[code] ?? dict.errorGeneric;
-}
+import { errorMessage } from '@/lib/errors';
 
 /**
  * The review actions as a floating bar — paper, 20px radius, the mid shadow —
@@ -76,7 +64,7 @@ export function ReviewBar({
         done?.();
         router.refresh();
       } else {
-        toast.error(message(dict, res.error));
+        toast.error(errorMessage(dict, res.error));
       }
     });
   }

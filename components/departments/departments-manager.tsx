@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
+import { errorMessage } from '@/lib/errors';
 
 export type DepartmentRow = { id: string; nameAr: string; nameEn: string };
 
@@ -48,7 +49,7 @@ export function DepartmentsManager({
               setNameEn('');
               router.refresh();
             } else {
-              toast.error(res.error === 'fields_required' ? dict.fieldsRequired : res.error);
+              toast.error(errorMessage(dict, res.error));
             }
           });
         }}
@@ -100,12 +101,10 @@ export function DepartmentsManager({
                             router.refresh();
                           } else {
                             // Postgres refuses while staff or places still
-                            // reference this department — show why.
-                            toast.error(
-                              res.error === 'nothing_changed'
-                                ? dict.nothingChanged
-                                : res.error,
-                            );
+                            // reference this department. That is now the
+                            // still_referenced code rather than the driver's
+                            // own sentence, which named the constraint.
+                            toast.error(errorMessage(dict, res.error));
                           }
                         });
                       }}

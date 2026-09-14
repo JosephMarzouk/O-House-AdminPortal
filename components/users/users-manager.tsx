@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import { STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
+import { errorMessage } from '@/lib/errors';
 
 export type UserRow = {
   id: string;
@@ -101,15 +102,7 @@ export function UsersManager({
       router.refresh();
       return;
     }
-    const map: Record<string, string> = {
-      not_authorized: dict.notAuthorized,
-      phone_invalid: dict.phoneInvalid,
-      password_too_short: dict.passwordTooShort,
-      fields_required: dict.fieldsRequired,
-      service_key_missing: dict.serviceKeyMissing,
-      role_not_allowed: dict.roleNotAllowed,
-    };
-    toast.error(map[res.error] ?? res.error);
+    toast.error(errorMessage(dict, res.error));
   }
 
   /** Drops the typed password on the way out, whichever way the dialog was

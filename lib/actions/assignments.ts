@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
 /**
  * Every write goes through a SECURITY DEFINER RPC. This is not a style
@@ -10,15 +11,14 @@ import { createClient } from '@/lib/supabase/server';
  * affect zero rows rather than erroring.
  */
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type { ActionResult };
 
-/** The RPCs raise plain Postgres exceptions. Map the ones a user can cause;
- *  let anything else through rather than swallowing it into "went wrong". */
+/** The RPCs raise plain Postgres exceptions. This one is worth its own
+ *  message; the rest go through the shared mapper, which ends at
+ *  'error_generic' rather than handing the driver's string to the browser. */
 function friendly(message: string): string {
-  if (/Only admins/i.test(message)) return 'not_authorized';
   if (/New deadline must be in the future/i.test(message)) return 'deadline_must_be_future';
-  if (/permission denied/i.test(message)) return 'not_authorized';
-  return message;
+  return toErrorCode(message);
 }
 
 export type NewAssignmentInput = {

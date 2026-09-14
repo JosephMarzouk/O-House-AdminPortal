@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
+import { errorMessage } from '@/lib/errors';
 
 export type DepartmentOption = { id: string; nameAr: string; nameEn: string };
 
@@ -53,13 +54,7 @@ export function PlaceForm({
         router.push('/places');
         router.refresh();
       } else {
-        toast.error(
-          res.error === 'fields_required'
-            ? dict.fieldsRequired
-            : res.error === 'nothing_changed'
-              ? dict.nothingChanged
-              : dict.errorGeneric,
-        );
+        toast.error(errorMessage(dict, res.error));
       }
     });
   }

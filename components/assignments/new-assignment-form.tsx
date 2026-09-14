@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
+import { errorMessage } from '@/lib/errors';
 
 export type PlaceOption = {
   id: string;
@@ -139,15 +140,7 @@ export function NewAssignmentForm({
         router.refresh();
         return;
       }
-      toast.error(
-        res.error === 'fields_required'
-          ? dict.fieldsRequired
-          : res.error === 'need_at_least_one_subtask'
-            ? dict.needAtLeastOneSubtask
-            : res.error === 'not_authorized'
-              ? dict.notAuthorized
-              : res.error,
-      );
+      toast.error(errorMessage(dict, res.error));
     });
   }
 
