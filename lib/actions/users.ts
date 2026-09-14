@@ -6,16 +6,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getProfile } from '@/lib/auth';
 import { normalizePhone, phoneToLoginEmail, phoneToE164 } from '@/lib/phone';
 import { isStaffRole, type Role, type StaffRole } from '@/lib/types/database';
+import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+export type { ActionResult };
 
 const MIN_PASSWORD = 8; // matches set_password_screen.dart's own rule
-
-function friendly(message: string): string {
-  if (/Only admins/i.test(message) || /permission denied/i.test(message)) return 'not_authorized';
-  if (/already registered|already been registered/i.test(message)) return 'phone_taken';
-  return message;
-}
 
 export async function setUserRole(targetUserId: string, newRole: Role): Promise<ActionResult> {
   // isStaffRole is the real guard, not the <select> that omits 'admin': a
@@ -29,7 +24,7 @@ export async function setUserRole(targetUserId: string, newRole: Role): Promise<
     target_user_id: targetUserId,
     new_role: newRole,
   });
-  if (error) return { ok: false, error: friendly(error.message) };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   revalidatePath('/users');
   return { ok: true };
 }
@@ -43,7 +38,7 @@ export async function setUserDepartment(
     target_user_id: targetUserId,
     new_department_id: departmentId,
   });
-  if (error) return { ok: false, error: friendly(error.message) };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   revalidatePath('/users');
   return { ok: true };
 }
@@ -57,7 +52,7 @@ export async function setUserManager(
     target_user_id: targetUserId,
     new_manager_id: managerId,
   });
-  if (error) return { ok: false, error: friendly(error.message) };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
   revalidatePath('/users');
   return { ok: true };
 }
@@ -107,7 +102,7 @@ export async function createStaff(input: {
     email_confirm: true,
     user_metadata: { name: input.name.trim() },
   });
-  if (error || !created?.user) return { ok: false, error: friendly(error?.message ?? 'create_failed') };
+  if (error || !created?.user) return { ok: false, error: toErrorCode(error?.message ?? 'create_failed') };
 
   // The signup trigger has been observed not firing for Admin-API-created
   // users on this project before. Verify rather than assume, and fill in the
@@ -143,7 +138,7 @@ export async function createStaff(input: {
     .eq('id', created.user.id);
   // The account exists at this point; reporting success while it carries the
   // wrong role would leave an inspector quietly filed as a cleaner.
-  if (roleErr) return { ok: false, error: friendly(roleErr.message) };
+  if (roleErr) return { ok: false, error: toErrorCode(roleErr.message) };
 
   revalidatePath('/users');
   return { ok: true };
@@ -164,10 +159,27 @@ export async function resetStaffPassword(
     return { ok: false, error: 'service_key_missing' };
   }
 
+  // Being an admin says you may reset STAFF credentials. It does not say you
+  // may reset a peer's: that is a silent account takeover — the target is
+  // never told — and it walks straight round the boundary 0009 exists to hold,
+  // that admins are made and unmade in the dashboard and nowhere else.
+  //
+  // isStaffRole rather than `!== 'admin'`, so a target with no profiles row or
+  // an unrecognised role denies too. Reading through the service-role client
+  // because the answer must not depend on what RLS shows the caller.
+  const { data: target } = await admin
+    .from('profiles')
+    .select('role')
+    .eq('id', targetUserId)
+    .maybeSingle();
+  // One code for "no such user" and "not a staff account" alike — telling them
+  // apart would turn this into an id oracle.
+  if (!target || !isStaffRole(target.role)) return { ok: false, error: 'not_authorized' };
+
   const { error } = await admin.auth.admin.updateUserById(targetUserId, {
     password: newPassword,
   });
-  if (error) return { ok: false, error: friendly(error.message) };
+  if (error) return { ok: false, error: toErrorCode(error.message) };
 
   revalidatePath('/users');
   return { ok: true };
