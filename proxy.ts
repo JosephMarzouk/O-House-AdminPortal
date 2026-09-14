@@ -7,10 +7,14 @@ import { NextResponse, type NextRequest } from 'next/server';
  *
  * This only checks that a session EXISTS. Whether that user may use the
  * portal at all (admin/manager, not cleaner) is decided in the portal layout,
- * which can read profiles.role — middleware runs on the edge and a role read
- * per request would be a query on every asset.
+ * which can read profiles.role — the proxy runs on the edge and a role read
+ * per request would be a query on every asset. Next's own docs say the same:
+ * this convention "should not be used as a full authorization solution".
+ *
+ * Named `proxy`, in proxy.ts, because Next 16 deprecated the `middleware`
+ * convention and renamed it. Behaviour is identical; only the names changed.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
