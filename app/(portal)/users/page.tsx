@@ -1,4 +1,4 @@
-import { listProfiles } from '@/lib/db/users';
+import { adminStaffList } from '@/lib/db/users';
 import { listDepartments } from '@/lib/db/places';
 import { getProfile } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
@@ -13,7 +13,11 @@ export default async function UsersPage() {
   const kicker = fmtDate(todayInCairo(), locale);
 
   // set_user_role is admin-only, and staff creation needs the service-role
-  // key — a manager would see nothing but disabled controls.
+  // key — a manager or inspector would see nothing but disabled controls.
+  //
+  // This early return is courtesy, not the control. adminStaffList() below
+  // calls a SECURITY DEFINER RPC that raises for a non-admin, so phone
+  // numbers stay out of reach even if this check were removed.
   if (me?.role !== 'admin') {
     return (
       <>
@@ -23,7 +27,7 @@ export default async function UsersPage() {
     );
   }
 
-  const [users, departments] = await Promise.all([listProfiles(), listDepartments()]);
+  const [users, departments] = await Promise.all([adminStaffList(), listDepartments()]);
 
   return (
     <>

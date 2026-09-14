@@ -25,8 +25,12 @@ export const dictionaries = {
     password: 'كلمة المرور',
     signInButton: 'تسجيل الدخول',
     signOut: 'تسجيل الخروج',
-    signInError: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-    signInMissingFields: 'أدخل البريد الإلكتروني وكلمة المرور.',
+    // The field takes either, so the label and both messages have to name
+    // both — a cleaner told to "enter your email" would be stuck.
+    signInIdentifier: 'رقم الهاتف أو البريد الإلكتروني',
+    signInIdentifierHint: 'الموظفون يدخلون برقم الهاتف — ١٠ أرقام بدون الصفر',
+    signInError: 'بيانات الدخول أو كلمة المرور غير صحيحة.',
+    signInMissingFields: 'أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور.',
     notAuthorized: 'هذا الحساب لا يملك صلاحية الدخول إلى لوحة الإدارة.',
 
     // nav
@@ -217,8 +221,12 @@ export const dictionaries = {
     password: 'Password',
     signInButton: 'Sign in',
     signOut: 'Sign out',
-    signInError: 'Incorrect email or password.',
-    signInMissingFields: 'Enter your email and password.',
+    // The field takes either, so the label and both messages have to name
+    // both — a cleaner told to "enter your email" would be stuck.
+    signInIdentifier: 'Phone number or email',
+    signInIdentifierHint: 'Staff sign in with their phone number — 10 digits, no leading zero',
+    signInError: 'Incorrect sign-in details or password.',
+    signInMissingFields: 'Enter your phone number or email, and your password.',
     notAuthorized: 'This account does not have access to the admin portal.',
 
     navDashboard: 'Dashboard',

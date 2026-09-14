@@ -6,27 +6,35 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toLoginCredential } from '@/lib/phone';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 export function LoginForm({ dict }: { dict: Dictionary }) {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    const typed = identifier.trim();
+    if (!typed || !password) {
       setError(dict.signInMissingFields);
       return;
     }
     setLoading(true);
     setError(null);
 
+    // Staff type a phone, admins and managers an email; GoTrue only ever
+    // holds an email, so toLoginCredential rebuilds the phone into the same
+    // synthetic address the Flutter app builds. See lib/phone.ts for why
+    // the '@' test in there is not optional.
+    const credential = toLoginCredential(typed);
+
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: credential,
       password,
     });
 
@@ -47,15 +55,18 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4 text-start">
       <div className="space-y-1">
-        <Label htmlFor="email">{dict.email}</Label>
+        <Label htmlFor="identifier">{dict.signInIdentifier}</Label>
+        {/* type="text", not "email": the browser's own email validation
+            would reject a phone number before onSubmit ever ran. */}
         <Input
-          id="email"
-          type="email"
+          id="identifier"
+          type="text"
           autoComplete="username"
           dir="ltr"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
         />
+        <p className="text-caption text-text/55">{dict.signInIdentifierHint}</p>
       </div>
 
       <div className="space-y-1">

@@ -7,7 +7,13 @@
  */
 import assert from 'node:assert/strict';
 import { mediaUrl, mediaUrls } from '../lib/media';
-import { normalizePhone, isValidPhone, phoneToLoginEmail, phoneToE164 } from '../lib/phone';
+import {
+  normalizePhone,
+  isValidPhone,
+  phoneToLoginEmail,
+  phoneToE164,
+  toLoginCredential,
+} from '../lib/phone';
 import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
 import { todayInCairo } from '../lib/format';
 import { templateItems } from '../lib/template-items';
@@ -59,6 +65,36 @@ assert.equal(isValidPhone('1012345678'), true);
 assert.equal(isValidPhone('101234567'), false); // 9 digits
 assert.equal(isValidPhone(''), false);
 assert.throws(() => phoneToLoginEmail('12345'), /phone_must_be_10_digits/);
+
+// --- the login box's one branch ------------------------------------------
+// The portal takes a phone OR an email in a single field. Getting the
+// discrimination wrong locks a real user out of their own account, so it is
+// worth more than the four lines it costs.
+
+// Staff: every shape an admin might have given them, all one account.
+assert.equal(toLoginCredential('1012345678'), EXPECTED);
+assert.equal(toLoginCredential('01012345678'), EXPECTED);
+assert.equal(toLoginCredential('+20 101 234 5678'), EXPECTED);
+assert.equal(toLoginCredential('  1012345678  '), EXPECTED); // pasted with spaces
+
+// Admins and managers: passed through untouched.
+assert.equal(toLoginCredential('joseph@blueribbon-inc.com'), 'joseph@blueribbon-inc.com');
+assert.equal(toLoginCredential(' Admin@Example.com '), 'Admin@Example.com');
+
+// The one that matters: normalizePhone strips non-digits, so an address
+// whose local part is ten digits reduces to a valid-looking phone. Without
+// the '@' test this would be rewritten to 201012345678@ohouse.internal and
+// that user could never sign in.
+assert.equal(
+  toLoginCredential('1012345678@gmail.com'),
+  '1012345678@gmail.com',
+  'an email must never be rewritten as a phone',
+);
+
+// Not a phone and not an address: hand it to GoTrue and let it refuse,
+// rather than guessing.
+assert.equal(toLoginCredential('12345'), '12345');
+assert.equal(toLoginCredential(''), '');
 
 // --- dashboard arithmetic -------------------------------------------------
 // Only the fields isLate() reads; the rest of Assignment is irrelevant here.

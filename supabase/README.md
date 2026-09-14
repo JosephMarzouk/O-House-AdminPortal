@@ -34,6 +34,65 @@ raise` never fires when the value is NULL, because PL/pgSQL reads a NULL
 condition as false. Each migration carries its own checks at the foot; run
 them, and read the output, rather than assuming the script took.
 
+## How to make an admin
+
+Nothing in the portal can mint an admin, by design, and since `0010` the
+database refuses it too — `set_user_role` accepts only `manager`, `inspector`
+and `cleaner`, so a direct `POST /rest/v1/rpc/set_user_role` with `"admin"`
+raises. That leaves exactly one path, and it is deliberately manual.
+
+**1. Create the account.** Supabase Dashboard → Authentication → Users →
+*Add user* → *Create new user*. Give it a **real email address** and a
+password, and leave *Auto confirm user* ticked. The dialog has no phone
+field, which is fine: staff sign in by phone, admins by email, and the
+portal's login box accepts either (`components/login-form.tsx`).
+
+**2. Promote it.** SQL Editor:
+
+```sql
+update public.profiles
+   set role = 'admin'
+ where email = 'the.address@you.just.used';
+-- expect: UPDATE 1
+```
+
+The `handle_new_user` trigger files every new account as `cleaner` — the
+least-privileged role — so step 2 is what makes the difference, and it takes
+project-level access to run. That is the whole point: the slow, witnessed
+path. `0009` deliberately left `public.profiles` writable from the SQL Editor
+for exactly this.
+
+To demote an admin, the same `update` in reverse. Do not add an RPC for
+either — an RPC that can grant `admin` is the thing `0010` exists to remove.
+
+## Who can sign into the portal
+
+`admin`, `manager` and `inspector`. `cleaner` is the one role that stays on
+the phone app: `canUsePortal` in `lib/auth.ts` blocks it server-side in the
+portal layout, and `0011` leaves it out of every policy and RPC that the
+portal's screens depend on.
+
+Note the layout gate only decides whether pages *render*. Server Actions are
+POST endpoints that never re-enter it, so the database half — `0011` — is
+what actually holds. Both lists have to agree.
+
+## Phone numbers are admin-only
+
+`0011` revoked the table-wide SELECT on `public.profiles` from
+`authenticated` and granted back every column except `phone`. The only way to
+read a phone number is `admin_staff_list()`, which is `SECURITY DEFINER` and
+raises for a non-admin.
+
+Two consequences worth knowing before you change anything here:
+
+- **`select('*')` on `profiles` now fails** with a permission error. Use
+  `PROFILE_COLUMNS` from `lib/types/database.ts`.
+- **Narrowing `profiles_select` instead would have been a trap.** Six
+  policies across `submissions`, `assignment_items`, `actions` and
+  `action_events` subquery `profiles` inside their own expressions, and
+  Postgres applies RLS to those subqueries — restricting the table would
+  silently cut every supervisor off from their own reports' work.
+
 ## Two orphan Edge Functions
 
 The project (`ptonujazlljpkgpfrkpw`, "Check List") still has two Edge Functions

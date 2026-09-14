@@ -42,3 +42,25 @@ export function phoneToE164(raw: string): string {
 export function isSyntheticEmail(email: string | null | undefined): boolean {
   return !!email && email.endsWith(`@${LOGIN_EMAIL_DOMAIN}`);
 }
+
+/**
+ * What the portal's login box hands to signInWithPassword.
+ *
+ * Staff type the phone number they use in the app; admins and managers type
+ * the email their account was created under. GoTrue only holds an email
+ * either way, so a phone is rebuilt into the same synthetic address the
+ * Flutter app builds — which is why the portal needs no phone auth and the
+ * project needs no SMS provider.
+ *
+ * The '@' test is load-bearing, not tidiness. normalizePhone strips every
+ * non-digit, so "1012345678@gmail.com" reduces to ten digits and would
+ * otherwise be rewritten into a synthetic address, locking that user out of
+ * their own account. An address is anything containing '@'; a phone is
+ * everything else that normalises to ten digits. Anything else is passed
+ * through untouched and left for GoTrue to reject.
+ */
+export function toLoginCredential(typed: string): string {
+  const value = typed.trim();
+  if (value.includes('@')) return value;
+  return isValidPhone(value) ? phoneToLoginEmail(value) : value;
+}

@@ -272,6 +272,26 @@ export type Database = {
         Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string };
         Returns: undefined;
       };
+      /**
+       * The Users screen's rows, phone numbers included. SECURITY DEFINER
+       * and admin-only — it raises for anyone else, so this is the only
+       * route to profiles.phone now that 0011 took the column off the
+       * table's grant.
+       */
+      admin_staff_list: {
+        Args: never;
+        Returns: {
+          id: string;
+          name: string;
+          email: string;
+          phone: string | null;
+          role: string;
+          department_id: string | null;
+          manager_id: string | null;
+          active: boolean;
+          must_change_password: boolean;
+        }[];
+      };
       set_user_role: { Args: { target_user_id: string; new_role: Role }; Returns: undefined };
       set_user_department: { Args: { target_user_id: string; new_department_id: string | null }; Returns: undefined };
       set_user_manager: { Args: { target_user_id: string; new_manager_id: string | null }; Returns: undefined };
@@ -348,6 +368,22 @@ export type Tables<T extends keyof (PublicSchema['Tables'] & PublicSchema['Views
   (PublicSchema['Tables'] & PublicSchema['Views'])[T] extends { Row: infer R } ? R : never;
 
 export type Profile = Tables<'profiles'>;
+
+/**
+ * The profiles columns a signed-in user may SELECT, as a PostgREST column
+ * list — every column except `phone`.
+ *
+ * Migration 0011 revoked the table-wide SELECT on profiles from
+ * `authenticated` and granted these columns back individually, so `phone`
+ * is unreachable through the table and comes only from admin_staff_list().
+ * A `select('*')` anywhere on profiles now fails with a permission error,
+ * which is why this string exists rather than being inlined twice.
+ */
+export const PROFILE_COLUMNS =
+  'id, name, email, role, created_at, department_id, manager_id, active, must_change_password, locale';
+
+/** A profile as the portal can read it: everything but the phone number. */
+export type PortalProfile = Omit<Profile, 'phone'>;
 export type Site = Tables<'sites'>;
 export type Department = Tables<'departments'>;
 export type Template = Tables<'templates'>;

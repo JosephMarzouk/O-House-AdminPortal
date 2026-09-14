@@ -1,9 +1,9 @@
 -- =====================================================================
 -- 0010 — put the no-admin-minting rule in the database
 -- Target: Supabase project ptonujazlljpkgpfrkpw ("Check List")
--- Status: NOT YET APPLIED. Run in the SQL Editor and tick the checks at
---         the foot before treating it as live — 0007 and 0008 were both
---         committed here while production still ran the old definitions.
+-- Status: APPLIED 2026-09-14, verified against pg_proc and the column
+--         privileges — set_user_role rejects 'admin', and anon holds no
+--         insert/update/select on profiles.
 --
 -- Two things, both defence in depth. Neither changes what the portal can
 -- do today; both remove a way round it.
