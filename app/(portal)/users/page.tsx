@@ -6,6 +6,7 @@ import { fmtDate, todayInCairo } from '@/lib/format';
 import { UsersManager } from '@/components/users/users-manager';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import type { Role } from '@/lib/types/database';
+import { toDepartmentOptions } from '@/lib/options';
 
 export default async function UsersPage() {
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
@@ -41,11 +42,7 @@ export default async function UsersPage() {
             departmentId: u.department_id,
             managerId: u.manager_id,
           }))}
-          departments={departments.map((d) => ({
-            id: d.id,
-            nameAr: d.name_ar,
-            nameEn: d.name_en,
-          }))}
+          departments={toDepartmentOptions(departments)}
         />
       </PageBody>
     </>

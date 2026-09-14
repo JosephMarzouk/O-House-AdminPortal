@@ -3,6 +3,7 @@ import { getPlace, listDepartments, templateItems } from '@/lib/db/places';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { PlaceForm } from '@/components/places/place-form';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
+import { toDepartmentOptions } from '@/lib/options';
 
 export default async function EditPlacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,11 +33,7 @@ export default async function EditPlacePage({ params }: { params: Promise<{ id: 
             departmentId: place.department_id,
             items: templateItems(place.items),
           }}
-          departments={departments.map((d) => ({
-            id: d.id,
-            nameAr: d.name_ar,
-            nameEn: d.name_en,
-          }))}
+          departments={toDepartmentOptions(departments)}
         />
       </PageBody>
     </>

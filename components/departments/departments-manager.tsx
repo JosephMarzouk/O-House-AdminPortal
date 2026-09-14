@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { PlusIcon, TrashIcon } from '@/components/icons';
+import { PlusIcon } from '@/components/icons';
 import { createDepartment, deleteDepartment } from '@/lib/actions/departments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +17,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
+import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button';
 import { errorMessage } from '@/lib/errors';
-
-export type DepartmentRow = { id: string; nameAr: string; nameEn: string };
+import type { DepartmentOption } from '@/lib/options';
 
 export function DepartmentsManager({
   departments,
   dict,
 }: {
-  departments: DepartmentRow[];
+  departments: DepartmentOption[];
   dict: Dictionary;
 }) {
   const router = useRouter();
@@ -86,31 +86,11 @@ export function DepartmentsManager({
                   <TableCell>{d.nameAr || dict.none}</TableCell>
                   <TableCell dir="ltr">{d.nameEn || dict.none}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-magenta hover:bg-magenta/10"
-                      aria-label={dict.remove}
-                      disabled={pending}
-                      onClick={() => {
-                        if (!confirm(dict.confirmDelete)) return;
-                        startTransition(async () => {
-                          const res = await deleteDepartment(d.id);
-                          if (res.ok) {
-                            toast.success(dict.saved);
-                            router.refresh();
-                          } else {
-                            // Postgres refuses while staff or places still
-                            // reference this department. That is now the
-                            // still_referenced code rather than the driver's
-                            // own sentence, which named the constraint.
-                            toast.error(errorMessage(dict, res.error));
-                          }
-                        });
-                      }}
-                    >
-                      <TrashIcon />
-                    </Button>
+                    {/* Postgres refuses while staff or places still reference
+                        this department; the shared button reports that as
+                        still_referenced rather than as the driver's own
+                        sentence, which named the constraint. */}
+                    <ConfirmDeleteButton dict={dict} onDelete={() => deleteDepartment(d.id)} />
                   </TableCell>
                 </TableRow>
               ))}

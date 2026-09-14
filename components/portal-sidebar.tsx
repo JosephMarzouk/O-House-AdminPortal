@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   BuildingsIcon,
   ClipboardIcon,
@@ -13,7 +13,7 @@ import {
   TranslateIcon,
   UsersIcon,
 } from '@/components/icons';
-import { createClient } from '@/lib/supabase/client';
+import { useSignOut } from '@/lib/use-sign-out';
 import { setLocale } from '@/lib/actions/locale';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { BrandMark } from '@/components/brand-mark';
@@ -52,7 +52,7 @@ export function PortalSidebar({
   initialTheme: Theme;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const signOut = useSignOut();
   const [pending, startTransition] = useTransition();
 
   // Seeded from a cookie the server already read, so the correct width paints
@@ -204,11 +204,7 @@ export function PortalSidebar({
           type="button"
           title={collapsed ? dict.signOut : undefined}
           className={rowClass(false)}
-          onClick={async () => {
-            await createClient().auth.signOut();
-            router.refresh();
-            router.push('/login');
-          }}
+          onClick={signOut}
         >
           <SignOutIcon />
           {!collapsed && <span className="truncate">{dict.signOut}</span>}

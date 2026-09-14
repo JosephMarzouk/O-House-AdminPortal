@@ -3,6 +3,7 @@ import { getDictionary, getLocale } from '@/lib/i18n';
 import { fmtDate, todayInCairo } from '@/lib/format';
 import { DepartmentsManager } from '@/components/departments/departments-manager';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
+import { toDepartmentOptions } from '@/lib/options';
 
 export default async function DepartmentsPage() {
   const [dict, locale, departments] = await Promise.all([
@@ -20,11 +21,7 @@ export default async function DepartmentsPage() {
       <PageBody>
         <DepartmentsManager
           dict={dict}
-          departments={departments.map((d) => ({
-            id: d.id,
-            nameAr: d.name_ar,
-            nameEn: d.name_en,
-          }))}
+          departments={toDepartmentOptions(departments)}
         />
       </PageBody>
     </>

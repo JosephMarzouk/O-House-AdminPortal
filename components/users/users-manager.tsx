@@ -36,6 +36,7 @@ import {
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import { STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
+import type { DepartmentOption } from '@/lib/options';
 
 export type UserRow = {
   id: string;
@@ -46,8 +47,6 @@ export type UserRow = {
   departmentId: string | null;
   managerId: string | null;
 };
-
-export type Option = { id: string; nameAr: string; nameEn: string };
 
 /** Mirrors MIN_PASSWORD in lib/actions/users.ts. Duplicated rather than
  *  imported because that module is 'use server' and may export nothing but
@@ -63,7 +62,7 @@ export function UsersManager({
   currentUserId,
 }: {
   users: UserRow[];
-  departments: Option[];
+  departments: DepartmentOption[];
   dict: Dictionary;
   locale: Locale;
   currentUserId: string;

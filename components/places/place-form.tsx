@@ -12,8 +12,11 @@ import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
+import type { DepartmentOption } from '@/lib/options';
 
-export type DepartmentOption = { id: string; nameAr: string; nameEn: string };
+// Re-exported: the pages that render this form import the option type from
+// here, and it now has one definition in lib/options.
+export type { DepartmentOption };
 
 export function PlaceForm({
   place,
