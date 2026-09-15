@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { toLoginCredential } from '@/lib/phone';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
@@ -71,13 +72,17 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
 
       <div className="space-y-1">
         <Label htmlFor="password">{dict.password}</Label>
-        <Input
+        {/* The same field the Users screen uses, so the reveal toggle behaves
+            and announces itself identically in both places. autoComplete is
+            the one difference: here the browser SHOULD offer the saved
+            credential, because this password is the reader's own. */}
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
-          dir="ltr"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          showLabel={dict.showPassword}
+          hideLabel={dict.hidePassword}
         />
       </div>
 

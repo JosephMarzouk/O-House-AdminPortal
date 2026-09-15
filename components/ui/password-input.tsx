@@ -16,13 +16,16 @@ import { Input } from '@/components/ui/input';
  * Revealing is always transient — the field is remounted as type="password"
  * wherever it is reset, so a value never survives visible into the next use.
  *
- * `autoComplete="new-password"` on every instance: these fields set *someone
- * else's* password, so a browser offering the admin's own saved credential is
- * at best noise and at worst the wrong password silently submitted.
+ * `autoComplete` defaults to "new-password" because most of these fields set
+ * *someone else's* password, and a browser offering the admin's own saved
+ * credential there is at best noise and at worst the wrong password silently
+ * submitted. The sign-in form is the one place the opposite is true, so it
+ * passes "current-password" and gets the saved credential offered.
  */
 export function PasswordInput({
   showLabel,
   hideLabel,
+  autoComplete = 'new-password',
   ...props
 }: Omit<React.ComponentProps<typeof Input>, 'type' | 'suffix'> & {
   showLabel: string;
@@ -38,7 +41,7 @@ export function PasswordInput({
       id={id}
       type={shown ? 'text' : 'password'}
       dir="ltr"
-      autoComplete="new-password"
+      autoComplete={autoComplete}
       suffix={
         <button
           type="button"
