@@ -76,12 +76,41 @@ Note the layout gate only decides whether pages *render*. Server Actions are
 POST endpoints that never re-enter it, so the database half — `0011` — is
 what actually holds. Both lists have to agree.
 
+## Who administers whom
+
+The Users screen is open to `admin` and `manager` (`canManageUsers` in
+`lib/auth.ts`). What each of them may reach is one function,
+`grantableRoles` in `lib/types/database.ts`, and it answers two questions
+with one list on purpose — which roles you may create, and whose password you
+may set. Creating an account and taking one over are the same reach by two
+routes; `0010` is the argument for why granting one without the other closes
+nothing.
+
+| Caller | May create / reset | May not touch |
+|---|---|---|
+| `admin` | manager, inspector, cleaner | other admins |
+| `manager` | inspector, cleaner | admins, other managers |
+
+Both rows still *see* every account on the screen, admins included — the key
+button is greyed on the ones they may not set. Roles themselves stay admin-only
+(`set_user_role`, `0010`); department and manager have been admin+manager
+since `0009`. Account creation and password resets have no SQL path at all —
+both run through the service-role key in `lib/actions/users.ts`, which is
+where those two checks live. `pnpm check` asserts the table above.
+
 ## Phone numbers are admin-only
 
 `0011` revoked the table-wide SELECT on `public.profiles` from
 `authenticated` and granted back every column except `phone`. The only way to
-read a phone number is `admin_staff_list()`, which is `SECURITY DEFINER` and
-raises for a non-admin.
+read a phone number is `admin_staff_list()`, which is `SECURITY DEFINER`.
+
+`0012` opened that function to managers as well, because the Users screen is
+theirs too now — but only the rows. A manager gets every row back with
+`phone` null; the column is still admin-only, decided inside the function
+rather than by who can see the screen. An inspector or cleaner still gets an
+exception. The function kept its `admin_staff_list` name, which is now a
+shade inaccurate; renaming it would have churned the generated types to change
+nothing.
 
 Two consequences worth knowing before you change anything here:
 

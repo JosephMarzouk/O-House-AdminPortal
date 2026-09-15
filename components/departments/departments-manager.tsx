@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { PlusIcon } from '@/components/icons';
 import { createDepartment, deleteDepartment } from '@/lib/actions/departments';
 import { Button } from '@/components/ui/button';
@@ -44,12 +44,12 @@ export function DepartmentsManager({
           startTransition(async () => {
             const res = await createDepartment(nameAr, nameEn);
             if (res.ok) {
-              toast.success(dict.saved);
+              alert.success(dict.saved);
               setNameAr('');
               setNameEn('');
               router.refresh();
             } else {
-              toast.error(errorMessage(dict, res.error));
+              alert.error(errorMessage(dict, res.error));
             }
           });
         }}

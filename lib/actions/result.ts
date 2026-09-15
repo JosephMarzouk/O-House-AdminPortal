@@ -14,7 +14,7 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
  * The default is `error_generic`, NOT the message itself. Raw driver strings
  * carry table names, constraint names and phrases like "permission denied for
  * table profiles" — they describe the schema to anyone who can provoke an
- * error, and they tell the cleaner reading the toast nothing they can act on.
+ * error, and they tell the cleaner reading the message nothing they can act on.
  * A message worth showing gets a code here; everything else is generic.
  */
 export function toErrorCode(message: string): string {

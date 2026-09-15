@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { approveAssignment, rejectItems, extendAssignment } from '@/lib/actions/assignments';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,11 +60,11 @@ export function ReviewBar({
     startTransition(async () => {
       const res = await fn();
       if (res.ok) {
-        toast.success(dict.saved);
+        alert.success(dict.saved);
         done?.();
         router.refresh();
       } else {
-        toast.error(errorMessage(dict, res.error));
+        alert.error(errorMessage(dict, res.error));
       }
     });
   }

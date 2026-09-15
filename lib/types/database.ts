@@ -273,10 +273,11 @@ export type Database = {
         Returns: undefined;
       };
       /**
-       * The Users screen's rows, phone numbers included. SECURITY DEFINER
-       * and admin-only — it raises for anyone else, so this is the only
-       * route to profiles.phone now that 0011 took the column off the
-       * table's grant.
+       * The Users screen's rows. SECURITY DEFINER; admins and managers only
+       * (0012), and it raises for anyone else. `phone` comes back populated
+       * for an admin and null for a manager, which makes this the only route
+       * to profiles.phone now that 0011 took the column off the table's
+       * grant.
        */
       admin_staff_list: {
         Args: never;
@@ -331,6 +332,22 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export function isStaffRole(role: string): role is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * The staff roles a caller may hand out — and, identically, the roles whose
+ * password that caller may set. One function because they are one question:
+ * creating an account and taking one over are the same reach by two routes,
+ * and 0010's whole argument is that granting one without the other closes
+ * nothing.
+ *
+ * An admin gets STAFF_ROLES, which is exactly what isStaffRole already gated
+ * on, so the admin path is unchanged. A manager may not mint or take over a
+ * peer — that would let one manager quietly multiply itself — and no caller
+ * reaches 'admin' at all, which stays the Supabase dashboard's job.
+ */
+export function grantableRoles(callerRole: string | undefined | null): readonly StaffRole[] {
+  return callerRole === 'admin' ? STAFF_ROLES : (['inspector', 'cleaner'] as const);
 }
 
 /** submissions.status — the five CHECK-legal stored values. */

@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { TrashIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { errorMessage } from '@/lib/errors';
@@ -11,15 +11,16 @@ import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 /**
  * The destructive row control: ghost so the table stays quiet, magenta text as
- * the destructive marker, confirm() as the gate.
+ * the destructive marker, a confirmation dialog as the gate.
  *
  * Places and departments had this twice, character for character, and the
  * copies had already started to drift on how they reported a failure. The
  * caller supplies only the action, because that is the sole difference.
  *
- * confirm() rather than the Dialog primitive: it is one irreversible click on
- * a table row, the browser's own dialog cannot be missed or mis-focused, and
- * a themed modal here would buy nothing the native one does not already do.
+ * The gate used to be the browser's own confirm(). It is the portal's dialog
+ * now — the same one the password reset uses — so that every irreversible
+ * click in the portal is stopped by the same thing, in the right typeface and
+ * the right reading direction.
  */
 export function ConfirmDeleteButton({
   dict,
@@ -40,15 +41,23 @@ export function ConfirmDeleteButton({
       className="text-magenta hover:bg-magenta/10"
       aria-label={label ?? dict.remove}
       disabled={pending}
-      onClick={() => {
-        if (!confirm(dict.confirmDelete)) return;
+      // async, and the transition starts only once the promise has settled:
+      // starting it around the await would let React tear the pending state
+      // down while the dialog is still open.
+      onClick={async () => {
+        const ok = await alert.confirm({
+          title: dict.confirmDelete,
+          confirmLabel: dict.remove,
+          destructive: true,
+        });
+        if (!ok) return;
         startTransition(async () => {
           const res = await onDelete();
           if (res.ok) {
-            toast.success(dict.saved);
+            alert.success(dict.saved);
             router.refresh();
           } else {
-            toast.error(errorMessage(dict, res.error));
+            alert.error(errorMessage(dict, res.error));
           }
         });
       }}

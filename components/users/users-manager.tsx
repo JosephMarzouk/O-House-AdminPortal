@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { KeyIcon, PlusIcon } from '@/components/icons';
 import {
   setUserRole,
@@ -34,7 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
-import { STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
+import { grantableRoles, STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
 import type { DepartmentOption } from '@/lib/options';
 
@@ -72,12 +72,16 @@ export function UsersManager({
   dict,
   locale,
   currentUserId,
+  callerRole,
 }: {
   users: UserRow[];
   departments: DepartmentOption[];
   dict: Dictionary;
   locale: Locale;
   currentUserId: string;
+  /** Admin or manager — canManageUsers is what got us here. It decides what
+   *  this screen offers; lib/actions/users.ts decides what it may do. */
+  callerRole: Role;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -93,6 +97,12 @@ export function UsersManager({
   const [resetting, setResetting] = useState<UserRow | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+
+  // What this caller may hand out, and — the same list, on purpose — whose
+  // password they may set. An admin gets all three staff roles; a manager
+  // gets inspector and cleaner, never a peer. See grantableRoles.
+  const grantable = grantableRoles(callerRole);
+  const isAdminCaller = callerRole === 'admin';
 
   const digits = normalizePhone(phone);
   const preview = digits.length === 10 ? phoneToLoginEmail(digits) : null;
@@ -145,11 +155,11 @@ export function UsersManager({
 
   function report(res: { ok: true } | { ok: false; error: string }) {
     if (res.ok) {
-      toast.success(dict.saved);
+      alert.success(dict.saved);
       router.refresh();
       return;
     }
-    toast.error(errorMessage(dict, res.error));
+    alert.error(errorMessage(dict, res.error));
   }
 
   /** Drops the typed password on the way out, whichever way the dialog was
@@ -169,7 +179,7 @@ export function UsersManager({
           startTransition(async () => {
             const res = await createStaff({ name, phone, password, role });
             if (res.ok) {
-              toast.success(dict.staffCreated);
+              alert.success(dict.staffCreated);
               setName('');
               setPhone('');
               setPassword('');
@@ -208,10 +218,11 @@ export function UsersManager({
         </div>
         <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-role">{dict.role}</Label>
-          {/* STAFF_ROLES, so 'admin' is never on offer. createStaff re-checks
-              it — this select is the convenience, not the boundary. */}
+          {/* 'admin' is never on offer, and 'manager' only to an admin.
+              createStaff re-checks against the same list — this select is the
+              convenience, not the boundary. */}
           <Select id="s-role" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
-            {STAFF_ROLES.map((r) => (
+            {grantable.map((r) => (
               <option key={r} value={r}>
                 {roleLabel(r)}
               </option>
@@ -268,6 +279,12 @@ export function UsersManager({
                 // there, so the option is never reachable from another row.
                 const isAdmin = u.role === 'admin';
                 const roleOptions: Role[] = isAdmin ? [...ROLE_ORDER] : [...STAFF_ROLES];
+                // The row's password button. Same list as the create form,
+                // because taking an account over and minting one are the same
+                // reach — so a manager's own row, and every admin's, is shown
+                // with the key greyed rather than hidden. resetStaffPassword
+                // enforces it; this only keeps the rule visible.
+                const canSetPassword = (grantable as readonly string[]).includes(u.role);
 
                 return (
                   // Keyed by role as well as id, so a confirmed role change
@@ -294,7 +311,10 @@ export function UsersManager({
                     // form; downward because demoting the last admin locks the
                     // whole org out of role changes — and set_user_role guards
                     // neither. Admins are made and unmade in Supabase.
-                    disabled={pending || isAdmin || u.id === currentUserId}
+                    // ...and frozen for a manager on every row: set_user_role
+                    // is admin-only in the database (0010), so leaving this
+                    // live would only buy a raw error.
+                    disabled={pending || isAdmin || u.id === currentUserId || !isAdminCaller}
                     onChange={(e) =>
                       startTransition(async () =>
                         report(await setUserRole(u.id, e.target.value as Role)),
@@ -365,7 +385,7 @@ export function UsersManager({
                     variant="ghost"
                     size="icon"
                     aria-label={dict.resetPassword}
-                    disabled={pending}
+                    disabled={pending || !canSetPassword}
                     onClick={() => {
                       setResetting(u);
                       setConfirming(false);
@@ -438,7 +458,7 @@ export function UsersManager({
                     startTransition(async () => {
                       const res = await resetStaffPassword(target.id, newPassword);
                       if (res.ok) {
-                        toast.success(dict.passwordReset);
+                        alert.success(dict.passwordReset);
                         closeReset();
                         router.refresh();
                       } else {

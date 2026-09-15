@@ -1,6 +1,6 @@
 import { adminStaffList } from '@/lib/db/users';
 import { listDepartments } from '@/lib/db/places';
-import { getProfile } from '@/lib/auth';
+import { canManageUsers, getProfile } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { fmtDate, todayInCairo } from '@/lib/format';
 import { UsersManager } from '@/components/users/users-manager';
@@ -12,13 +12,11 @@ export default async function UsersPage() {
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
   const kicker = fmtDate(todayInCairo(), locale);
 
-  // set_user_role is admin-only, and staff creation needs the service-role
-  // key — a manager or inspector would see nothing but disabled controls.
-  //
-  // This early return is courtesy, not the control. adminStaffList() below
-  // calls a SECURITY DEFINER RPC that raises for a non-admin, so phone
-  // numbers stay out of reach even if this check were removed.
-  if (me?.role !== 'admin') {
+  // Admins and managers. This early return is courtesy, not the control:
+  // adminStaffList() below calls a SECURITY DEFINER RPC that raises for
+  // anyone else and hands a manager every row with the phone stripped, so
+  // neither the screen nor a phone number is reachable without it.
+  if (!me || !canManageUsers(me.role)) {
     return (
       <>
         <PageHeader kicker={kicker} title={dict.navUsers} subtitle={dict.adminOnly} />
@@ -37,6 +35,7 @@ export default async function UsersPage() {
           dict={dict}
           locale={locale}
           currentUserId={me.id}
+          callerRole={me.role as Role}
           users={users.map((u) => ({
             id: u.id,
             name: u.name,

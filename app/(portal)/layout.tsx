@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getProfile, canUsePortal } from '@/lib/auth';
+import { getProfile, canManageUsers, canUsePortal } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
@@ -33,16 +33,28 @@ export default async function PortalLayout({ children }: { children: React.React
     );
   }
 
-  const isAdmin = profile.role === 'admin';
+  // The sidebar's Users row, and nothing else. What a manager may do once on
+  // that screen is decided there and in lib/actions/users.ts.
+  const manages = canManageUsers(profile.role);
+
+  // Every non-admin used to read as "Manager" here, which quietly mislabelled
+  // every inspector in the portal. Three roles reach this layout, so the label
+  // has to answer for three.
+  const roleLabel =
+    profile.role === 'admin'
+      ? dict.roleAdmin
+      : profile.role === 'manager'
+        ? dict.roleManager
+        : dict.roleInspector;
 
   return (
     <div className="flex min-h-dvh">
       <PortalSidebar
         dict={dict}
         locale={locale}
-        isAdmin={isAdmin}
+        canManageUsers={manages}
         userName={profile.name}
-        roleLabel={isAdmin ? dict.roleAdmin : dict.roleManager}
+        roleLabel={roleLabel}
         initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
         initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
       />

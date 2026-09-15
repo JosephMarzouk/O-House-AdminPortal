@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { createAssignment } from '@/lib/actions/assignments';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +62,7 @@ export function NewAssignmentForm({
     if (!titleEn) setTitleEn(p.nameEn);
   }
 
-  /** Names the exact fields that are missing. The old version toasted a
+  /** Names the exact fields that are missing. The old version showed a
    *  generic "fill in the required fields", which left you hunting. */
   function validate(): Set<FieldKey> {
     const bad = new Set<FieldKey>();
@@ -97,7 +97,7 @@ export function NewAssignmentForm({
 
     if (bad.size > 0) {
       const names = [...bad].map((k) => LABELS[k]).join('، ');
-      toast.error(`${dict.missingFields} ${names}`);
+      alert.error(`${dict.missingFields} ${names}`);
       // Put the first offending field on screen — the form is tall enough
       // that the culprit is often scrolled out of view.
       document
@@ -109,7 +109,7 @@ export function NewAssignmentForm({
     // Every template carries a site_id, but a hand-made row might not, and
     // create_assignment requires p_site_id — say so rather than blaming the form.
     if (!place?.siteId) {
-      toast.error(dict.placeHasNoSite);
+      alert.error(dict.placeHasNoSite);
       return;
     }
 
@@ -135,12 +135,12 @@ export function NewAssignmentForm({
       });
 
       if (res.ok) {
-        toast.success(dict.assignmentCreated);
+        alert.success(dict.assignmentCreated);
         router.push(`/assignments/${res.id}`);
         router.refresh();
         return;
       }
-      toast.error(errorMessage(dict, res.error));
+      alert.error(errorMessage(dict, res.error));
     });
   }
 

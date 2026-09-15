@@ -21,6 +21,19 @@ export function canUsePortal(role: string | undefined | null): boolean {
 }
 
 /**
+ * Who may open the Users screen and act on it. Admins and managers; what each
+ * of them may actually reach once inside is grantableRoles' answer, not this
+ * one — this only decides whether the screen and its Server Actions engage at
+ * all.
+ *
+ * Inspectors are deliberately absent. They are portal users (PORTAL_ROLES)
+ * but not staff administrators, and 0011 says the same in the database.
+ */
+export function canManageUsers(role: string | undefined | null): boolean {
+  return role === 'admin' || role === 'manager';
+}
+
+/**
  * The signed-in user's profile, or null if there is no session.
  *
  * Note this is a real query, not a JWT claim read: `role` lives in

@@ -1,8 +1,8 @@
 /**
  * Self-check for the pure rules the portal cannot get wrong: storage path
  * resolution, the phone -> login-email transform, the dashboard's
- * lateness/date-bucket arithmetic, and the template-item parser that guards
- * what savePlace is allowed to store.
+ * lateness/date-bucket arithmetic, the template-item parser that guards what
+ * savePlace is allowed to store, and who may administer whom.
  * Run: pnpm check
  */
 import assert from 'node:assert/strict';
@@ -17,6 +17,8 @@ import {
 import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
 import { todayInCairo } from '../lib/format';
 import { templateItems } from '../lib/template-items';
+import { grantableRoles, STAFF_ROLES } from '../lib/types/database';
+import { canManageUsers, canUsePortal } from '../lib/auth';
 import type { Assignment } from '../lib/types/database';
 
 const BASE = 'https://ptonujazlljpkgpfrkpw.supabase.co/storage/v1/object/public/checklist-media';
@@ -180,4 +182,34 @@ assert.equal(clean.type, 'yesno', 'an unrecognised type falls back');
 assert.equal(clean.critical, false, "the string 'yes' is not true");
 assert.equal(clean.text_ar, '');
 
-console.log('ok — media + phone + dashboard + template-item rules hold');
+// --- who may administer whom ---------------------------------------------
+// The two questions grantableRoles answers are deliberately the same one:
+// which roles a caller may create, and whose password they may set.
+
+// An admin's reach is exactly what it was before managers arrived.
+assert.deepEqual([...grantableRoles('admin')], [...STAFF_ROLES]);
+
+// A manager reaches field staff and stops.
+assert.deepEqual([...grantableRoles('manager')], ['inspector', 'cleaner']);
+
+// Nobody mints a peer, and nobody mints an admin. These two are the whole
+// point of the function — 0010 in the database says the same thing.
+assert.ok(!grantableRoles('manager').includes('manager'), 'no peer minting');
+assert.ok(
+  !(grantableRoles('admin') as readonly string[]).includes('admin'),
+  'the portal never mints an admin',
+);
+
+// Unknown, missing and field roles all fall to the narrow list rather than
+// widening — the function must never fail open.
+for (const r of ['inspector', 'cleaner', 'nonsense', undefined, null]) {
+  assert.deepEqual([...grantableRoles(r)], ['inspector', 'cleaner'], `grantableRoles(${r})`);
+}
+
+// The Users screen's audience is narrower than the portal's.
+assert.ok(canManageUsers('admin') && canManageUsers('manager'));
+assert.ok(!canManageUsers('inspector'), 'an inspector is a portal user, not a staff admin');
+assert.ok(!canManageUsers('cleaner') && !canManageUsers(undefined));
+assert.ok(canUsePortal('inspector'), 'but an inspector does use the portal');
+
+console.log('ok — media + phone + dashboard + template-item + role rules hold');

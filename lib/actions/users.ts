@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getProfile } from '@/lib/auth';
+import { canManageUsers, getProfile } from '@/lib/auth';
 import { normalizePhone, phoneToLoginEmail, phoneToE164 } from '@/lib/phone';
-import { isStaffRole, type Role, type StaffRole } from '@/lib/types/database';
+import { grantableRoles, isStaffRole, type Role, type StaffRole } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
 export type { ActionResult };
@@ -79,13 +79,19 @@ export async function createStaff(input: {
   role: StaffRole;
 }): Promise<ActionResult> {
   const caller = await getProfile();
-  if (caller?.role !== 'admin') return { ok: false, error: 'not_authorized' };
+  if (!canManageUsers(caller?.role)) return { ok: false, error: 'not_authorized' };
 
   const digits = normalizePhone(input.phone);
   if (digits.length !== 10) return { ok: false, error: 'phone_invalid' };
   if (input.password.length < MIN_PASSWORD) return { ok: false, error: 'password_too_short' };
   if (!input.name.trim()) return { ok: false, error: 'fields_required' };
-  if (!isStaffRole(input.role)) return { ok: false, error: 'role_not_allowed' };
+  // grantableRoles rather than isStaffRole: for an admin the two are the same
+  // set, and for a manager this is what keeps 'manager' off the list. The
+  // <select> narrows to the same roles — this is the boundary, that is the
+  // convenience.
+  if (!grantableRoles(caller?.role).includes(input.role)) {
+    return { ok: false, error: 'role_not_allowed' };
+  }
 
   let admin;
   try {
@@ -149,7 +155,7 @@ export async function resetStaffPassword(
   newPassword: string,
 ): Promise<ActionResult> {
   const caller = await getProfile();
-  if (caller?.role !== 'admin') return { ok: false, error: 'not_authorized' };
+  if (!canManageUsers(caller?.role)) return { ok: false, error: 'not_authorized' };
   if (newPassword.length < MIN_PASSWORD) return { ok: false, error: 'password_too_short' };
 
   let admin;
@@ -159,14 +165,18 @@ export async function resetStaffPassword(
     return { ok: false, error: 'service_key_missing' };
   }
 
-  // Being an admin says you may reset STAFF credentials. It does not say you
-  // may reset a peer's: that is a silent account takeover — the target is
-  // never told — and it walks straight round the boundary 0009 exists to hold,
-  // that admins are made and unmade in the dashboard and nowhere else.
+  // Administering staff says you may reset STAFF credentials. It does not say
+  // you may reset a peer's: that is a silent account takeover — the target is
+  // never told — and for an admin it walks straight round the boundary 0009
+  // exists to hold, that admins are made and unmade in the dashboard and
+  // nowhere else. A manager's peers are the other managers, and the same
+  // argument applies one rung down.
   //
-  // isStaffRole rather than `!== 'admin'`, so a target with no profiles row or
-  // an unrecognised role denies too. Reading through the service-role client
-  // because the answer must not depend on what RLS shows the caller.
+  // grantableRoles is the same list that decides what this caller may create,
+  // which is the point: creating an account and taking one over are the same
+  // reach. A target with no profiles row or an unrecognised role denies too.
+  // Read through the service-role client, because the answer must not depend
+  // on what RLS shows the caller.
   const { data: target } = await admin
     .from('profiles')
     .select('role')
@@ -174,7 +184,9 @@ export async function resetStaffPassword(
     .maybeSingle();
   // One code for "no such user" and "not a staff account" alike — telling them
   // apart would turn this into an id oracle.
-  if (!target || !isStaffRole(target.role)) return { ok: false, error: 'not_authorized' };
+  if (!target || !grantableRoles(caller?.role).includes(target.role as StaffRole)) {
+    return { ok: false, error: 'not_authorized' };
+  }
 
   const { error } = await admin.auth.admin.updateUserById(targetUserId, {
     password: newPassword,

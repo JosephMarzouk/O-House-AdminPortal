@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { alert } from '@/components/ui/alert-dialog';
 import { savePlace } from '@/lib/actions/places';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,11 +53,11 @@ export function PlaceForm({
         items,
       });
       if (res.ok) {
-        toast.success(place ? dict.placeSaved : dict.placeCreated);
+        alert.success(place ? dict.placeSaved : dict.placeCreated);
         router.push('/places');
         router.refresh();
       } else {
-        toast.error(errorMessage(dict, res.error));
+        alert.error(errorMessage(dict, res.error));
       }
     });
   }

@@ -37,7 +37,7 @@ export const SIDEBAR_COOKIE = 'sidebar';
 export function PortalSidebar({
   dict,
   locale,
-  isAdmin,
+  canManageUsers,
   userName,
   roleLabel,
   initialCollapsed,
@@ -45,7 +45,7 @@ export function PortalSidebar({
 }: {
   dict: Dictionary;
   locale: Locale;
-  isAdmin: boolean;
+  canManageUsers: boolean;
   userName: string;
   roleLabel: string;
   initialCollapsed: boolean;
@@ -72,9 +72,10 @@ export function PortalSidebar({
     { href: '/assignments', label: dict.navAssignments, Icon: ClipboardIcon },
     { href: '/places', label: dict.navPlaces, Icon: MapPinIcon },
     { href: '/departments', label: dict.navDepartments, Icon: BuildingsIcon },
-    // set_user_role is admin-only and staff creation needs the service key,
-    // so a manager would find nothing but disabled controls here.
-    ...(isAdmin ? [{ href: '/users', label: dict.navUsers, Icon: UsersIcon }] : []),
+    // Admins and managers. An inspector is a portal user but not a staff
+    // administrator, and the page and the RPC behind it both say so too —
+    // this row only spares them a dead end.
+    ...(canManageUsers ? [{ href: '/users', label: dict.navUsers, Icon: UsersIcon }] : []),
   ];
 
   const rowClass = (active: boolean) =>

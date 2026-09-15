@@ -25,7 +25,8 @@ export async function listProfiles(): Promise<PortalProfile[]> {
   return data ?? [];
 }
 
-/** One row of the admin Users screen. Phone is here and nowhere else. */
+/** One row of the Users screen. Phone is here and nowhere else — and only
+ *  for an admin caller; a manager gets the same row with phone null. */
 export type StaffRow = {
   id: string;
   name: string;
@@ -39,13 +40,17 @@ export type StaffRow = {
 };
 
 /**
- * The Users screen's data, phone numbers included — admins only.
+ * The Users screen's data — admins and managers, phone numbers for admins.
  *
  * Goes through the admin_staff_list() RPC rather than the table because the
- * table no longer exposes `phone` to anyone. The RPC is SECURITY DEFINER
- * and raises for a non-admin caller, so this is a real boundary rather than
- * a screen that is merely hidden: a manager or inspector calling it
- * directly gets an exception, not a quietly empty list.
+ * table no longer exposes `phone` to anyone. The RPC is SECURITY DEFINER and
+ * decides both halves itself (0012): it raises for an inspector or a cleaner,
+ * and returns every row with phone null to a manager. So this is a real
+ * boundary rather than a screen that is merely hidden — calling it directly as
+ * an inspector gets an exception, not a quietly empty list, and calling it as
+ * a manager gets no phone number however the screen is rendered.
+ *
+ * The name is 0011's and stayed: see the note at the head of 0012.
  */
 export async function adminStaffList(): Promise<StaffRow[]> {
   const supabase = await createClient();
