@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { Fragment, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KeyIcon, PlusIcon } from '@/components/icons';
@@ -54,6 +54,18 @@ export type UserRow = {
  *  the button. */
 const MIN_PASSWORD = 8;
 
+/**
+ * Descending privilege — the order the table's sections run in, and the
+ * order a row select offers.
+ *
+ * `admin` is on the front of STAFF_ROLES rather than in it: STAFF_ROLES is
+ * the list the portal may GRANT, and admin is deliberately absent from that
+ * (see lib/types/database.ts). Here the question is only what to display,
+ * and admins have to be displayable — they exist, and an admin looking at
+ * this screen should see the other admins.
+ */
+const ROLE_ORDER: readonly Role[] = ['admin', ...STAFF_ROLES];
+
 export function UsersManager({
   users,
   departments,
@@ -94,6 +106,42 @@ export function UsersManager({
           ? dict.roleInspector
           : dict.roleCleaner;
   }
+
+  function rolePlural(r: Role) {
+    return r === 'admin'
+      ? dict.roleAdminPlural
+      : r === 'manager'
+        ? dict.roleManagerPlural
+        : r === 'inspector'
+          ? dict.roleInspectorPlural
+          : r === 'cleaner'
+            ? dict.roleCleanerPlural
+            : // Not in ROLE_ORDER: a role the database grew and this file did
+              // not. Label it with the raw value rather than guessing.
+              r;
+  }
+
+  // The table is grouped by role, most-privileged first, rather than sorted
+  // flat. `order by role` in admin_staff_list is alphabetical — admin,
+  // cleaner, inspector, manager — which is not an order anyone reads a staff
+  // list in. ROLE_ORDER is, and it is the same list the row selects offer,
+  // so a role change moves the row into the section the select just named.
+  //
+  // Empty roles are dropped: a heading over nothing is noise, and the page
+  // already says how many of each there are by showing them.
+  //
+  // The section list is ROLE_ORDER plus anything the data holds that it does
+  // not, rather than ROLE_ORDER alone. profiles_role_check allows exactly the
+  // four roles below, so the tail is normally empty — but this project has
+  // twice shipped code whose idea of the database was out of date, and a flat
+  // `ROLE_ORDER.map` would drop a fifth role's accounts off this screen in
+  // silence rather than show them in a section nobody styled.
+  const extraRoles = [...new Set(users.map((u) => u.role))].filter(
+    (r) => !ROLE_ORDER.includes(r),
+  );
+  const groups = [...ROLE_ORDER, ...extraRoles]
+    .map((role) => ({ role, rows: users.filter((u) => u.role === role) }))
+    .filter((g) => g.rows.length > 0);
 
   function report(res: { ok: true } | { ok: false; error: string }) {
     if (res.ok) {
@@ -201,15 +249,33 @@ export function UsersManager({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.map((u) => {
-            // An admin's own row keeps an 'admin' option purely so its select
-            // has something to display. The select is disabled there, so the
-            // option is never reachable from anyone else's row.
-            const isAdmin = u.role === 'admin';
-            const roleOptions: Role[] = isAdmin ? ['admin', ...STAFF_ROLES] : [...STAFF_ROLES];
+          {groups.map(({ role, rows }, groupIndex) => (
+            <Fragment key={role}>
+              {/* A label row rather than a second <Table> per group: one
+                  header, one set of column widths, so the selects below stay
+                  in line down the whole page. Whitespace does the separating,
+                  which is why this row carries no rule and no hover. */}
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell colSpan={6} className={groupIndex > 0 ? 'pt-8 pb-1' : 'pb-1'}>
+                  <span className="section-label">{rolePlural(role)}</span>
+                  <span className="ms-2 text-caption tabular-nums text-text/50">{rows.length}</span>
+                </TableCell>
+              </TableRow>
 
-            return (
-              <TableRow key={u.id}>
+              {rows.map((u) => {
+                // An admin's own row keeps an 'admin' option purely so its
+                // select has something to display. The select is disabled
+                // there, so the option is never reachable from another row.
+                const isAdmin = u.role === 'admin';
+                const roleOptions: Role[] = isAdmin ? [...ROLE_ORDER] : [...STAFF_ROLES];
+
+                return (
+                  // Keyed by role as well as id, so a confirmed role change
+                  // remounts the row in its new section with the selects
+                  // re-seeded. Keyed by id alone, React would move the same
+                  // DOM node and the uncontrolled selects would keep showing
+                  // whatever was last picked.
+                  <TableRow key={`${u.id}-${u.role}`}>
                 <TableCell className="font-semibold">{u.name || dict.none}</TableCell>
                 <TableCell dir="ltr">
                   {/* profiles.email is deliberately '' for phone accounts —
@@ -309,9 +375,11 @@ export function UsersManager({
                     <KeyIcon />
                   </Button>
                 </TableCell>
-              </TableRow>
-            );
-          })}
+                  </TableRow>
+                );
+              })}
+            </Fragment>
+          ))}
         </TableBody>
       </Table>
 

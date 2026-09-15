@@ -86,6 +86,12 @@ export const dictionaries = {
     roleManager: 'مشرف',
     roleInspector: 'مفتش',
     roleCleaner: 'عامل نظافة',
+    // Plurals, for the section headings on the users screen. The singular
+    // labels stay in the row selects, where they name one person's role.
+    roleAdminPlural: 'المدراء',
+    roleManagerPlural: 'المشرفون',
+    roleInspectorPlural: 'المفتشون',
+    roleCleanerPlural: 'عمال النظافة',
 
     // common
     loading: 'جارٍ التحميل…',
@@ -276,6 +282,12 @@ export const dictionaries = {
     roleManager: 'Manager',
     roleInspector: 'Inspector',
     roleCleaner: 'Cleaner',
+    // Plurals, for the section headings on the users screen. The singular
+    // labels stay in the row selects, where they name one person's role.
+    roleAdminPlural: 'Admins',
+    roleManagerPlural: 'Managers',
+    roleInspectorPlural: 'Inspectors',
+    roleCleanerPlural: 'Cleaners',
 
     loading: 'Loading…',
     noData: 'No data',
