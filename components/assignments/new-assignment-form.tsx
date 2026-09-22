@@ -123,15 +123,11 @@ export function NewAssignmentForm({
         scheduledDate: date,
         windowStart: from,
         windowEnd: to,
-        items: items
-          .filter((i) => i.text_ar.trim() || i.text_en.trim())
-          .map(({ text_ar, text_en, type, critical, requires_photo }) => ({
-            text_ar,
-            text_en,
-            type,
-            critical,
-            requires_photo,
-          })),
+        // Whole items, ids included: an item seeded from the place keeps its
+        // id, which becomes assignment_items.template_item_id, and its
+        // correct answer travels with it. The server action runs these
+        // through templateItems() before they reach the RPC.
+        items: items.filter((i) => i.text_ar.trim() || i.text_en.trim()),
       });
 
       if (res.ok) {

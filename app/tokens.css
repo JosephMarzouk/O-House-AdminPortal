@@ -139,6 +139,13 @@
   --spacing-thumb: 64px; /* photo evidence thumbnails */
   --spacing-rail: 64px; /* collapsed sidebar */
   --spacing-sidebar: 240px;
+  /* One tracker column, and the phone drawer: most of a phone's width, so
+     the edge of the next column (or the page) stays in view as the cue that
+     there is more to swipe to. */
+  --spacing-lane: 85vw;
+  /* A tracker column's floor on a wide screen — six of them fit beside the
+     rail on a laptop, and a place name wraps to two lines at most. */
+  --spacing-column: 240px;
   --container-dialog: 440px;
 
   /* ---------- Radius. Flat by default; controls are the one deliberate departure. ---------- */

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getProfile, canManageUsers, canUsePortal } from '@/lib/auth';
+import { getProfile, canManageUsers, canSchedule, canUsePortal } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
@@ -48,11 +48,14 @@ export default async function PortalLayout({ children }: { children: React.React
         : dict.roleInspector;
 
   return (
-    <div className="flex min-h-dvh">
+    // A column on phones (the sidebar's ink bar on top of the page), a row
+    // from md up (the sticky aside beside it).
+    <div className="flex min-h-dvh flex-col md:flex-row">
       <PortalSidebar
         dict={dict}
         locale={locale}
         canManageUsers={manages}
+        canSchedule={canSchedule(profile.role)}
         userName={profile.name}
         roleLabel={roleLabel}
         initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}

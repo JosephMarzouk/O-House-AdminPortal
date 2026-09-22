@@ -15,6 +15,7 @@ export type AssignmentWithItems = Assignment & { items: AssignmentItem[] };
 export const EFFECTIVE_STATUSES = [
   'pending',
   'in_progress',
+  'follow_up',
   'submitted',
   'approved',
   'rejected',
@@ -55,9 +56,8 @@ export type AssignmentFilters = {
  * Ask for a bounded page deliberately and return `total` from an exact count
  * so callers can say "200 of 1240" instead of quietly lying.
  *
- * 200 also keeps itemCountsFor() viable: it puts every id in the query string,
- * which is ~45 bytes per UUID once percent-encoded, and a few hundred rows is
- * enough URL for a gateway to reject the request outright.
+ * (itemCountsFor() used to be the other reason for keeping this small — it puts
+ * every id in the query string — but it now sends them in slices.)
  */
 const DEFAULT_LIMIT = 200;
 
@@ -88,31 +88,113 @@ export async function listAssignments(
   return { rows: data ?? [], total: count ?? data?.length ?? 0 };
 }
 
-export type ItemCounts = { total: number; done: number };
+export type ItemCounts = { total: number; done: number; followUp: number };
 
 /**
- * done/total per assignment, in one round trip rather than N+1.
- * The list needs progress on every row, and the app shows the same figure.
+ * `.in()` puts every id in the query string — ~45 bytes per UUID once
+ * percent-encoded — so a long list is sent in slices a gateway will accept.
+ * 100 ids is ~4.5KB of URL; the board can hold several hundred tasks.
+ */
+const IN_CHUNK = 100;
+
+function chunks<T>(xs: T[], size = IN_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
+  return out;
+}
+
+/**
+ * done/total per assignment, plus how many items are waiting on a follow-up,
+ * in one round trip per slice rather than N+1. The list and the board need
+ * progress on every row, and the app shows the same figure.
  */
 export async function itemCountsFor(ids: string[]): Promise<Map<string, ItemCounts>> {
   const counts = new Map<string, ItemCounts>();
   if (ids.length === 0) return counts;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('assignment_items')
-    .select('assignment_id, status')
-    .in('assignment_id', ids);
+  const pages = await Promise.all(
+    chunks(ids).map((slice) =>
+      supabase.from('assignment_items').select('assignment_id, status').in('assignment_id', slice),
+    ),
+  );
 
-  if (error) throw new Error(`itemCountsFor: ${error.message}`);
-
-  for (const row of data ?? []) {
-    const c = counts.get(row.assignment_id) ?? { total: 0, done: 0 };
-    c.total += 1;
-    if (row.status === 'done') c.done += 1;
-    counts.set(row.assignment_id, c);
+  for (const { data, error } of pages) {
+    if (error) throw new Error(`itemCountsFor: ${error.message}`);
+    for (const row of data ?? []) {
+      const c = counts.get(row.assignment_id) ?? { total: 0, done: 0, followUp: 0 };
+      c.total += 1;
+      if (row.status === 'done') c.done += 1;
+      if (row.status === 'follow_up') c.followUp += 1;
+      counts.set(row.assignment_id, c);
+    }
   }
   return counts;
+}
+
+/** An item as the reject dialog lists it. */
+export type ReviewItem = { id: string; text_ar: string; text_en: string };
+
+/**
+ * The checklist items of the given assignments, keyed by assignment — what
+ * the board's "send back" dialog offers for rejection. Only asked for the
+ * cards that can actually be sent back (In Review), so it stays small.
+ */
+export async function reviewItemsFor(ids: string[]): Promise<Map<string, ReviewItem[]>> {
+  const byTask = new Map<string, ReviewItem[]>();
+  if (ids.length === 0) return byTask;
+
+  const supabase = await createClient();
+  const pages = await Promise.all(
+    chunks(ids).map((slice) =>
+      supabase
+        .from('assignment_items')
+        .select('id, assignment_id, text_ar, text_en')
+        .in('assignment_id', slice)
+        .order('sort_order'),
+    ),
+  );
+
+  for (const { data, error } of pages) {
+    if (error) throw new Error(`reviewItemsFor: ${error.message}`);
+    for (const { assignment_id, ...item } of data ?? []) {
+      byTask.set(assignment_id, [...(byTask.get(assignment_id) ?? []), item]);
+    }
+  }
+  return byTask;
+}
+
+/** The board's page size. A busy day is ~100 tasks; this is the safety net. */
+const TRACKER_LIMIT = 500;
+
+/**
+ * Everything the task tracker shows for one Cairo day: the tasks scheduled on
+ * it, plus open work carried over from earlier days — a follow-up waiting on
+ * a fix, or a submission waiting on review — which would otherwise vanish
+ * from the board the morning after it happened.
+ *
+ * Legacy rows (the old web client's, with no scheduled_date) never match
+ * either branch, which is what keeps them off the board.
+ *
+ * `day` MUST come through parseDay() (lib/format.ts): it is interpolated into
+ * the filter.
+ */
+export async function listTrackerTasks(
+  day: string,
+): Promise<{ rows: Assignment[]; total: number }> {
+  const supabase = await createClient();
+  const { data, error, count } = await supabase
+    .from('assignments_v')
+    .select('*', { count: 'exact' })
+    .or(
+      `scheduled_date.eq.${day},and(scheduled_date.lt.${day},effective_status.in.(follow_up,submitted))`,
+    )
+    .order('scheduled_date', { ascending: true })
+    .order('window_start', { ascending: true, nullsFirst: false })
+    .range(0, TRACKER_LIMIT - 1);
+
+  if (error) throw new Error(`listTrackerTasks: ${error.message}`);
+  return { rows: data ?? [], total: count ?? data?.length ?? 0 };
 }
 
 export async function getAssignment(id: string): Promise<AssignmentWithItems | null> {

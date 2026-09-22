@@ -42,6 +42,8 @@ export const cn = createCn({
         'thumb',
         'rail',
         'sidebar',
+        'lane',
+        'column',
       ],
       container: ['dialog'],
     },

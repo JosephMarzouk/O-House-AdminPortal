@@ -13,7 +13,7 @@ import { listSites } from '@/lib/db/places';
 import { assignableStaff, listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtNum, fmtWindow, todayInCairo } from '@/lib/format';
-import { StatusBadge } from '@/components/status-badge';
+import { STATUS, StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
@@ -27,15 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-
-const STATUS_LABEL: Record<EffectiveStatus, string> = {
-  pending: 'statusPending',
-  in_progress: 'statusInProgress',
-  submitted: 'statusSubmitted',
-  approved: 'statusApproved',
-  rejected: 'statusRejected',
-  expired: 'statusExpired',
-};
 
 export default async function AssignmentsPage({
   searchParams,
@@ -71,8 +62,7 @@ export default async function AssignmentsPage({
     listProfiles(),
   ]);
 
-  // One round trip for both tables; listAssignments caps each page well under
-  // the point where this .in() list would outgrow the URL.
+  // One query per 100 ids for both tables together.
   const counts = await itemCountsFor(
     [...review.rows, ...rest.rows].map((r) => r.id!).filter(Boolean),
   );
@@ -134,7 +124,14 @@ export default async function AssignmentsPage({
     const title =
       bilingual(locale, a.title_ar, a.title_en) ||
       bilingual(locale, a.template_title_ar, a.template_title_en);
-    const place = bilingual(locale, a.site_name_ar, a.site_name_en);
+    // A task scheduled from a zone round carries the round's name first, so
+    // "Zone 1 Morning · Gym" reads the way the planner and the app say it.
+    const place = [
+      bilingual(locale, a.round_title_ar, a.round_title_en),
+      bilingual(locale, a.site_name_ar, a.site_name_en),
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
     return (
       <TableRow key={a.id}>
@@ -213,7 +210,7 @@ export default async function AssignmentsPage({
                       : 'bg-surface text-text/70 hover:bg-text/7 hover:text-text',
                   )}
                 >
-                  {s === 'all' ? dict.filterAll : dict[STATUS_LABEL[s] as keyof typeof dict]}
+                  {s === 'all' ? dict.filterAll : dict[STATUS[s].label]}
                   <LinkPending />
                 </Link>
               );

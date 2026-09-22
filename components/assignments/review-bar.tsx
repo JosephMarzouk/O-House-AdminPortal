@@ -3,21 +3,10 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { alert } from '@/components/ui/alert-dialog';
-import { approveAssignment, rejectItems, extendAssignment } from '@/lib/actions/assignments';
+import { approveAssignment } from '@/lib/actions/assignments';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
+import { ExtendDialog, RejectItemsDialog } from '@/components/assignments/review-dialogs';
+import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import type { AssignmentItem, EffectiveStatus } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
 
@@ -25,6 +14,9 @@ import { errorMessage } from '@/lib/errors';
  * The review actions as a floating bar — paper, 20px radius, the mid shadow —
  * that sticks to the bottom of the viewport while the checklist scrolls
  * underneath it, the way the app's bottom bar does.
+ *
+ * The reject and extend forms live in review-dialogs.tsx, shared with the
+ * tracker board.
  */
 export function ReviewBar({
   assignmentId,
@@ -41,31 +33,26 @@ export function ReviewBar({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [reason, setReason] = useState('');
-
   const [extendOpen, setExtendOpen] = useState(false);
-  const [deadline, setDeadline] = useState('');
-  const [extNote, setExtNote] = useState('');
 
   // approve_assignment only accepts a row already in 'submitted'; extend
-  // refuses anything submitted or approved. Mirror both so the buttons never
-  // promise something the database will silently decline.
+  // refuses anything submitted or approved — and, since 0013, a follow-up,
+  // which never expires and so has no deadline to move. Mirror all of that so
+  // the buttons never promise something the database will silently decline.
   const canReview = status === 'submitted';
-  const canExtend = status !== 'submitted' && status !== 'approved';
+  const canExtend = status !== 'submitted' && status !== 'approved' && status !== 'follow_up';
 
-  function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: () => void) {
+  function done() {
+    alert.success(dict.saved);
+    router.refresh();
+  }
+
+  function approve() {
     startTransition(async () => {
-      const res = await fn();
-      if (res.ok) {
-        alert.success(dict.saved);
-        done?.();
-        router.refresh();
-      } else {
-        alert.error(errorMessage(dict, res.error));
-      }
+      const res = await approveAssignment(assignmentId);
+      if (res.ok) done();
+      else alert.error(errorMessage(dict, res.error));
     });
   }
 
@@ -75,132 +62,37 @@ export function ReviewBar({
     <div className="sticky bottom-6 flex flex-wrap items-center gap-2 rounded-tile bg-raised p-4 shadow-md shadow-(color:--color-shade)">
       {canReview && (
         <>
-          <Button disabled={pending} onClick={() => run(() => approveAssignment(assignmentId))}>
+          <Button disabled={pending} onClick={approve}>
             {dict.approve}
           </Button>
-
-          <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-            <DialogTrigger render={<Button variant="outline" disabled={pending} />}>
-              {dict.reject}
-            </DialogTrigger>
-            <DialogContent closeLabel={dict.cancel}>
-              <DialogHeader>
-                <DialogTitle>{dict.selectItemsToReject}</DialogTitle>
-              </DialogHeader>
-
-              <ul className="max-h-64 overflow-y-auto">
-                {items.map((item) => (
-                  <li key={item.id} className="flex min-h-control items-center gap-3">
-                    <Checkbox
-                      id={`rej-${item.id}`}
-                      checked={selected.has(item.id)}
-                      onCheckedChange={(v) =>
-                        setSelected((prev) => {
-                          const next = new Set(prev);
-                          if (v) next.add(item.id);
-                          else next.delete(item.id);
-                          return next;
-                        })
-                      }
-                    />
-                    <Label htmlFor={`rej-${item.id}`} className="text-base text-text">
-                      {bilingual(locale, item.text_ar, item.text_en) || dict.none}
-                    </Label>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="space-y-1">
-                <Label htmlFor="reject-reason">{dict.rejectReason}</Label>
-                <Textarea
-                  id="reject-reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setRejectOpen(false)}>
-                  {dict.cancel}
-                </Button>
-                {/* The one destructive button in the portal: rejecting sends
-                    work back, so it wears magenta. */}
-                <Button
-                  variant="destructive"
-                  disabled={pending}
-                  onClick={() =>
-                    run(() => rejectItems(assignmentId, [...selected], reason), () => {
-                      setRejectOpen(false);
-                      setSelected(new Set());
-                      setReason('');
-                    })
-                  }
-                >
-                  {dict.reject}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" disabled={pending} onClick={() => setRejectOpen(true)}>
+            {dict.reject}
+          </Button>
+          <RejectItemsDialog
+            assignmentId={assignmentId}
+            items={items}
+            open={rejectOpen}
+            onOpenChange={setRejectOpen}
+            onDone={done}
+            dict={dict}
+            locale={locale}
+          />
         </>
       )}
 
       {canExtend && (
-        <Dialog open={extendOpen} onOpenChange={setExtendOpen}>
-          <DialogTrigger render={<Button variant="outline" disabled={pending} />}>
+        <>
+          <Button variant="outline" disabled={pending} onClick={() => setExtendOpen(true)}>
             {dict.extend}
-          </DialogTrigger>
-          <DialogContent closeLabel={dict.cancel}>
-            <DialogHeader>
-              <DialogTitle>{dict.extend}</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-1">
-              <Label htmlFor="new-deadline">{dict.newDeadline}</Label>
-              <Input
-                id="new-deadline"
-                type="datetime-local"
-                dir="ltr"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ext-note">
-                {dict.extensionNote} <span className="text-text/55">({dict.optional})</span>
-              </Label>
-              <Textarea
-                id="ext-note"
-                rows={2}
-                value={extNote}
-                onChange={(e) => setExtNote(e.target.value)}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setExtendOpen(false)}>
-                {dict.cancel}
-              </Button>
-              <Button
-                disabled={pending || !deadline}
-                onClick={() =>
-                  run(
-                    // datetime-local has no zone; the browser reads it as local
-                    // time, which for a Cairo-based club is the intended one.
-                    () => extendAssignment(assignmentId, new Date(deadline).toISOString(), extNote),
-                    () => {
-                      setExtendOpen(false);
-                      setDeadline('');
-                      setExtNote('');
-                    },
-                  )
-                }
-              >
-                {dict.save}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </Button>
+          <ExtendDialog
+            assignmentId={assignmentId}
+            open={extendOpen}
+            onOpenChange={setExtendOpen}
+            onDone={done}
+            dict={dict}
+          />
+        </>
       )}
     </div>
   );

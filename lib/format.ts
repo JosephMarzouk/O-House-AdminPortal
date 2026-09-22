@@ -56,6 +56,55 @@ export function todayInCairo(d: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TZ }).format(d);
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * A calendar day `n` days from `ymd`, as YYYY-MM-DD.
+ *
+ * Stepped from UTC noon, like windowDays() in lib/dashboard.ts: 24-hour hops
+ * from midday never cross a midnight, so no DST change can skip or repeat a
+ * day. The input and output are calendar dates, not instants — no timezone
+ * is involved at all.
+ */
+export function addDays(ymd: string, n: number): string {
+  return new Date(Date.parse(`${ymd}T12:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * The Saturday that starts `ymd`'s week. Egypt's week runs Saturday to
+ * Friday (CLDR's first day for EG), and that is how the club rosters — so the
+ * planner's week does too, whatever the viewer's language.
+ */
+export function weekStart(ymd: string): string {
+  const dow = new Date(`${ymd}T12:00:00Z`).getUTCDay(); // 0 = Sunday … 6 = Saturday
+  return addDays(ymd, -((dow + 1) % 7));
+}
+
+/** "Sat 19 Sep" — a planner column heading. Read in UTC because `ymd` is a
+ *  calendar date, not an instant; any other zone could shift it a day. */
+export function fmtWeekday(ymd: string, locale: Locale): string {
+  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString(localeTag(locale), {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * A `?date=` / `?week=` param as a real calendar day, or undefined.
+ *
+ * The tracker interpolates it into a PostgREST `.or()` filter string, so
+ * anything but YYYY-MM-DD must be refused here — a comma or a parenthesis
+ * would rewrite the filter rather than fail. The round trip through Date
+ * catches 2026-02-31.
+ */
+export function parseDay(v: string | string[] | undefined): string | undefined {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined;
+  const d = new Date(`${v}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : undefined;
+}
+
 /**
  * A count in the locale's own numerals. fmtDate/fmtDateTime use ar-EG, whose
  * default numbering system is arab (٠١٢٣); a chart axis left to its own

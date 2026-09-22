@@ -35,7 +35,9 @@ function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="px-8 pt-8">
+    // The gutter halves on a phone: 40px a side leaves a 375px screen 295px
+    // of page, and the tables and board need it more than the margin does.
+    <header className="px-4 pt-6 md:px-8 md:pt-8">
       <p className="section-label">{kicker}</p>
       <h1 className="mt-1 text-display">{title}</h1>
       {subtitle && <p className="mt-1 text-lg text-text/55">{subtitle}</p>}
@@ -71,7 +73,7 @@ function BackLink({ href, label }: { href: string; label: string }) {
 /** The body under the title block. Sections inside are separated by
  *  whitespace alone — no rules, borders or boxes. */
 function PageBody({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div className={cn('space-y-8 px-8 py-8', className)} {...props} />;
+  return <div className={cn('space-y-8 px-4 py-6 md:px-8 md:py-8', className)} {...props} />;
 }
 
 export { PageHeader, PageBody, BackLink };

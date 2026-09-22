@@ -32,6 +32,12 @@ export function errorMessage(dict: Dictionary, code: string): string {
     not_in_submitted_state: dict.notInSubmittedState,
     already_closed: dict.alreadyClosed,
     deadline_must_be_future: dict.deadlineMustBeFuture,
+    // rounds + week plan (0013)
+    need_at_least_one_place: dict.needAtLeastOnePlace,
+    round_places_invalid: dict.roundPlacesInvalid,
+    invalid_assignee: dict.invalidAssignee,
+    past_date: dict.pastDate,
+    invalid_plan: dict.invalidPlan,
   };
   return map[code] ?? dict.errorGeneric;
 }

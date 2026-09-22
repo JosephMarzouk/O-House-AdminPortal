@@ -5,15 +5,20 @@ import {
   StatusApprovedIcon,
   StatusExpiredIcon,
   StatusExtendedIcon,
+  StatusFollowUpIcon,
   StatusInProgressIcon,
   StatusPendingIcon,
   StatusRejectedIcon,
   StatusSubmittedIcon,
 } from '@/components/icons';
 
-const STATUS: Record<EffectiveStatus, { label: keyof Dictionary; Icon: typeof StatusPendingIcon }> = {
+export const STATUS: Record<
+  EffectiveStatus,
+  { label: keyof Dictionary; Icon: typeof StatusPendingIcon }
+> = {
   pending: { label: 'statusPending', Icon: StatusPendingIcon },
   in_progress: { label: 'statusInProgress', Icon: StatusInProgressIcon },
+  follow_up: { label: 'statusFollowUp', Icon: StatusFollowUpIcon },
   submitted: { label: 'statusSubmitted', Icon: StatusSubmittedIcon },
   approved: { label: 'statusApproved', Icon: StatusApprovedIcon },
   rejected: { label: 'statusRejected', Icon: StatusRejectedIcon },

@@ -24,7 +24,7 @@ should return nothing but comments in `globals.css`.
 | cyan | `bg-cyan` / `text-cyan` | `#0088B0` | Every primary action, active nav, focus rings, selection. |
 | cyan-dark | `text-cyan-dark` | `#006786` | Link and accent *paragraph* text (base cyan is only 3:1 on paper), pressed primaries, "submitted". |
 | cyan-tint | `bg-cyan-tint` | `#E9F8FF` | Tinted fills: in-progress tag, info banners, selected rows. |
-| magenta | `bg-magenta` / `text-magenta` | `#AA0B56` | **Reserved.** Rejected, expired/overdue, destructive, errors. Nothing else. |
+| magenta | `bg-magenta` / `text-magenta` | `#AA0B56` | **Reserved.** Rejected, expired/overdue, follow-up, destructive, errors. Nothing else. |
 | magenta-tint | `bg-magenta-tint` | `#FFF1F4` | Ground for the overdue tile and error banners. |
 | magenta-deep | `text-magenta-deep` | `#4B1528` | Text sitting on magenta-tint. |
 | paper | `bg-paper` | `#F3F2F2` | The page ground. |
@@ -198,6 +198,11 @@ no drawer to sit beside and nothing to read down.
    scrolls, and `overflow-y-auto` so it scrolls itself rather than clipping on
    a short viewport. Collapsing snaps between `w-sidebar` and `w-rail` with no
    transition — see the comment in the component for why width is not animated.
+   **Below `md`** there is no room beside the page for even the rail: a
+   `h-control-lg` ink bar sticks to the top with a menu button, and the same
+   nav opens from the start edge as a Base UI Drawer (`w-sidebar`, capped at
+   `max-w-lane`), swiped back the way it came — mirrored for Arabic. Page
+   gutters halve there too (`px-4`, `md:px-8`).
 7. **Dialogs**: surface, 4px, `shadow-lg`, 440px, backdrop `neutral-900/50`
    plus `backdrop-blur-sm`, actions at the end. The blur is the one place
    Broadsheet asks the browser for an effect rather than a colour: a dialog can
@@ -217,6 +222,21 @@ no drawer to sit beside and nothing to read down.
    plus `text-text` on the same element, because `<body>` sets `color` outside
    that subtree and inheritance would otherwise carry the root theme's ink in.
    **Anything set outside a scoped palette has to be set again inside it.**
+
+10. **The task tracker board** (`/tracker`): one lane per stage — To do, In
+    progress, Follow-up, In review, Done, Overdue — with no box around a lane;
+    the header (11px label + a count wearing the stage's own status tag) is the
+    structure. Cards are `Card`s: the round name as the cyan kicker, the place,
+    then assignee, date · window and a 4px done/total bar (magenta while a
+    follow-up is open). While a card is held, the lanes it may land in take the
+    `cyan-tint` ground and a dashed cyan outline (solid under the pointer);
+    nothing else lights up. On a phone each lane is `w-lane` (85vw) and snaps,
+    so the next lane's edge is the cue to swipe; from `md` up lanes share the
+    width with a `min-w-column` floor and scroll only when six no longer fit.
+11. **The week planner** (`/rounds`): the grid is a plain table — rounds down,
+    days across, a compact 44px select per cell, today's heading in
+    `cyan-dark`, a changed cell's border in cyan. Unsaved changes raise the same
+    floating bar as the review bar. On a phone the grid is read a day at a time.
 
 ## Component states — themed, never browser default
 
@@ -244,7 +264,14 @@ its own tag beside the status, never an amber warning icon.
 | approved | cyan | paper | CheckCircle |
 | rejected | magenta | paper | XCircle |
 | expired / overdue | transparent, 1px magenta outline | magenta | ClockCountdown |
+| follow_up | magenta-tint | magenta-deep | Flag |
 | extended (marker) | surface | `text/60` | ArrowsClockwise |
+
+The three alarm states each take a different weight of the one alarm colour so
+they stay apart at a glance: rejected is the solid fill (work sent back),
+expired the outline (the clock ran out), follow-up the tint (an answer missed
+its correct answer and is waiting on a fix — it never expires). A checklist
+item that missed wears the same follow-up tag.
 
 Tag anatomy: 11px, +0.02em, 3×10px padding, `rounded-control` (which clamps to
 a pill at tag height), 12px icon before the label, in a `<TagGroup>` so status
@@ -263,7 +290,12 @@ invariant for the same reason.
 - `inspector_id` means "the person assigned" (a cleaner or an inspector).
 - `submissions.answers` is deprecated; live checklist state is `assignment_items`.
 - Roles: `admin | manager | inspector | cleaner`.
-- All writes go through `SECURITY DEFINER` RPCs. Never add a direct table write.
+- Everything that touches an assignment — creating, reviewing, scheduling a
+  round — goes through a `SECURITY DEFINER` RPC; `submissions` and
+  `assignment_items` have no write policy, so a direct write silently changes
+  nothing. Configuration (`templates`, `sites`, `departments`,
+  `round_templates`) is written directly under RLS, always with `.select('id')`
+  so a zero-row write is caught.
 - Photo evidence is permanent. The portal never offers a delete-photo control.
 - Times are `Africa/Cairo`.
 

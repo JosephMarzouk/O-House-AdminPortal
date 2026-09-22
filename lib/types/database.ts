@@ -1,6 +1,11 @@
 /**
- * Generated from the live "Check List" project (ptonujazlljpkgpfrkpw).
- * Regenerate after any schema change — do not hand-edit.
+ * The live "Check List" project (ptonujazlljpkgpfrkpw), as the portal sees it.
+ *
+ * Hand-curated, NOT generated: the domain unions below, `Insert: never` on the
+ * RPC-only tables and the per-column comments do not come out of the
+ * generator, so regenerating would silently drop them. Edit by hand after a
+ * migration — 0013 added round_templates, rounds, the answer columns and
+ * `follow_up`.
  *
  * Legacy/unused relations (_backup_pre_ohouse_*, device_tokens) are omitted;
  * everything the portal or the Flutter app touches is here.
@@ -117,6 +122,8 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          /** The zone round this task was scheduled from (0013); null for a one-off assignment. */
+          round_id: string | null;
           extended_at: string | null;
           extended_by: string | null;
           extended_until: string | null;
@@ -151,9 +158,16 @@ export type Database = {
       };
       assignment_items: {
         Row: {
+          /** The latest answer given (0013): 'yes'|'no', 'pass'|'fail', a number as text, or free text. */
+          answer: string | null;
           assignment_id: string;
+          /** The item's correct-answer rule, copied from the place (0013). Null = any answer is fine. */
+          correct: Json | null;
           critical: boolean;
           done_at: string | null;
+          /** The first wrong answer and when it was given — kept after the fix, as history. */
+          flagged_answer: string | null;
+          flagged_at: string | null;
           id: string;
           note: string | null;
           photo_paths: string[];
@@ -218,6 +232,43 @@ export type Database = {
         Update: Partial<Database['public']['Tables']['actions']['Row']>;
         Relationships: [];
       };
+      /** A zone round (0013): an ordered list of places, each with its own window. */
+      round_templates: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          /** RoundPlace[] — parse with roundPlaces() in lib/rounds.ts. */
+          places: Json;
+          title_ar: string;
+          title_en: string;
+        };
+        Insert: {
+          active?: boolean;
+          id?: string;
+          places?: Json;
+          title_ar?: string;
+          title_en?: string;
+        };
+        Update: Partial<Database['public']['Tables']['round_templates']['Insert']>;
+        Relationships: [];
+      };
+      /** One round template on one day for one person (0013). Written only by schedule_rounds. */
+      rounds: {
+        Row: {
+          /** Null once unassigned while some of its tasks had already started. */
+          assignee_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          round_template_id: string;
+          scheduled_date: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       /** Always read effective_status, never submissions.status. */
@@ -230,6 +281,9 @@ export type Database = {
           deadline: string | null;
           effective_status: EffectiveStatus | null;
           was_extended: boolean | null;
+          /** The zone round's name when the task came from one (0013). */
+          round_title_en: string | null;
+          round_title_ar: string | null;
         };
         Insert: never;
         Update: never;
@@ -266,7 +320,16 @@ export type Database = {
         Args: { p_assignment_id: string; p_new_deadline: string; p_note?: string };
         Returns: undefined;
       };
-      mark_item_done: { Args: { p_item_id: string; p_note?: string }; Returns: undefined };
+      mark_item_done: {
+        Args: { p_item_id: string; p_note?: string; p_answer?: string };
+        Returns: undefined;
+      };
+      /**
+       * The week planner's Save (0013). Admin/manager only. Each cell is
+       * { round_template_id, date: 'YYYY-MM-DD', assignee_id | null }; raises
+       * PAST_DATE / INVALID_ASSIGNEE. Returns the ScheduleResult counts.
+       */
+      schedule_rounds: { Args: { p_plan: Json }; Returns: Json };
       attach_item_photo: { Args: { p_item_id: string; p_storage_path: string }; Returns: undefined };
       submit_assignment: {
         Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string };
@@ -350,17 +413,35 @@ export function grantableRoles(callerRole: string | undefined | null): readonly 
   return callerRole === 'admin' ? STAFF_ROLES : (['inspector', 'cleaner'] as const);
 }
 
-/** submissions.status — the five CHECK-legal stored values. */
-export type AssignmentStatus = 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
+/**
+ * submissions.status — the CHECK-legal stored values. `follow_up` (0013): the
+ * round was submitted with at least one answer that missed its correct
+ * answer, and stays here — never expiring — until the assignee fixes it.
+ */
+export type AssignmentStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'follow_up';
 
 /** assignments_v.effective_status — stored values plus computed 'expired'. */
 export type EffectiveStatus = AssignmentStatus | 'expired';
 
-/** assignment_items.status. */
-export type ItemStatus = 'pending' | 'done' | 'rejected';
+/** assignment_items.status. `follow_up`: answered, but not with the correct answer. */
+export type ItemStatus = 'pending' | 'done' | 'rejected' | 'follow_up';
 
 /** templates.items[].type — the four the builder emits. */
 export type ItemType = 'pass_fail' | 'yesno' | 'text' | 'number';
+
+/**
+ * An item's correct answer (0013) — answer_ok() in the database is the judge.
+ * `eq` for yes/no ('yes'|'no'), pass/fail ('pass'|'fail') and text (compared
+ * ignoring case and surrounding spaces); `min`/`max` for a number, either
+ * bound optional, an exact value being min = max.
+ */
+export type Correct = { eq: string } | { min?: number; max?: number };
 
 /** One entry of templates.items jsonb — also the shape create_assignment's p_items consumes. */
 export type TemplateItem = {
@@ -370,6 +451,29 @@ export type TemplateItem = {
   type: ItemType;
   critical: boolean;
   requires_photo: boolean;
+  /** Absent = any answer is accepted. Setting one turns on follow-up for the item. */
+  correct?: Correct;
+  /**
+   * The legacy inspector web client's keys, carried through untouched so a
+   * portal save no longer strips them. That client scores against `expected`
+   * and files an `actions` row when the answer equals `follow_up_on`. The new
+   * flow never reads them — `correct` is its rule.
+   */
+  expected?: string | number | boolean;
+  follow_up_on?: string | number | boolean;
+  scored?: string | number | boolean;
+};
+
+/** One place in a round template. Times are "HH:MM"; the order is the walk order. */
+export type RoundPlace = { template_id: string; window_start: string; window_end: string };
+
+/** What schedule_rounds reports back for a save. */
+export type ScheduleResult = {
+  created: number;
+  moved: number;
+  removed: number;
+  kept: number;
+  skipped: number;
 };
 
 /** One entry of templates.time_windows jsonb. Times are "HH:MM". */
@@ -407,3 +511,5 @@ export type Template = Tables<'templates'>;
 export type Assignment = Tables<'assignments_v'>;
 export type AssignmentItem = Tables<'assignment_items'>;
 export type Action = Tables<'actions'>;
+export type RoundTemplate = Tables<'round_templates'>;
+export type Round = Tables<'rounds'>;

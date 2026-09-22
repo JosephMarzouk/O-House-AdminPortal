@@ -2,12 +2,14 @@ import { notFound } from 'next/navigation';
 import {
   CameraIcon,
   StatusApprovedIcon,
+  StatusFollowUpIcon,
   StatusPendingIcon,
   StatusRejectedIcon,
 } from '@/components/icons';
 import { getAssignment, doneCount } from '@/lib/db/assignments';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtDateTime, fmtWindow } from '@/lib/format';
+import { answerLabel, correctLabel } from '@/lib/answers';
 import { mediaUrl, mediaUrls } from '@/lib/media';
 import { StatusBadge } from '@/components/status-badge';
 import { ReviewBar } from '@/components/assignments/review-bar';
@@ -31,12 +33,17 @@ export default async function AssignmentDetailPage({
   const place = bilingual(locale, a.site_name_ar, a.site_name_en);
   const signature = mediaUrl(a.signature_url);
 
-  // A checklist item has three states; they borrow the assignment tones so
-  // "done" reads as approved-cyan and "rejected" as magenta, same as the app.
+  // A checklist item has four states; they borrow the assignment tones so
+  // "done" reads as approved-cyan, "rejected" as solid magenta and a
+  // follow-up as the magenta tint, same as the app.
   const itemTag = (item: AssignmentItem) =>
     item.status === 'done' ? (
       <Tag tone="approved" icon={<StatusApprovedIcon />}>
         {dict.itemDone}
+      </Tag>
+    ) : item.status === 'follow_up' ? (
+      <Tag tone="follow_up" icon={<StatusFollowUpIcon />}>
+        {dict.itemFollowUp}
       </Tag>
     ) : item.status === 'rejected' ? (
       <Tag tone="rejected" icon={<StatusRejectedIcon />}>
@@ -53,8 +60,13 @@ export default async function AssignmentDetailPage({
       <PageHeader
         kicker={<BackLink href="/assignments" label={dict.back} />}
         title={title || dict.none}
-        // place · date · window — the same subtitle the app builds
-        subtitle={[place, fmtDate(a.scheduled_date, locale), fmtWindow(a.window_start, a.window_end)]
+        // round · place · date · window — the same subtitle the app builds
+        subtitle={[
+          bilingual(locale, a.round_title_ar, a.round_title_en),
+          place,
+          fmtDate(a.scheduled_date, locale),
+          fmtWindow(a.window_start, a.window_end),
+        ]
           .filter(Boolean)
           .join(' · ')}
       >
@@ -97,6 +109,7 @@ export default async function AssignmentDetailPage({
             <ul className="mt-4 space-y-2">
               {a.items.map((item) => {
                 const photos = mediaUrls(item.photo_paths);
+                const rule = correctLabel(item.type, item.correct, dict, locale);
                 return (
                   <li key={item.id}>
                   <Card className="flex flex-wrap items-start gap-3">
@@ -110,6 +123,37 @@ export default async function AssignmentDetailPage({
                         <p className="inline-flex items-center gap-1 text-caption text-text/55">
                           <CameraIcon className="size-icon-sm" />
                           {dict.requiresPhoto}
+                        </p>
+                      )}
+                      {(item.answer || rule) && (
+                        <p className="flex flex-wrap gap-x-4 text-sm">
+                          {item.answer && (
+                            <span>
+                              <span className="text-text/55">{dict.answer}: </span>
+                              <span className="font-semibold">
+                                {answerLabel(item.type, item.answer, dict)}
+                              </span>
+                            </span>
+                          )}
+                          {rule && (
+                            <span>
+                              <span className="text-text/55">{dict.correctAnswer}: </span>
+                              {rule}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {/* The first wrong answer stays after the fix — the one
+                          record that a problem was found and when. */}
+                      {item.flagged_answer && (
+                        <p className="text-sm text-magenta-deep">
+                          <span className="rounded-card bg-magenta-tint px-2 py-tag-y">
+                            {dict.flaggedAnswer.replace(
+                              '{answer}',
+                              answerLabel(item.type, item.flagged_answer, dict),
+                            )}{' '}
+                            · {fmtDateTime(item.flagged_at, locale)}
+                          </span>
                         </p>
                       )}
                       {item.note && <p className="text-sm text-text/55">{item.note}</p>}

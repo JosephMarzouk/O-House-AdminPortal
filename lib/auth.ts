@@ -34,6 +34,27 @@ export function canManageUsers(role: string | undefined | null): boolean {
 }
 
 /**
+ * Who may define zone rounds and plan the week. Admins and managers — the
+ * same pair round_templates_write and schedule_rounds() admit in the database
+ * (0013). An inspector carries rounds out; planning other people's weeks is
+ * not theirs to do.
+ */
+export function canSchedule(role: string | undefined | null): boolean {
+  return role === 'admin' || role === 'manager';
+}
+
+/**
+ * Who may drag cards on the task tracker. Admins only, by the club's own
+ * rule — managers and inspectors follow the board read-only. Note this is the
+ * board's rule, not a database one: the moves it offers are approve, send back
+ * and extend, which the detail page's review bar already offers managers and
+ * inspectors under their own RPC guards.
+ */
+export function canMoveTasks(role: string | undefined | null): boolean {
+  return role === 'admin';
+}
+
+/**
  * The signed-in user's profile, or null if there is no session.
  *
  * Note this is a real query, not a JWT claim read: `role` lives in

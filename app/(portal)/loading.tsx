@@ -8,7 +8,7 @@ import { PageBody } from '@/components/ui/page-header';
 export default function Loading() {
   return (
     <>
-      <div className="px-8 pt-8">
+      <div className="px-4 pt-6 md:px-8 md:pt-8">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="mt-2 h-9 w-64" />
       </div>

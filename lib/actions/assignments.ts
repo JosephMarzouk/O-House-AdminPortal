@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { templateItems } from '@/lib/template-items';
+import type { TemplateItem } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
 /**
@@ -30,7 +32,7 @@ export type NewAssignmentInput = {
   scheduledDate: string; // YYYY-MM-DD
   windowStart: string; // HH:MM
   windowEnd: string; // HH:MM
-  items: { text_ar: string; text_en: string; type: string; critical: boolean; requires_photo: boolean }[];
+  items: TemplateItem[];
 };
 
 /**
@@ -39,6 +41,11 @@ export type NewAssignmentInput = {
  * and effective_status compute at all; both go NULL without them.
  *
  * p_items becomes assignment_items, with sort_order taken from array position.
+ * It goes through templateItems(), the same whitelist savePlace uses: that
+ * keeps each item's id (it lands in assignment_items.template_item_id, so the
+ * row links back to the place's subtask — it used to be replaced with a fresh
+ * uuid, which linked to nothing), gives new items a real one, and drops a
+ * `correct` rule that does not fit its item's type.
  */
 export async function createAssignment(
   input: NewAssignmentInput,
@@ -65,7 +72,7 @@ export async function createAssignment(
     p_scheduled_date: input.scheduledDate,
     p_window_start: input.windowStart,
     p_window_end: input.windowEnd,
-    p_items: input.items.map((i) => ({ ...i, id: crypto.randomUUID() })),
+    p_items: templateItems(input.items),
     p_source_template_id: input.templateId,
     p_client_id: crypto.randomUUID(), // idempotency key for a retried submit
   });
@@ -95,6 +102,7 @@ export async function approveAssignment(id: string, score?: number): Promise<Act
 
   revalidatePath('/assignments');
   revalidatePath(`/assignments/${id}`);
+  revalidatePath('/tracker');
   return { ok: true };
 }
 
@@ -116,6 +124,7 @@ export async function rejectItems(
 
   revalidatePath('/assignments');
   revalidatePath(`/assignments/${id}`);
+  revalidatePath('/tracker');
   return { ok: true };
 }
 
@@ -143,5 +152,6 @@ export async function extendAssignment(
 
   revalidatePath('/assignments');
   revalidatePath(`/assignments/${id}`);
+  revalidatePath('/tracker');
   return { ok: true };
 }

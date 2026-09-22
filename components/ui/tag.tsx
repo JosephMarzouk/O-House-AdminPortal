@@ -8,14 +8,17 @@ export type TagTone =
   | 'approved'
   | 'rejected'
   | 'expired'
+  | 'follow_up'
   | 'extended';
 
 /**
- * The status vocabulary, pixel for pixel with the staff app's chips. Six
+ * The status vocabulary, pixel for pixel with the staff app's chips. Seven
  * statuses plus the independent "extended" marker, which is its own tag set
  * beside the status — never an amber warning icon. Magenta appears only on
- * rejected and expired; the outline treatment on expired is what tells it
- * apart from rejected at a glance.
+ * the three alarm states, each in its own weight so they stay apart at a
+ * glance: rejected is the solid fill, expired the outline, and follow-up the
+ * tint — an answer that missed and is waiting on a fix, quieter than work
+ * that was sent back.
  */
 const TONES: Record<TagTone, string> = {
   pending: 'bg-surface text-text/60',
@@ -24,6 +27,7 @@ const TONES: Record<TagTone, string> = {
   approved: 'bg-cyan text-on-brand',
   rejected: 'bg-accent2-700 text-on-brand',
   expired: 'border border-magenta bg-transparent text-magenta',
+  follow_up: 'bg-magenta-tint text-magenta-deep',
   extended: 'bg-surface text-text/60',
 };
 

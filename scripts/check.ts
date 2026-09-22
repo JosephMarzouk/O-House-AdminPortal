@@ -15,10 +15,12 @@ import {
   toLoginCredential,
 } from '../lib/phone';
 import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
-import { todayInCairo } from '../lib/format';
-import { templateItems } from '../lib/template-items';
+import { addDays, parseDay, todayInCairo, weekStart } from '../lib/format';
+import { parseCorrect, parseDecimal, templateItems } from '../lib/template-items';
 import { grantableRoles, STAFF_ROLES } from '../lib/types/database';
-import { canManageUsers, canUsePortal } from '../lib/auth';
+import { canManageUsers, canMoveTasks, canSchedule, canUsePortal } from '../lib/auth';
+import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
+import { allowedMoves, COLUMN_OF } from '../lib/tracker';
 import type { Assignment } from '../lib/types/database';
 
 const BASE = 'https://ptonujazlljpkgpfrkpw.supabase.co/storage/v1/object/public/checklist-media';
@@ -182,6 +184,123 @@ assert.equal(clean.type, 'yesno', 'an unrecognised type falls back');
 assert.equal(clean.critical, false, "the string 'yes' is not true");
 assert.equal(clean.text_ar, '');
 
+// The legacy web client's keys survive a portal round trip — it scores on
+// `expected` and files follow-ups on `follow_up_on`, and a save used to strip
+// both. Primitives only: anything else is still a key a caller invented.
+const [legacyItem] = templateItems([
+  { id: 'l', type: 'yesno', expected: 'yes', follow_up_on: 'no', scored: true },
+]);
+assert.equal(legacyItem.expected, 'yes');
+assert.equal(legacyItem.follow_up_on, 'no');
+assert.equal(legacyItem.scored, true);
+const [junkLegacy] = templateItems([{ id: 'j', expected: { deep: 1 } }]);
+assert.ok(!('expected' in junkLegacy), 'a non-primitive legacy value is dropped');
+
+// --- correct answers (0013) -----------------------------------------------
+// The same shapes answer_ok() judges in the database. A rule that does not
+// fit its item's type is dropped, not kept — it would flag every answer.
+assert.deepEqual(parseCorrect('yesno', { eq: 'yes' }), { eq: 'yes' });
+assert.equal(parseCorrect('yesno', { eq: 'maybe' }), undefined);
+assert.equal(parseCorrect('pass_fail', { eq: 'yes' }), undefined, 'yes is not a pass/fail answer');
+assert.deepEqual(parseCorrect('pass_fail', { eq: 'fail' }), { eq: 'fail' });
+assert.deepEqual(parseCorrect('text', { eq: '  Clean  ' }), { eq: 'Clean' });
+assert.equal(parseCorrect('text', { eq: '   ' }), undefined);
+assert.deepEqual(parseCorrect('number', { min: 1, max: 3 }), { min: 1, max: 3 });
+assert.deepEqual(parseCorrect('number', { max: 0 }), { max: 0 }, 'zero is a real bound');
+assert.equal(parseCorrect('number', { min: 5, max: 1 }), undefined, 'an inverted range');
+assert.equal(parseCorrect('number', { min: '1' }), undefined, 'bounds are numbers, not strings');
+assert.equal(parseCorrect('number', { eq: '5' }), undefined);
+assert.equal(parseCorrect('yesno', null), undefined);
+
+const [ruled, misfit] = templateItems([
+  { id: 'r', type: 'number', correct: { min: 1, max: 3 } },
+  { id: 'm', type: 'yesno', correct: { min: 1 } }, // left behind by a type change
+]);
+assert.deepEqual(ruled.correct, { min: 1, max: 3 });
+assert.ok(!('correct' in misfit), 'a rule that does not fit its type never reaches the column');
+
+// Numbers as an Arabic keyboard types them — answer_ok() accepts the same.
+assert.equal(parseDecimal('٢٫٥'), 2.5);
+assert.equal(parseDecimal('۳'), 3);
+assert.equal(parseDecimal('3,5'), 3.5);
+assert.equal(parseDecimal(' -4 '), -4);
+assert.equal(parseDecimal('1.'), undefined, 'half-typed is not a number yet');
+assert.equal(parseDecimal('abc'), undefined);
+assert.equal(parseDecimal(''), undefined);
+
+// --- calendar arithmetic for the planner and tracker ------------------------
+// Egypt's week starts on Saturday. 2026-09-25 is a Friday.
+assert.equal(weekStart('2026-09-25'), '2026-09-19');
+assert.equal(weekStart('2026-09-19'), '2026-09-19', 'a Saturday is its own week start');
+assert.equal(weekStart('2026-09-20'), '2026-09-19');
+assert.equal(addDays('2026-10-29', 3), '2026-11-01', 'across a month end and the DST change');
+assert.equal(addDays('2026-01-01', -1), '2025-12-31');
+// parseDay guards a PostgREST filter string — nothing but a real day passes.
+assert.equal(parseDay('2026-09-21'), '2026-09-21');
+assert.equal(parseDay('2026-02-31'), undefined);
+assert.equal(parseDay('2026-09-21,status.eq.x'), undefined);
+assert.equal(parseDay(['2026-09-21']), undefined);
+
+// --- round templates ---------------------------------------------------------
+const G = 'aaaaaaaa-0000-4000-8000-000000000001';
+const P = 'aaaaaaaa-0000-4000-8000-000000000002';
+assert.deepEqual(
+  roundPlaces([
+    { template_id: G, window_start: '07:00:00', window_end: '07:30' }, // Postgres-style time
+    { template_id: 'not-a-uuid', window_start: '07:30', window_end: '08:00' },
+    { template_id: P, window_start: '08:00', window_end: '08:00' }, // zero-length
+    { template_id: P, window_start: '23:00', window_end: '01:00' }, // overnight is fine
+    { template_id: G, window_start: '09:00', window_end: '10:00' }, // a place twice
+    { template_id: P, window_start: '25:00', window_end: '26:00' },
+  ]),
+  [
+    { template_id: G, window_start: '07:00', window_end: '07:30' },
+    { template_id: P, window_start: '23:00', window_end: '01:00' },
+  ],
+);
+assert.deepEqual(roundPlaces('nope'), []);
+
+// Save sends only what changed; a cleared cell is an explicit unassign.
+assert.deepEqual(
+  changedCells(
+    { [`${G}|2026-09-21`]: 'u1', [`${G}|2026-09-22`]: 'u1' },
+    { [`${G}|2026-09-21`]: 'u1', [`${G}|2026-09-22`]: '', [`${P}|2026-09-22`]: 'u2' },
+  ),
+  [
+    { round_template_id: G, date: '2026-09-22', assignee_id: null },
+    { round_template_id: P, date: '2026-09-22', assignee_id: 'u2' },
+  ],
+);
+
+// "Copy last week" fills blanks only, never the past, never overwrites.
+const planDays = ['2026-09-19', '2026-09-20', '2026-09-21'];
+const prevDays = ['2026-09-12', '2026-09-13', '2026-09-14'];
+assert.deepEqual(
+  fillFromLastWeek(
+    { [`${G}|2026-09-21`]: 'kept' },
+    { [`${G}|2026-09-12`]: 'a', [`${G}|2026-09-13`]: 'b', [`${G}|2026-09-14`]: 'c' },
+    [G],
+    planDays,
+    prevDays,
+    '2026-09-20',
+  ),
+  { [`${G}|2026-09-20`]: 'b', [`${G}|2026-09-21`]: 'kept' },
+);
+
+// --- the tracker ---------------------------------------------------------------
+// Every status has a column — a status without one would be a card that
+// silently vanishes.
+for (const s of ['pending', 'in_progress', 'follow_up', 'submitted', 'approved', 'rejected', 'expired']) {
+  assert.ok(s in COLUMN_OF, `${s} has a column`);
+}
+// Review moves only.
+assert.deepEqual(allowedMoves('submitted', 'submitted'), { done: 'approve', in_progress: 'send_back' });
+assert.deepEqual(allowedMoves('expired', 'pending'), { todo: 'extend' });
+assert.deepEqual(allowedMoves('expired', 'in_progress'), { in_progress: 'extend' });
+for (const s of ['pending', 'in_progress', 'follow_up', 'approved'] as const) {
+  assert.deepEqual(allowedMoves(s, s), {}, `${s} cannot be moved from the board`);
+}
+
 // --- who may administer whom ---------------------------------------------
 // The two questions grantableRoles answers are deliberately the same one:
 // which roles a caller may create, and whose password they may set.
@@ -212,4 +331,13 @@ assert.ok(!canManageUsers('inspector'), 'an inspector is a portal user, not a st
 assert.ok(!canManageUsers('cleaner') && !canManageUsers(undefined));
 assert.ok(canUsePortal('inspector'), 'but an inspector does use the portal');
 
-console.log('ok — media + phone + dashboard + template-item + role rules hold');
+// Planning rounds is admin + manager (the database agrees); moving cards on
+// the tracker is admin only, by the club's rule.
+assert.ok(canSchedule('admin') && canSchedule('manager'));
+assert.ok(!canSchedule('inspector') && !canSchedule('cleaner') && !canSchedule(null));
+assert.ok(canMoveTasks('admin'));
+assert.ok(!canMoveTasks('manager') && !canMoveTasks('inspector') && !canMoveTasks(undefined));
+
+console.log(
+  'ok — media + phone + dashboard + template-item + correct-answer + round + tracker + role rules hold',
+);
