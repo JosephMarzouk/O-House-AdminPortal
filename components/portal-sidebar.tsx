@@ -9,6 +9,7 @@ import {
   CalendarIcon,
   ClipboardIcon,
   HouseIcon,
+  InfoIcon,
   KanbanIcon,
   ListIcon,
   MapPinIcon,
@@ -49,6 +50,7 @@ export function PortalSidebar({
   locale,
   canManageUsers,
   canSchedule,
+  canEditClubPages,
   userName,
   roleLabel,
   initialCollapsed,
@@ -59,6 +61,8 @@ export function PortalSidebar({
   canManageUsers: boolean;
   /** Admins and managers: the Rounds screen plans work for other people. */
   canSchedule: boolean;
+  /** Admins: the staff app's About and Policies text. */
+  canEditClubPages: boolean;
   userName: string;
   roleLabel: string;
   initialCollapsed: boolean;
@@ -94,6 +98,7 @@ export function PortalSidebar({
     // administrator, and the page and the RPC behind it both say so too —
     // this row only spares them a dead end.
     ...(canManageUsers ? [{ href: '/users', label: dict.navUsers, Icon: UsersIcon }] : []),
+    ...(canEditClubPages ? [{ href: '/club-pages', label: dict.navClubPages, Icon: InfoIcon }] : []),
   ];
 
   /**

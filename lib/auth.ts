@@ -55,6 +55,14 @@ export function canMoveTasks(role: string | undefined | null): boolean {
 }
 
 /**
+ * Who may edit the staff app's About and Policies text. Admins only, the same
+ * rule set_club_page() enforces in the database.
+ */
+export function canEditClubPages(role: string | undefined | null): boolean {
+  return role === 'admin';
+}
+
+/**
  * The signed-in user's profile, or null if there is no session.
  *
  * Note this is a real query, not a JWT claim read: `role` lives in

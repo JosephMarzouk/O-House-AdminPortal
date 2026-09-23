@@ -10,7 +10,9 @@ import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
 export type { ActionResult };
 
-const MIN_PASSWORD = 8; // matches set_password_screen.dart's own rule
+// Staff never set their own password: the app has no screen for it, by the
+// business rule. The portal (here) is the only place a password is set.
+const MIN_PASSWORD = 8;
 
 export async function setUserRole(targetUserId: string, newRole: Role): Promise<ActionResult> {
   // isStaffRole is the real guard, not the <select> that omits 'admin': a
@@ -133,11 +135,9 @@ export async function createStaff(input: {
   // second round trip — the trigger has already set 'cleaner' by now either
   // way, so this is a correction in both the trigger-fired and fallback paths.
   //
-  // ponytail: must_change_password defaults true, but the app's forced-change
-  // screen only started calling complete_password_change() in an unreleased
-  // build — on the shipped build it raises 42501 and traps the user in a loop.
-  // Ceiling: the admin's chosen password persists until the user changes it.
-  // Flip this to leave the flag true once that app build is deployed.
+  // must_change_password defaults true in the database, but nothing reads it
+  // any more: staff cannot change their password in the app (business rule),
+  // so the admin's chosen password stands until an admin resets it here.
   const { error: roleErr } = await admin
     .from('profiles')
     .update({ must_change_password: false, role: input.role })

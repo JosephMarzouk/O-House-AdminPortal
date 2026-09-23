@@ -273,6 +273,19 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /** The staff app's About and Policies text. Everyone reads; only set_club_page (admins) writes. */
+      club_pages: {
+        Row: {
+          key: ClubPageKey;
+          body_en: string;
+          body_ar: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       /**
        * What a phone's outbox parked, and why (SY-6, SY-10). Written only by
        * record_sync_refusal (the API, as the user). Readable by the staff
@@ -358,6 +371,10 @@ export type Database = {
        * PAST_DATE / INVALID_ASSIGNEE. Returns the ScheduleResult counts.
        */
       schedule_rounds: { Args: { p_plan: Json }; Returns: Json };
+      set_club_page: {
+        Args: { p_key: ClubPageKey; p_body_en: string; p_body_ar: string };
+        Returns: undefined;
+      };
       attach_item_photo: { Args: { p_item_id: string; p_storage_path: string }; Returns: undefined };
       submit_assignment: {
         Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string; p_note?: string };
@@ -542,3 +559,6 @@ export type Action = Tables<'actions'>;
 export type RoundTemplate = Tables<'round_templates'>;
 export type Round = Tables<'rounds'>;
 export type SyncRefusal = Tables<'sync_refusals'>;
+export const CLUB_PAGE_KEYS = ['about', 'policies'] as const;
+export type ClubPageKey = (typeof CLUB_PAGE_KEYS)[number];
+export type ClubPage = Tables<'club_pages'>;

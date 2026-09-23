@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getProfile, canManageUsers, canSchedule, canUsePortal } from '@/lib/auth';
+import { getProfile, canEditClubPages, canManageUsers, canSchedule, canUsePortal } from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
@@ -56,6 +56,7 @@ export default async function PortalLayout({ children }: { children: React.React
         locale={locale}
         canManageUsers={manages}
         canSchedule={canSchedule(profile.role)}
+        canEditClubPages={canEditClubPages(profile.role)}
         userName={profile.name}
         roleLabel={roleLabel}
         initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
