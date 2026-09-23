@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
@@ -47,6 +48,7 @@ export function NewAssignmentForm({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [items, setItems] = useState<TemplateItem[]>([]);
+  const [taskNote, setTaskNote] = useState('');
   const [errors, setErrors] = useState<Set<FieldKey>>(new Set());
 
   const place = places.find((p) => p.id === placeId);
@@ -128,6 +130,7 @@ export function NewAssignmentForm({
         // correct answer travels with it. The server action runs these
         // through templateItems() before they reach the RPC.
         items: items.filter((i) => i.text_ar.trim() || i.text_en.trim()),
+        taskNote,
       });
 
       if (res.ok) {
@@ -241,6 +244,13 @@ export function NewAssignmentForm({
             {err('to')}
           </div>
         </div>
+      </div>
+
+      <div className="max-w-2xl space-y-1">
+        <Label htmlFor="task-note">
+          {dict.taskNote} <span className="text-text/55">({dict.optional})</span>
+        </Label>
+        <Textarea id="task-note" rows={3} value={taskNote} onChange={(e) => setTaskNote(e.target.value)} />
       </div>
 
       <section id="subtasks">

@@ -143,7 +143,11 @@ export type Database = {
           site_name_en: string | null;
           source_template_id: string | null;
           status: string;
+          /** The staff member's optional note at submit (notes migration). */
+          submit_note: string | null;
           submitted_at: string | null;
+          /** Optional instructions from whoever created the task (notes migration). */
+          task_note: string | null;
           template_id: string | null;
           template_title_ar: string;
           template_title_en: string;
@@ -292,7 +296,7 @@ export type Database = {
     };
     Functions: {
       create_assignment: {
-        // Only p_client_id and p_source_template_id are optional — every
+        // Only p_client_id, p_source_template_id and p_task_note are optional — every
         // assignment REQUIRES a date and a time window.
         Args: {
           p_title_en: string;
@@ -305,6 +309,7 @@ export type Database = {
           p_items: Json;
           p_source_template_id?: string;
           p_client_id?: string;
+          p_task_note?: string;
         };
         Returns: string;
       };
@@ -313,7 +318,7 @@ export type Database = {
         Returns: undefined;
       };
       reject_items: {
-        Args: { p_assignment_id: string; p_item_ids: string[]; p_reason: string };
+        Args: { p_assignment_id: string; p_item_ids: string[]; p_reason?: string };
         Returns: undefined;
       };
       extend_assignment: {
@@ -332,7 +337,7 @@ export type Database = {
       schedule_rounds: { Args: { p_plan: Json }; Returns: Json };
       attach_item_photo: { Args: { p_item_id: string; p_storage_path: string }; Returns: undefined };
       submit_assignment: {
-        Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string };
+        Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string; p_note?: string };
         Returns: undefined;
       };
       /**

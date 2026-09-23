@@ -27,7 +27,6 @@ export function errorMessage(dict: Dictionary, code: string): string {
     service_key_missing: dict.serviceKeyMissing,
     // assignments
     need_at_least_one_subtask: dict.needAtLeastOneSubtask,
-    reason_required: dict.reasonRequired,
     no_items_selected: dict.noItemsSelected,
     not_in_submitted_state: dict.notInSubmittedState,
     already_closed: dict.alreadyClosed,

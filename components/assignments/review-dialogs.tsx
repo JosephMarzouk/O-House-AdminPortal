@@ -98,7 +98,9 @@ export function RejectItemsDialog({
         </ul>
 
         <div className="space-y-1">
-          <Label htmlFor={`reject-reason-${assignmentId}`}>{dict.rejectReason}</Label>
+          <Label htmlFor={`reject-reason-${assignmentId}`}>
+            {dict.rejectReason} <span className="text-text/55">({dict.optional})</span>
+          </Label>
           <Textarea
             id={`reject-reason-${assignmentId}`}
             value={reason}

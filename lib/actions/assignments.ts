@@ -33,6 +33,8 @@ export type NewAssignmentInput = {
   windowStart: string; // HH:MM
   windowEnd: string; // HH:MM
   items: TemplateItem[];
+  /** Optional instructions shown to the assignee on the task. */
+  taskNote?: string;
 };
 
 /**
@@ -75,6 +77,9 @@ export async function createAssignment(
     p_items: templateItems(input.items),
     p_source_template_id: input.templateId,
     p_client_id: crypto.randomUUID(), // idempotency key for a retried submit
+    // Omitted rather than sent empty: the RPC also turns '' into NULL, but an
+    // absent key is what a pre-notes database would accept too.
+    ...(input.taskNote?.trim() ? { p_task_note: input.taskNote.trim() } : {}),
   });
 
   if (error) return { ok: false, error: friendly(error.message) };
@@ -106,19 +111,19 @@ export async function approveAssignment(id: string, score?: number): Promise<Act
   return { ok: true };
 }
 
+/** The reason is optional (notes migration): reject_items stores a blank one as NULL. */
 export async function rejectItems(
   id: string,
   itemIds: string[],
-  reason: string,
+  reason?: string,
 ): Promise<ActionResult> {
   if (itemIds.length === 0) return { ok: false, error: 'no_items_selected' };
-  if (!reason.trim()) return { ok: false, error: 'reason_required' }; // p_reason has no default
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('reject_items', {
     p_assignment_id: id,
     p_item_ids: itemIds,
-    p_reason: reason.trim(),
+    ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
   });
   if (error) return { ok: false, error: friendly(error.message) };
 

@@ -91,6 +91,20 @@ export default async function AssignmentDetailPage({
           </div>
         </dl>
 
+        {a.task_note && (
+          <p className="max-w-2xl rounded-card bg-surface px-3 py-2 text-sm">
+            <span className="me-2 text-label uppercase">{dict.taskNote}</span>
+            {a.task_note}
+          </p>
+        )}
+
+        {a.submit_note && (
+          <p className="max-w-2xl rounded-card bg-surface px-3 py-2 text-sm">
+            <span className="me-2 text-label uppercase">{dict.submitNote}</span>
+            {a.submit_note}
+          </p>
+        )}
+
         {a.review_note && (
           <p className="max-w-2xl rounded-card bg-magenta-tint px-3 py-2 text-sm text-magenta-deep">
             <span className="me-2 text-label uppercase">{dict.rejectReason}</span>
