@@ -10,7 +10,7 @@ import { getAssignment, doneCount } from '@/lib/db/assignments';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtDateTime, fmtWindow } from '@/lib/format';
 import { answerLabel, correctLabel } from '@/lib/answers';
-import { mediaUrl, mediaUrls } from '@/lib/media';
+import { roundMedia } from '@/lib/media';
 import { StatusBadge } from '@/components/status-badge';
 import { ReviewBar } from '@/components/assignments/review-bar';
 import { Card } from '@/components/ui/card';
@@ -24,14 +24,19 @@ export default async function AssignmentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [dict, locale, a] = await Promise.all([getDictionary(), getLocale(), getAssignment(id)]);
+  const [dict, locale, a, media] = await Promise.all([
+    getDictionary(),
+    getLocale(),
+    getAssignment(id),
+    roundMedia(id),
+  ]);
   if (!a) notFound();
 
   const title =
     bilingual(locale, a.title_ar, a.title_en) ||
     bilingual(locale, a.template_title_ar, a.template_title_en);
   const place = bilingual(locale, a.site_name_ar, a.site_name_en);
-  const signature = mediaUrl(a.signature_url);
+  const signature = media(a.signature_url);
 
   // A checklist item has four states; they borrow the assignment tones so
   // "done" reads as approved-cyan, "rejected" as solid magenta and a
@@ -122,7 +127,9 @@ export default async function AssignmentDetailPage({
           ) : (
             <ul className="mt-4 space-y-2">
               {a.items.map((item) => {
-                const photos = mediaUrls(item.photo_paths);
+                const photos = (item.photo_paths ?? [])
+                  .map(media)
+                  .filter((u): u is string => u !== null);
                 const rule = correctLabel(item.type, item.correct, dict, locale);
                 return (
                   <li key={item.id}>

@@ -4,6 +4,8 @@ import { cairo } from './fonts';
 import { getDictionary, getLocale, dir } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { AlertHost } from '@/components/ui/alert-dialog';
+import { ClubProvider } from '@/components/club-provider';
+import { requestClub } from '@/lib/club';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -12,7 +14,12 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [locale, dict, store] = await Promise.all([getLocale(), getDictionary(), cookies()]);
+  const [locale, dict, store, club] = await Promise.all([
+    getLocale(),
+    getDictionary(),
+    cookies(),
+    requestClub(),
+  ]);
   const theme = parseTheme(store.get(THEME_COOKIE)?.value);
 
   // dir on <html> is the whole RTL mechanism — the same approach the old
@@ -31,7 +38,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${cairo.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        {children}
+        {/* No club only on a host proxy.ts already refused, i.e. the 404 page. */}
+        {club ? <ClubProvider club={club}>{children}</ClubProvider> : children}
         {/* One alert surface for the whole portal. Its two labels are passed
             in because the host is imperative and holds no dictionary. */}
         <AlertHost labels={{ ok: dict.ok, cancel: dict.cancel }} />

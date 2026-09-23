@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useClub } from '@/components/club-provider';
 
 /**
  * The sign-out sequence, in one place.
@@ -17,8 +18,9 @@ import { createClient } from '@/lib/supabase/client';
  */
 export function useSignOut(): () => Promise<void> {
   const router = useRouter();
+  const club = useClub();
   return async () => {
-    await createClient().auth.signOut();
+    await createClient(club).auth.signOut();
     router.refresh();
     router.push('/login');
   };

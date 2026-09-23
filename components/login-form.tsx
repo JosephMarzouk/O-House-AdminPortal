@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useClub } from '@/components/club-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +13,7 @@ import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 export function LoginForm({ dict }: { dict: Dictionary }) {
   const router = useRouter();
+  const club = useClub();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
     // the '@' test in there is not optional.
     const credential = toLoginCredential(typed);
 
-    const supabase = createClient();
+    const supabase = createClient(club);
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: credential,
       password,

@@ -16,7 +16,6 @@
  */
 import { installNodeWebSocket } from '../lib/node-ws';
 import { createClient } from '@supabase/supabase-js';
-import { mediaUrl, mediaUrls } from '../lib/media';
 import type { Database } from '../lib/types/database';
 
 installNodeWebSocket(); // must run before createClient — see lib/node-ws.ts
@@ -24,6 +23,21 @@ installNodeWebSocket(); // must run before createClient — see lib/node-ws.ts
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_BUCKET ?? 'checklist-media';
+
+/** The API's signed links for one round, or null when the API can't be used. */
+async function signedMedia(
+  sb: ReturnType<typeof createClient<Database>>,
+  id: string,
+): Promise<Record<string, string | null> | null> {
+  const api = process.env.OHOUSE_API_URL;
+  const token = (await sb.auth.getSession()).data.session?.access_token;
+  if (!api || !token) return null;
+  const res = await fetch(`${api.replace(/\/+$/, '')}/assignments/${id}`, {
+    headers: { Authorization: `Bearer ${token}`, 'X-Club': process.env.CLUB_SLUG ?? 'ohouse' },
+  });
+  if (!res.ok) throw new Error(`O House API answered ${res.status} for round ${id}`);
+  return ((await res.json()) as { media: Record<string, string | null> }).media;
+}
 
 async function connect() {
   const email = process.env.ADMIN_EMAIL;
@@ -93,12 +107,19 @@ async function main() {
     console.log(`  deadline ${a.deadline ?? '— (no schedule: can never expire)'}`);
     console.log(`  items    ${items?.length ?? 0}${!items?.length ? '  <-- renders 0/0, Submit disabled on the phone' : ''}`);
 
+    // Signed links from the O House API, as the portal gets them (the bucket
+    // is going private, so there are no public URLs to test any more).
+    const links = await signedMedia(sb, a.id!);
     const media: { label: string; url: string }[] = [];
-    const sig = mediaUrl(a.signature_url);
-    if (sig) media.push({ label: 'signature', url: sig });
-    for (const it of items ?? []) {
-      for (const p of mediaUrls(it.photo_paths)) {
-        media.push({ label: `photo (${it.text_en || it.text_ar})`, url: p });
+    if (links === null) {
+      console.log('  media    skipped (needs OHOUSE_API_URL and a signed-in admin)');
+    } else {
+      const sig = a.signature_url ? links[a.signature_url] : null;
+      if (a.signature_url) media.push({ label: 'signature', url: sig ?? '(no link: object missing)' });
+      for (const it of items ?? []) {
+        for (const p of it.photo_paths ?? []) {
+          media.push({ label: `photo (${it.text_en || it.text_ar})`, url: links[p] ?? '(no link: object missing)' });
+        }
       }
     }
 

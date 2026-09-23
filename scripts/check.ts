@@ -1,12 +1,10 @@
 /**
- * Self-check for the pure rules the portal cannot get wrong: storage path
- * resolution, the phone -> login-email transform, the dashboard's
+ * Self-check for the pure rules the portal cannot get wrong: the phone -> login-email transform, the dashboard's
  * lateness/date-bucket arithmetic, the template-item parser that guards what
  * savePlace is allowed to store, and who may administer whom.
  * Run: pnpm check
  */
 import assert from 'node:assert/strict';
-import { mediaUrl, mediaUrls } from '../lib/media';
 import {
   normalizePhone,
   isValidPhone,
@@ -23,33 +21,8 @@ import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
 import { allowedMoves, COLUMN_OF } from '../lib/tracker';
 import type { Assignment } from '../lib/types/database';
 
-const BASE = 'https://ptonujazlljpkgpfrkpw.supabase.co/storage/v1/object/public/checklist-media';
-
-// --- media ---------------------------------------------------------------
-assert.equal(mediaUrl(null), null);
-assert.equal(mediaUrl(''), null);
-assert.equal(mediaUrl(undefined), null);
-
-// A bare path, as submit_assignment writes it (row 893f1c08).
-assert.equal(
-  mediaUrl('signatures/893f1c08-f14c-4dec-907d-7f9dbef54440-1788868212340289.png'),
-  `${BASE}/signatures/893f1c08-f14c-4dec-907d-7f9dbef54440-1788868212340289.png`,
-);
-
-// A full URL, as the legacy browser flow stored it (row d23535de). Passes through.
-const legacy = `${BASE}/signatures/c32742ac-2020-4454-8335-d27142d11017.png`;
-assert.equal(mediaUrl(legacy), legacy);
-
-// A real photo_paths entry.
-assert.equal(
-  mediaUrl('photos/893f1c08-f14c-4dec-907d-7f9dbef54440/09718390-9ec5-4bef-abd3-f1657edc9c91-1788868210552896.jpg'),
-  `${BASE}/photos/893f1c08-f14c-4dec-907d-7f9dbef54440/09718390-9ec5-4bef-abd3-f1657edc9c91-1788868210552896.jpg`,
-);
-
-assert.equal(mediaUrl('/answers/abc.jpg'), `${BASE}/answers/abc.jpg`); // leading slash
-assert.equal(mediaUrl('answers/a b.jpg'), `${BASE}/answers/a%20b.jpg`); // space encoded
-assert.deepEqual(mediaUrls(null), []);
-assert.deepEqual(mediaUrls(['answers/a.jpg', 'answers/b.jpg']).length, 2);
+// Storage path resolution moved to the O House API (media signing), and is
+// tested there: o-house-api/src/assignments/assignments.spec.ts, toBucketPath.
 
 // --- phone ---------------------------------------------------------------
 const EXPECTED = '201012345678@ohouse.internal';
@@ -339,5 +312,5 @@ assert.ok(canMoveTasks('admin'));
 assert.ok(!canMoveTasks('manager') && !canMoveTasks('inspector') && !canMoveTasks(undefined));
 
 console.log(
-  'ok — media + phone + dashboard + template-item + correct-answer + round + tracker + role rules hold',
+  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role rules hold',
 );

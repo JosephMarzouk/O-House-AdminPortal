@@ -95,7 +95,7 @@ export async function createStaff(input: {
 
   let admin;
   try {
-    admin = createAdminClient();
+    admin = await createAdminClient();
   } catch {
     return { ok: false, error: 'service_key_missing' };
   }
@@ -160,7 +160,7 @@ export async function resetStaffPassword(
 
   let admin;
   try {
-    admin = createAdminClient();
+    admin = await createAdminClient();
   } catch {
     return { ok: false, error: 'service_key_missing' };
   }
