@@ -19,6 +19,8 @@ import { grantableRoles, STAFF_ROLES } from '../lib/types/database';
 import { canManageUsers, canMoveTasks, canSchedule, canUsePortal } from '../lib/auth';
 import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
 import { allowedMoves, COLUMN_OF } from '../lib/tracker';
+import { refusalLabel } from '../lib/refusals';
+import { dictionaries } from '../lib/i18n/dictionaries';
 import type { Assignment } from '../lib/types/database';
 
 // Storage path resolution moved to the O House API (media signing), and is
@@ -311,6 +313,16 @@ assert.ok(!canSchedule('inspector') && !canSchedule('cleaner') && !canSchedule(n
 assert.ok(canMoveTasks('admin'));
 assert.ok(!canMoveTasks('manager') && !canMoveTasks('inspector') && !canMoveTasks(undefined));
 
+// --- sync refusals (SY-10) -----------------------------------------------
+// Every code the API can record reads as something a supervisor can act on,
+// and an unknown one never renders blank.
+for (const d of Object.values(dictionaries)) {
+  assert.equal(refusalLabel('ASSIGNMENT_EXPIRED', d), d.refusalExpired);
+  assert.equal(refusalLabel('ITEM_NOT_FOUND', d), d.refusalNotFound);
+  assert.equal(refusalLabel('MISSING_FILE', d), d.refusalMissingFile);
+  assert.equal(refusalLabel('SOMETHING_NEW', d), d.refusalOther);
+}
+
 console.log(
-  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role rules hold',
+  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal rules hold',
 );

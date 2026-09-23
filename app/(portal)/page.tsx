@@ -1,5 +1,7 @@
 import { getProfile } from '@/lib/auth';
 import { getDashboardData } from '@/lib/dashboard';
+import { listRefusals } from '@/lib/db/sync';
+import { SyncRefusals } from '@/components/sync-refusals';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
 import { CategoryBars } from '@/components/charts/category-bars';
@@ -17,7 +19,7 @@ import {
 
 export default async function DashboardPage() {
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
-  const d = await getDashboardData(locale, dict.none);
+  const [d, refusals] = await Promise.all([getDashboardData(locale, dict.none), listRefusals()]);
 
   const n = (v: number) => fmtNum(v, locale);
   const rate = (v: number | null) => (v === null ? dict.none : `${n(v)}%`);
@@ -47,6 +49,9 @@ export default async function DashboardPage() {
             narrowed to their own reports. Say so, rather than letting a
             team-sized figure read as club-wide. */}
         {me?.role === 'manager' && <p className="text-sm text-text/55">{dict.dashboardScope}</p>}
+
+        {/* Only when there is something to act on: an empty table is noise. */}
+        {refusals.length > 0 && <SyncRefusals rows={refusals} dict={dict} locale={locale} />}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
           {tiles.map((t) => (

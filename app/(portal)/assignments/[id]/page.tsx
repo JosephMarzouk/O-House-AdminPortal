@@ -11,6 +11,8 @@ import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtDateTime, fmtWindow } from '@/lib/format';
 import { answerLabel, correctLabel } from '@/lib/answers';
 import { roundMedia } from '@/lib/media';
+import { listRefusals } from '@/lib/db/sync';
+import { SyncRefusals } from '@/components/sync-refusals';
 import { StatusBadge } from '@/components/status-badge';
 import { ReviewBar } from '@/components/assignments/review-bar';
 import { Card } from '@/components/ui/card';
@@ -24,11 +26,12 @@ export default async function AssignmentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [dict, locale, a, media] = await Promise.all([
+  const [dict, locale, a, media, refusals] = await Promise.all([
     getDictionary(),
     getLocale(),
     getAssignment(id),
     roundMedia(id),
+    listRefusals({ assignmentId: id }),
   ]);
   if (!a) notFound();
 
@@ -76,6 +79,9 @@ export default async function AssignmentDetailPage({
           .join(' · ')}
       >
         <StatusBadge status={a.effective_status} dict={dict} extended={a.was_extended} />
+        {/* Done in time on the phone, but reached the server after the
+            deadline (SY-11): not the staff member's lateness. */}
+        {a.late_sync && <Tag tone="pending">{dict.lateSync}</Tag>}
       </PageHeader>
 
       <PageBody>
@@ -115,6 +121,10 @@ export default async function AssignmentDetailPage({
             <span className="me-2 text-label uppercase">{dict.rejectReason}</span>
             {a.review_note}
           </p>
+        )}
+
+        {refusals.length > 0 && (
+          <SyncRefusals rows={refusals} dict={dict} locale={locale} showRound={false} />
         )}
 
         <section>

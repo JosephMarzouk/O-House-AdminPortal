@@ -273,6 +273,29 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /**
+       * What a phone's outbox parked, and why (SY-6, SY-10). Written only by
+       * record_sync_refusal (the API, as the user). Readable by the staff
+       * member, their manager and admins. No foreign key to submissions on
+       * purpose: a planner delete must not erase the record.
+       */
+      sync_refusals: {
+        Row: {
+          assignment_id: string | null;
+          code: string;
+          created_at: string;
+          id: string;
+          idempotency_key: string | null;
+          item_id: string | null;
+          message: string | null;
+          /** answer | photos | submit | locale (the API route's last segment) */
+          op: string;
+          user_id: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       /** Always read effective_status, never submissions.status. */
@@ -518,3 +541,4 @@ export type AssignmentItem = Tables<'assignment_items'>;
 export type Action = Tables<'actions'>;
 export type RoundTemplate = Tables<'round_templates'>;
 export type Round = Tables<'rounds'>;
+export type SyncRefusal = Tables<'sync_refusals'>;
