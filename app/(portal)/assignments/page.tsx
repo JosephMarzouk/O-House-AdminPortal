@@ -12,9 +12,17 @@ import {
 import { listSites } from '@/lib/db/places';
 import { assignableStaff, listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
-import { fmtDate, fmtNum, fmtWindow, todayInCairo } from '@/lib/format';
+import {
+  assigneeNames,
+  fmtDate,
+  fmtNum,
+  fmtPeriod,
+  fmtWindow,
+  todayInCairo,
+} from '@/lib/format';
 import { STATUS, StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
+import { SearchBox } from '@/components/search-box';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
@@ -40,8 +48,9 @@ export default async function AssignmentsPage({
   const who = parseOne(sp.who);
   const from = parseOne(sp.from);
   const to = parseOne(sp.to);
+  const q = parseOne(sp.q);
 
-  const base = { siteId: site, inspectorId: who, from, to };
+  const base = { siteId: site, inspectorId: who, from, to, search: q };
 
   // Sections are driven by the status filter: with none chosen the list splits
   // into "waiting on you" and the rest; choosing one makes that split
@@ -71,9 +80,9 @@ export default async function AssignmentsPage({
   const chipHref = (s: EffectiveStatus | 'all') => {
     const qs = new URLSearchParams();
     if (s !== 'all') qs.set('status', s);
-    for (const [k, v] of Object.entries({ site, who, from, to })) if (v) qs.set(k, v);
-    const q = qs.toString();
-    return q ? `/assignments?${q}` : '/assignments';
+    for (const [k, v] of Object.entries({ site, who, from, to, q })) if (v) qs.set(k, v);
+    const query = qs.toString();
+    return query ? `/assignments?${query}` : '/assignments';
   };
 
   function section(
@@ -145,8 +154,16 @@ export default async function AssignmentsPage({
           </Link>
           {place && <div className="text-caption text-text/55">{place}</div>}
         </TableCell>
-        <TableCell>{a.inspector_name || dict.none}</TableCell>
-        <TableCell>{fmtDate(a.scheduled_date, locale)}</TableCell>
+        <TableCell>
+          {assigneeNames(a) || dict.none}
+          {/* Given to several: who took it, once someone has. */}
+          {(a.assignee_ids ?? []).length > 1 && a.inspector_name && (
+            <div className="text-caption text-text/55">
+              {a.submitted_at ? dict.submittedBy : dict.takenBy}: {a.inspector_name}
+            </div>
+          )}
+        </TableCell>
+        <TableCell>{fmtPeriod(a.scheduled_date, a.end_date, locale)}</TableCell>
         <TableCell className="tabular-nums" dir="ltr">
           {fmtWindow(a.window_start, a.window_end) ?? dict.none}
         </TableCell>
@@ -190,6 +207,8 @@ export default async function AssignmentsPage({
         {/* The filter rows belong with the title rather than in the body:
             status chips, then the place / assignee / date controls. */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <SearchBox value={q} label={dict.search} />
+
           {/* Status filters are plain links: they enumerate, so they need no
               client JS at all, and Next still navigates them client-side. */}
           <nav className="flex flex-wrap gap-1" aria-label={dict.status}>
@@ -218,7 +237,7 @@ export default async function AssignmentsPage({
           </nav>
 
           <AssignmentFilters
-            values={{ status, site, who, from, to }}
+            values={{ status, site, who, from, to, q }}
             sites={sites.map((s) => ({
               value: s.id,
               label: bilingual(locale, s.name_ar, s.name_en) || s.id,

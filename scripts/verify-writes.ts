@@ -193,7 +193,7 @@ async function checkAssignment(
     p_site_id: place.siteId,
     // Assigned to the admin running this, so no real staff member sees a
     // phantom task appear and vanish on their phone.
-    p_assignee_id: assigneeId,
+    p_assignee_ids: [assigneeId],
     p_scheduled_date: new Date().toISOString().slice(0, 10),
     p_window_start: '08:00',
     p_window_end: '17:00',

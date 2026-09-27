@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, dbSession } from '@/lib/supabase/server';
 import { PROFILE_COLUMNS, type PortalProfile } from '@/lib/types/database';
 
 /**
@@ -55,6 +55,15 @@ export function canMoveTasks(role: string | undefined | null): boolean {
 }
 
 /**
+ * Who may open Reports and export the daily department report. Admins and
+ * managers, by the club's request. What the report contains is RLS's answer:
+ * a manager's report holds only the tasks their reports were given.
+ */
+export function canExportReports(role: string | undefined | null): boolean {
+  return role === 'admin' || role === 'manager';
+}
+
+/**
  * Who may edit the staff app's About and Policies text. Admins only, the same
  * rule set_club_page() enforces in the database.
  */
@@ -77,17 +86,16 @@ export function canEditClubPages(role: string | undefined | null): boolean {
  * through adminStaffList() alone.
  */
 export async function getProfile(): Promise<PortalProfile | null> {
+  // Who is signed in comes from the API's exchange (it verified the access
+  // token); the row itself is read as them.
+  const session = await dbSession();
+  if (!session) return null;
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
 
   const { data, error } = await supabase
     .from('profiles')
     .select(PROFILE_COLUMNS)
-    .eq('id', user.id)
+    .eq('id', session.userId)
     .single();
   if (error || !data) return null;
   return data;

@@ -1,7 +1,14 @@
 import { canMoveTasks, getProfile } from '@/lib/auth';
 import { itemCountsFor, listTrackerTasks, reviewItemsFor } from '@/lib/db/assignments';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
-import { fmtDate, fmtNum, fmtWindow, parseDay, todayInCairo } from '@/lib/format';
+import {
+  assigneeNames,
+  fmtDate,
+  fmtNum,
+  fmtWindow,
+  parseDay,
+  todayInCairo,
+} from '@/lib/format';
 import type { BoardTask } from '@/lib/tracker';
 import { DayNav } from '@/components/tracker/day-nav';
 import { TaskBoard } from '@/components/tracker/task-board';
@@ -53,7 +60,9 @@ export default async function TrackerPage({
           bilingual(locale, r.template_title_ar, r.template_title_en),
         place: bilingual(locale, r.site_name_ar, r.site_name_en),
         round: bilingual(locale, r.round_title_ar, r.round_title_en),
-        assignee: r.inspector_name ?? '',
+        // Several assignees and nobody has started: all of them. Once someone
+        // has, the owner — the card is theirs now.
+        assignee: r.inspector_name || assigneeNames(r),
         date: r.scheduled_date,
         window: fmtWindow(r.window_start, r.window_end),
         effective: r.effective_status!,

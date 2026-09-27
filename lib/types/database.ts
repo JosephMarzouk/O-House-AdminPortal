@@ -129,8 +129,17 @@ export type Database = {
           extended_until: string | null;
           extension_note: string | null;
           id: string;
-          inspector_id: string;
-          inspector_name: string;
+          /**
+           * The OWNER: the one assignee, or whichever of several acted first
+           * (answer, photo or submit). Null while several assignees have not
+           * started.
+           */
+          inspector_id: string | null;
+          inspector_name: string | null;
+          /** Everyone the task was given to (sorted). One id for a single-assignee task. */
+          assignee_ids: string[];
+          /** The last day of a multi-day task; null = one day (scheduled_date). */
+          end_date: string | null;
           late_sync: boolean;
           review_note: string | null;
           reviewed_at: string | null;
@@ -261,8 +270,10 @@ export type Database = {
       /** One round template on one day for one person (0013). Written only by schedule_rounds. */
       rounds: {
         Row: {
-          /** Null once unassigned while some of its tasks had already started. */
+          /** The first of assignee_ids, kept for the portal build on main. Read assignee_ids. */
           assignee_id: string | null;
+          /** The cell's people. Empty once unassigned while some of its tasks had already started. */
+          assignee_ids: string[];
           created_at: string;
           created_by: string | null;
           id: string;
@@ -309,6 +320,24 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /**
+       * A task's status history, written only by the trigger on submissions.
+       * Readable by whoever can see the task. Rows before 27 Sep 2026 are a
+       * backfill from the timestamps the task still held.
+       */
+      submission_events: {
+        Row: {
+          id: number;
+          submission_id: string;
+          event: SubmissionEvent;
+          actor_id: string | null;
+          at: string;
+          note: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       /** Always read effective_status, never submissions.status. */
@@ -324,6 +353,8 @@ export type Database = {
           /** The zone round's name when the task came from one (0013). */
           round_title_en: string | null;
           round_title_ar: string | null;
+          /** assignee_ids' names, in the same order (profiles RLS applies). */
+          assignee_names: string[] | null;
         };
         Insert: never;
         Update: never;
@@ -332,13 +363,15 @@ export type Database = {
     };
     Functions: {
       create_assignment: {
-        // Only p_client_id, p_source_template_id and p_task_note are optional — every
-        // assignment REQUIRES a date and a time window.
+        // Only p_client_id, p_source_template_id, p_task_note and p_end_date are
+        // optional — every assignment REQUIRES a date and a time window.
+        // (An older p_assignee_id signature survives for the build on main.)
         Args: {
           p_title_en: string;
           p_title_ar: string;
           p_site_id: string;
-          p_assignee_id: string;
+          /** One id: that person owns it. Several: the first to act claims it. */
+          p_assignee_ids: string[];
           p_scheduled_date: string;
           p_window_start: string;
           p_window_end: string;
@@ -346,6 +379,8 @@ export type Database = {
           p_source_template_id?: string;
           p_client_id?: string;
           p_task_note?: string;
+          /** The last day, for a task that runs over several days. */
+          p_end_date?: string;
         };
         Returns: string;
       };
@@ -367,7 +402,8 @@ export type Database = {
       };
       /**
        * The week planner's Save (0013). Admin/manager only. Each cell is
-       * { round_template_id, date: 'YYYY-MM-DD', assignee_id | null }; raises
+       * { round_template_id, date: 'YYYY-MM-DD', assignee_ids: string[] } (empty
+       * clears the cell); raises
        * PAST_DATE / INVALID_ASSIGNEE. Returns the ScheduleResult counts.
        */
       schedule_rounds: { Args: { p_plan: Json }; Returns: Json };
@@ -474,6 +510,18 @@ export type AssignmentStatus =
 /** assignments_v.effective_status — stored values plus computed 'expired'. */
 export type EffectiveStatus = AssignmentStatus | 'expired';
 
+/** submission_events.event — one step of a task's history. */
+export type SubmissionEvent =
+  | 'created'
+  | 'claimed'
+  | 'reassigned'
+  | 'started'
+  | 'submitted'
+  | 'follow_up'
+  | 'sent_back'
+  | 'approved'
+  | 'extended';
+
 /** assignment_items.status. `follow_up`: answered, but not with the correct answer. */
 export type ItemStatus = 'pending' | 'done' | 'rejected' | 'follow_up';
 
@@ -559,6 +607,7 @@ export type Action = Tables<'actions'>;
 export type RoundTemplate = Tables<'round_templates'>;
 export type Round = Tables<'rounds'>;
 export type SyncRefusal = Tables<'sync_refusals'>;
+export type SubmissionEventRow = Tables<'submission_events'>;
 export const CLUB_PAGE_KEYS = ['about', 'policies'] as const;
 export type ClubPageKey = (typeof CLUB_PAGE_KEYS)[number];
 export type ClubPage = Tables<'club_pages'>;

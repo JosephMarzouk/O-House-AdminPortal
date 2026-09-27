@@ -21,6 +21,7 @@ import {
   DotsThreeVertical,
   Eye,
   EyeSlash,
+  FilePdf,
   Flag,
   House,
   Info,
@@ -77,6 +78,7 @@ export const EyeIcon = duotone(Eye);
 export const EyeSlashIcon = duotone(EyeSlash);
 export const HouseIcon = duotone(House);
 export const InfoIcon = duotone(Info);
+export const ReportIcon = duotone(FilePdf);
 export const KanbanIcon = duotone(Kanban);
 export const KeyIcon = duotone(Key);
 export const ListIcon = duotone(List);

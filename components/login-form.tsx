@@ -2,18 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { useClub } from '@/components/club-provider';
+import { signIn } from '@/lib/actions/session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
-import { toLoginCredential } from '@/lib/phone';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 
 export function LoginForm({ dict }: { dict: Dictionary }) {
   const router = useRouter();
-  const club = useClub();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -29,28 +26,26 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
     setLoading(true);
     setError(null);
 
-    // Staff type a phone, admins and managers an email; GoTrue only ever
-    // holds an email, so toLoginCredential rebuilds the phone into the same
-    // synthetic address the Flutter app builds. See lib/phone.ts for why
-    // the '@' test in there is not optional.
-    const credential = toLoginCredential(typed);
+    // A phone or an email, as typed: the API tells them apart (an '@' makes
+    // it an email) and never says whether the account exists.
+    const res = await signIn(typed, password);
 
-    const supabase = createClient(club);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: credential,
-      password,
-    });
-
-    if (signInError) {
-      // Never surface the raw GoTrue string — it distinguishes "no such user"
-      // from "wrong password", which is an enumeration oracle.
-      setError(dict.signInError);
+    if (!res.ok) {
+      setError(
+        res.error === 'locked'
+          ? dict.signInLocked
+          : res.error === 'no_access'
+            ? dict.notAuthorized
+            : res.error === 'unavailable'
+              ? dict.errorGeneric
+              : dict.signInError,
+      );
       setLoading(false);
       return;
     }
 
-    // refresh() so the server layout re-reads the session cookie the client
-    // just wrote; push alone would render the old, signed-out tree.
+    // refresh() so the server layout re-reads the session cookies the action
+    // just set; push alone would render the old, signed-out tree.
     router.refresh();
     router.push('/');
   }

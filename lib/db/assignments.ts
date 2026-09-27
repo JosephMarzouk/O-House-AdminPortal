@@ -1,5 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
-import type { Assignment, AssignmentItem, EffectiveStatus } from '@/lib/types/database';
+import { ilikePattern } from '@/lib/search';
+import type {
+  Assignment,
+  AssignmentItem,
+  EffectiveStatus,
+  SubmissionEventRow,
+} from '@/lib/types/database';
 
 /**
  * Reads go through assignments_v, never `submissions` — the view is the only
@@ -47,6 +53,8 @@ export type AssignmentFilters = {
   /** Inclusive YYYY-MM-DD against scheduled_date, in Africa/Cairo. */
   from?: string;
   to?: string;
+  /** Free text: title, place or assignee name, EN or AR. */
+  search?: string;
   limit?: number;
 };
 
@@ -79,9 +87,21 @@ export async function listAssignments(
   // from both halves of the list rather than putting them in this one.
   if (f.notStatus) q = q.or(`effective_status.neq.${f.notStatus},effective_status.is.null`);
   if (f.siteId) q = q.eq('site_id', f.siteId);
-  if (f.inspectorId) q = q.eq('inspector_id', f.inspectorId);
+  // Any task given to that person, claimed or not. The owner is always one of
+  // the assignees, so this also covers the tasks they own.
+  if (f.inspectorId) q = q.contains('assignee_ids', [f.inspectorId]);
   if (f.from) q = q.gte('scheduled_date', f.from);
   if (f.to) q = q.lte('scheduled_date', f.to);
+  // In the database, not over the page: the list is capped at DEFAULT_LIMIT,
+  // so filtering what came back would miss everything past row 200.
+  const p = ilikePattern(f.search);
+  if (p) {
+    q = q.or(
+      ['title_en', 'title_ar', 'site_name_en', 'site_name_ar', 'inspector_name']
+        .map((c) => `${c}.ilike.${p}`)
+        .join(','),
+    );
+  }
 
   const { data, error, count } = await q;
   if (error) throw new Error(`listAssignments: ${error.message}`);
@@ -164,6 +184,82 @@ export async function reviewItemsFor(ids: string[]): Promise<Map<string, ReviewI
   return byTask;
 }
 
+/**
+ * Whole checklist items of the given tasks, in order, keyed by task — what
+ * the daily report prints under each task.
+ */
+export async function itemsFor(ids: string[]): Promise<Map<string, AssignmentItem[]>> {
+  const byTask = new Map<string, AssignmentItem[]>();
+  if (ids.length === 0) return byTask;
+
+  const supabase = await createClient();
+  const pages = await Promise.all(
+    chunks(ids).map((slice) =>
+      supabase.from('assignment_items').select('*').in('assignment_id', slice).order('sort_order'),
+    ),
+  );
+
+  for (const { data, error } of pages) {
+    if (error) throw new Error(`itemsFor: ${error.message}`);
+    for (const item of data ?? []) {
+      byTask.set(item.assignment_id, [...(byTask.get(item.assignment_id) ?? []), item]);
+    }
+  }
+  return byTask;
+}
+
+/**
+ * Every task whose period includes `day`: scheduled on it, or a multi-day
+ * task running through it. RLS scopes it — a manager gets their reports'.
+ *
+ * `day` MUST come through parseDay() (lib/format.ts): it is interpolated.
+ */
+export async function listTasksOnDay(day: string): Promise<{ rows: Assignment[]; total: number }> {
+  const supabase = await createClient();
+  const { data, error, count } = await supabase
+    .from('assignments_v')
+    .select('*', { count: 'exact' })
+    .lte('scheduled_date', day)
+    .or(`end_date.gte.${day},and(end_date.is.null,scheduled_date.eq.${day})`)
+    .order('window_start', { ascending: true, nullsFirst: false })
+    .order('title_en')
+    // ponytail: one department's day is tens of tasks; past this the report
+    // says "n of total" rather than paging.
+    .range(0, TRACKER_LIMIT - 1);
+
+  if (error) throw new Error(`listTasksOnDay: ${error.message}`);
+  return { rows: data ?? [], total: count ?? data?.length ?? 0 };
+}
+
+/**
+ * Each task's status history, oldest first, keyed by task. RLS lets a caller
+ * see the history of exactly the tasks they can see.
+ */
+export async function eventsFor(ids: string[]): Promise<Map<string, SubmissionEventRow[]>> {
+  const byTask = new Map<string, SubmissionEventRow[]>();
+  if (ids.length === 0) return byTask;
+
+  const supabase = await createClient();
+  const pages = await Promise.all(
+    chunks(ids).map((slice) =>
+      supabase
+        .from('submission_events')
+        .select('*')
+        .in('submission_id', slice)
+        .order('at')
+        .order('id'),
+    ),
+  );
+
+  for (const { data, error } of pages) {
+    if (error) throw new Error(`eventsFor: ${error.message}`);
+    for (const e of data ?? []) {
+      byTask.set(e.submission_id, [...(byTask.get(e.submission_id) ?? []), e]);
+    }
+  }
+  return byTask;
+}
+
 /** The board's page size. A busy day is ~100 tasks; this is the safety net. */
 const TRACKER_LIMIT = 500;
 
@@ -187,7 +283,8 @@ export async function listTrackerTasks(
     .from('assignments_v')
     .select('*', { count: 'exact' })
     .or(
-      `scheduled_date.eq.${day},and(scheduled_date.lt.${day},effective_status.in.(follow_up,submitted))`,
+      // on the day · a multi-day task running through it · carried-over open work
+      `scheduled_date.eq.${day},and(scheduled_date.lt.${day},end_date.gte.${day}),and(scheduled_date.lt.${day},effective_status.in.(follow_up,submitted))`,
     )
     .order('scheduled_date', { ascending: true })
     .order('window_start', { ascending: true, nullsFirst: false })

@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
 import { Tag } from '@/components/ui/tag';
+import { SearchBox } from '@/components/search-box';
+import { parseOne } from '@/lib/db/assignments';
+import { matchesQuery } from '@/lib/search';
 import {
   Table,
   TableBody,
@@ -58,17 +61,17 @@ export default async function RoundsPage({
   const thisWeek = rounds.filter((r) => r.scheduled_date >= days[0]);
   const started = await startedRoundIds(thisWeek.map((r) => r.id));
 
-  const initial: Record<string, string> = {};
+  const initial: Record<string, string[]> = {};
   const startedKeys: string[] = [];
   for (const r of thisWeek) {
     const key = cellKey(r.round_template_id, r.scheduled_date);
-    initial[key] = r.assignee_id ?? '';
+    initial[key] = r.assignee_ids ?? [];
     if (started.has(r.id)) startedKeys.push(key);
   }
-  const lastWeek: Record<string, string> = {};
+  const lastWeek: Record<string, string[]> = {};
   for (const r of rounds) {
-    if (r.scheduled_date < days[0] && r.assignee_id) {
-      lastWeek[cellKey(r.round_template_id, r.scheduled_date)] = r.assignee_id;
+    if (r.scheduled_date < days[0] && r.assignee_ids?.length) {
+      lastWeek[cellKey(r.round_template_id, r.scheduled_date)] = r.assignee_ids;
     }
   }
 
@@ -84,7 +87,7 @@ export default async function RoundsPage({
   // their name rather than an empty cell that looks unplanned.
   const assignable = assignableStaff(profiles);
   const assignableIds = new Set(assignable.map((p) => p.id));
-  const holders = new Set(Object.values(initial).filter(Boolean));
+  const holders = new Set(Object.values(initial).flat());
   const staff = [
     ...assignable,
     ...profiles.filter((p) => holders.has(p.id) && !assignableIds.has(p.id)),
@@ -92,6 +95,18 @@ export default async function RoundsPage({
 
   const placeName = new Map(
     places.map((p) => [p.id, bilingual(locale, p.title_ar, p.title_en)]),
+  );
+
+  // The search narrows the template table only; the planner above keeps
+  // every round, or a search would hide cells someone is scheduling.
+  const q = parseOne(sp.q);
+  const listed = templates.filter((t) =>
+    matchesQuery(
+      q,
+      t.title_en,
+      t.title_ar,
+      ...roundPlaces(t.places).map((s) => placeName.get(s.template_id)),
+    ),
   );
 
   return (
@@ -130,8 +145,11 @@ export default async function RoundsPage({
         <section>
           <h2 className="text-heading">{dict.roundTemplates}</h2>
           <div className="mt-4">
-            {templates.length === 0 ? (
-              <p className="text-text/55">{dict.noRounds}</p>
+            <SearchBox value={q} label={dict.search} />
+          </div>
+          <div className="mt-4">
+            {listed.length === 0 ? (
+              <p className="text-text/55">{q ? dict.noData : dict.noRounds}</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -143,7 +161,7 @@ export default async function RoundsPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {templates.map((t) => {
+                  {listed.map((t) => {
                     const stops = roundPlaces(t.places);
                     return (
                       <TableRow key={t.id}>

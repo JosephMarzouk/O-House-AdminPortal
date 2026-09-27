@@ -1,6 +1,13 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getProfile, canEditClubPages, canManageUsers, canSchedule, canUsePortal } from '@/lib/auth';
+import {
+  getProfile,
+  canEditClubPages,
+  canExportReports,
+  canManageUsers,
+  canSchedule,
+  canUsePortal,
+} from '@/lib/auth';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
@@ -51,17 +58,22 @@ export default async function PortalLayout({ children }: { children: React.React
     // A column on phones (the sidebar's ink bar on top of the page), a row
     // from md up (the sticky aside beside it).
     <div className="flex min-h-dvh flex-col md:flex-row">
-      <PortalSidebar
-        dict={dict}
-        locale={locale}
-        canManageUsers={manages}
-        canSchedule={canSchedule(profile.role)}
-        canEditClubPages={canEditClubPages(profile.role)}
-        userName={profile.name}
-        roleLabel={roleLabel}
-        initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
-        initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
-      />
+      {/* `contents` keeps the sidebar a direct flex child; print:hidden keeps
+          it out of an exported report. */}
+      <div className="contents print:hidden">
+        <PortalSidebar
+          dict={dict}
+          locale={locale}
+          canManageUsers={manages}
+          canSchedule={canSchedule(profile.role)}
+          canEditClubPages={canEditClubPages(profile.role)}
+          canExportReports={canExportReports(profile.role)}
+          userName={profile.name}
+          roleLabel={roleLabel}
+          initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
+          initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
+        />
+      </div>
       {/* No padding here: PageHeader and PageBody bring their own gutters, so
           they stay the single place the page's left edge is decided — the
           not-authorized branch above renders them inside a different <main>

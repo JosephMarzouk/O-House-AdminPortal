@@ -10,6 +10,8 @@ export type FilterValues = {
   who?: string;
   from?: string;
   to?: string;
+  /** The search box's text — carried so a dropdown change keeps it. */
+  q?: string;
 };
 
 export type Option = { value: string; label: string };
@@ -113,7 +115,14 @@ export function AssignmentFilters({
       {hasAny && (
         <button
           type="button"
-          onClick={() => router.replace('/assignments', { scroll: false })}
+          // Keeps the search: the box holds its own text, and clearing only the
+          // URL would leave it showing words that no longer filter anything.
+          onClick={() =>
+            router.replace(
+              values.q ? `/assignments?${new URLSearchParams({ q: values.q })}` : '/assignments',
+              { scroll: false },
+            )
+          }
           className="h-control rounded-control px-3 text-sm text-cyan-dark underline underline-offset-4 transition-colors hover:text-cyan"
         >
           {labels.reset}

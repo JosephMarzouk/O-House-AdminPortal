@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { DeletePlaceButton } from '@/components/places/delete-place-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
+import { SearchBox } from '@/components/search-box';
+import { parseOne } from '@/lib/db/assignments';
+import { matchesQuery } from '@/lib/search';
 import {
   Table,
   TableBody,
@@ -16,14 +19,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-export default async function PlacesPage() {
-  const [dict, locale, places, departments] = await Promise.all([
+export default async function PlacesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const q = parseOne((await searchParams).q);
+  const [dict, locale, allPlaces, departments] = await Promise.all([
     getDictionary(),
     getLocale(),
     listPlaces(),
     listDepartments(),
   ]);
   const deptById = new Map(departments.map((d) => [d.id, d]));
+  // A handful of rows, so filtered here rather than in the query.
+  const places = allPlaces.filter((p) => {
+    const dept = p.department_id ? deptById.get(p.department_id) : undefined;
+    return matchesQuery(q, p.title_en, p.title_ar, dept?.name_en, dept?.name_ar);
+  });
 
   return (
     <>
@@ -37,7 +50,9 @@ export default async function PlacesPage() {
             <LinkPending />
           </Button>
         }
-      />
+      >
+        <SearchBox value={q} label={dict.search} />
+      </PageHeader>
 
       <PageBody>
         {places.length === 0 ? (

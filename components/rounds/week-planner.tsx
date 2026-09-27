@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/table';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import { addDays, fmtDate, fmtNum, fmtWeekday } from '@/lib/format';
-import { cellKey, changedCells, fillFromLastWeek } from '@/lib/rounds';
+import { cellKey, changedCells, fillFromLastWeek, sameIds } from '@/lib/rounds';
+import { AssigneePicker } from '@/components/assignee-picker';
 import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 import type { ScheduleResult } from '@/lib/types/database';
@@ -63,9 +64,9 @@ export function WeekPlanner({
   today: string;
   rounds: PlannerRound[];
   staff: PlannerStaff[];
-  /** cellKey → assignee id ('' when the round exists but nobody holds it). */
-  initial: Record<string, string>;
-  lastWeek: Record<string, string>;
+  /** cellKey → assignee ids ([] when the round exists but nobody holds it). */
+  initial: Record<string, string[]>;
+  lastWeek: Record<string, string[]>;
   /** cellKeys whose round already has a started task. */
   started: string[];
   dict: Dictionary;
@@ -73,19 +74,21 @@ export function WeekPlanner({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [cells, setCells] = useState<Record<string, string>>(initial);
+  const [cells, setCells] = useState<Record<string, string[]>>(initial);
 
   const startedSet = useMemo(() => new Set(started), [started]);
   const changes = useMemo(() => changedCells(initial, cells), [initial, cells]);
   const editable = (day: string) => day >= today;
   const title = (r: PlannerRound) => bilingual(locale, r.titleAr, r.titleEn) || dict.none;
 
-  function setCell(roundId: string, day: string, assignee: string) {
-    setCells((c) => ({ ...c, [cellKey(roundId, day)]: assignee }));
+  function setCell(roundId: string, day: string, assignees: string[]) {
+    setCells((c) => ({ ...c, [cellKey(roundId, day)]: assignees }));
   }
 
+  // One person for every editable day — the quick case. Several people on a
+  // day are picked in that day's cell.
   function setWholeWeek(roundId: string, picked: string) {
-    const assignee = picked === NOBODY ? '' : picked;
+    const assignee = picked === NOBODY ? [] : [picked];
     setCells((c) => {
       const next = { ...c };
       for (const day of days) if (editable(day)) next[cellKey(roundId, day)] = assignee;
@@ -127,32 +130,21 @@ export function WeekPlanner({
     });
   }
 
-  const staffOptions = (
-    <>
-      <option value="">{dict.unassigned}</option>
-      {staff.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.name}
-        </option>
-      ))}
-    </>
-  );
-
   function cellPicker(r: PlannerRound, day: string, className?: string) {
     const key = cellKey(r.id, day);
-    const changed = (cells[key] ?? '') !== (initial[key] ?? '');
     return (
       <div className={cn('flex items-center gap-1', className)}>
-        <Select
+        <AssigneePicker
           compact
-          className={cn('min-w-36 flex-1', changed && '[&_select]:border-cyan')}
-          aria-label={`${title(r)} — ${fmtWeekday(day, locale)}`}
+          className="min-w-36 flex-1"
+          changed={!sameIds(cells[key], initial[key])}
+          label={`${title(r)} — ${fmtWeekday(day, locale)}`}
           disabled={!editable(day) || pending}
-          value={cells[key] ?? ''}
-          onChange={(e) => setCell(r.id, day, e.target.value)}
-        >
-          {staffOptions}
-        </Select>
+          staff={staff}
+          value={cells[key] ?? []}
+          onChange={(ids) => setCell(r.id, day, ids)}
+          placeholder={dict.unassigned}
+        />
         {startedSet.has(key) && (
           <span title={dict.startedHint} aria-label={dict.startedHint} className="text-text/55">
             <LockIcon className="size-icon-sm" />

@@ -1,24 +1,35 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { clubForHost, effectiveHost, type PublicClub } from '@/lib/club-registry';
+import {
+  ACCESS_COOKIE,
+  authPost,
+  expiresAt,
+  REFRESH_COOKIE,
+  sessionCookies,
+} from '@/lib/session';
+
+/** Refresh a little before the access token runs out, so a page never renders on a dying one. */
+const REFRESH_EARLY_MS = 60_000;
 
 /**
- * Refreshes the Supabase session on every request and bounces anonymous
+ * Keeps the sign-in session fresh on every request and bounces anonymous
  * traffic to /login.
+ *
+ * The session is the API's own two tokens (lib/session.ts). When the access
+ * token is missing or about to expire and a refresh token is there, it is
+ * refreshed here, before the page renders, and both cookies are rewritten —
+ * on the response for the browser, and on the request so this same render
+ * already sees the new ones.
  *
  * This only checks that a session EXISTS. Whether that user may use the
  * portal at all (admin/manager, not cleaner) is decided in the portal layout,
- * which can read profiles.role — the proxy runs on the edge and a role read
- * per request would be a query on every asset. Next's own docs say the same:
- * this convention "should not be used as a full authorization solution".
+ * which reads profiles.role. The API verifies every token it is given.
  *
- * Named `proxy`, in proxy.ts, because Next 16 deprecated the `middleware`
- * convention and renamed it. Behaviour is identical; only the names changed.
+ * Named `proxy`, in proxy.ts: Next 16's name for middleware.
  *
- * It first decides which club the host belongs to (lib/club-registry.ts):
- * each club is its own Supabase project, so the session is checked against
- * that club's. A host that belongs to no club gets a plain 404 — no login
- * page for an address nobody configured.
+ * It first decides which club the host belongs to (lib/club-registry.ts). A
+ * host that belongs to no club gets a plain 404 — no login page for an
+ * address nobody configured.
  */
 export async function proxy(request: NextRequest) {
   let club: PublicClub | null;
@@ -30,46 +41,53 @@ export async function proxy(request: NextRequest) {
   }
   if (!club) return new NextResponse('Not found', { status: 404 });
 
-  let response = NextResponse.next({ request });
+  const access = request.cookies.get(ACCESS_COOKIE)?.value;
+  const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
+  let signedIn = expiresAt(access) > Date.now() + REFRESH_EARLY_MS;
+  let fresh: ReturnType<typeof sessionCookies> | null = null;
 
-  const supabase = createServerClient(
-    club.supabaseUrl,
-    club.publishableKey,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-
-  // getUser(), not getSession(): getSession only decodes the cookie, while
-  // getUser revalidates the token with Supabase. Do not remove — it is also
-  // what triggers the refresh whose cookies are written above.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!signedIn && refresh) {
+    try {
+      const res = await authPost(club.slug, '/auth/refresh', { refreshToken: refresh });
+      if (res.status === 200 && res.data) {
+        fresh = sessionCookies(res.data);
+        signedIn = true;
+      }
+    } catch {
+      // API unreachable: the page will say so; don't sign anyone out for it.
+      return new NextResponse('Service temporarily unavailable', { status: 503 });
+    }
+  }
 
   const isLogin = request.nextUrl.pathname.startsWith('/login');
-
-  if (!user && !isLogin) {
+  let response: NextResponse;
+  if (!signedIn && !isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isLogin) {
+    response = NextResponse.redirect(url);
+  } else if (signedIn && isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
-    return NextResponse.redirect(url);
+    response = NextResponse.redirect(url);
+  } else {
+    if (fresh) for (const [name, value] of fresh) request.cookies.set(name, value);
+    response = NextResponse.next({ request });
   }
 
+  // Supabase sign-in cookies from before our own sign-in (sb-<ref>-auth-token,
+  // and its .0/.1 chunks). Nothing reads them any more, and unlike ours they
+  // are readable by page scripts and hold a live Supabase refresh token.
+  for (const c of request.cookies.getAll()) {
+    if (c.name.startsWith('sb-')) response.cookies.delete(c.name);
+  }
+
+  if (fresh) {
+    for (const [name, value, options] of fresh) response.cookies.set(name, value, options);
+  } else if (!signedIn && (access || refresh)) {
+    // A dead session: clear it, so the next request does not try it again.
+    response.cookies.delete(ACCESS_COOKIE);
+    response.cookies.delete(REFRESH_COOKIE);
+  }
   return response;
 }
 

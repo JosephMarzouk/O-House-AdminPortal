@@ -85,11 +85,16 @@ export async function saveWeekPlan(
   const plan: PlanCell[] = [];
   for (const c of cells) {
     const date = parseDay(c?.date);
-    const assignee = c?.assignee_id ?? null;
-    if (!isUuid(c?.round_template_id) || !date || (assignee !== null && !isUuid(assignee))) {
+    const ids = c?.assignee_ids;
+    if (
+      !isUuid(c?.round_template_id) ||
+      !date ||
+      !Array.isArray(ids) ||
+      !ids.every((id) => isUuid(id))
+    ) {
       return { ok: false, error: 'invalid_plan' };
     }
-    plan.push({ round_template_id: c.round_template_id, date, assignee_id: assignee });
+    plan.push({ round_template_id: c.round_template_id, date, assignee_ids: [...new Set(ids)] });
   }
 
   const supabase = await createClient();

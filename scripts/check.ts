@@ -1,25 +1,29 @@
 /**
- * Self-check for the pure rules the portal cannot get wrong: the phone -> login-email transform, the dashboard's
+ * Self-check for the pure rules the portal cannot get wrong: the staff phone format, the dashboard's
  * lateness/date-bucket arithmetic, the template-item parser that guards what
  * savePlace is allowed to store, and who may administer whom.
  * Run: pnpm check
  */
 import assert from 'node:assert/strict';
-import {
-  normalizePhone,
-  isValidPhone,
-  phoneToLoginEmail,
-  phoneToE164,
-  toLoginCredential,
-} from '../lib/phone';
+import { normalizePhone, isValidPhone, phoneToE164 } from '../lib/phone';
 import { isLate, pct, windowDays, WINDOW_DAYS } from '../lib/dashboard';
-import { addDays, parseDay, todayInCairo, weekStart } from '../lib/format';
+import {
+  addDays,
+  assigneeNames,
+  fmtDate,
+  fmtPeriod,
+  parseDay,
+  todayInCairo,
+  weekStart,
+} from '../lib/format';
 import { parseCorrect, parseDecimal, templateItems } from '../lib/template-items';
 import { grantableRoles, STAFF_ROLES } from '../lib/types/database';
 import { canManageUsers, canMoveTasks, canSchedule, canUsePortal } from '../lib/auth';
 import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
 import { allowedMoves, COLUMN_OF } from '../lib/tracker';
 import { refusalLabel } from '../lib/refusals';
+import { ilikePattern, matchesQuery } from '../lib/search';
+import { reportScore, roundDepartment, workDuration } from '../lib/report';
 import { dictionaries } from '../lib/i18n/dictionaries';
 import type { Assignment } from '../lib/types/database';
 
@@ -27,53 +31,19 @@ import type { Assignment } from '../lib/types/database';
 // tested there: o-house-api/src/assignments/assignments.spec.ts, toBucketPath.
 
 // --- phone ---------------------------------------------------------------
-const EXPECTED = '201012345678@ohouse.internal';
-
-assert.equal(phoneToLoginEmail('1012345678'), EXPECTED);   // what the app's field accepts
-assert.equal(phoneToLoginEmail('01012345678'), EXPECTED);  // admin typed the trunk 0
-assert.equal(phoneToLoginEmail('+201012345678'), EXPECTED); // pasted E.164
-assert.equal(phoneToLoginEmail('0101 234 5678'), EXPECTED); // spaced
-assert.equal(phoneToLoginEmail('(010) 1234-5678'), EXPECTED);
-
-// The one real account in the database.
-assert.equal(phoneToLoginEmail('+201229338195'), '201229338195@ohouse.internal');
-assert.equal(phoneToE164('1229338195'), '+201229338195');
-
+// The staff form's preview. The login box's phone-or-email rule moved to the
+// API with sign-in (o-house-api/src/auth/logins.spec.ts, parseLogin).
+const EXPECTED = '+201012345678';
+assert.equal(phoneToE164('1012345678'), EXPECTED);   // what the app's field accepts
+assert.equal(phoneToE164('01012345678'), EXPECTED);  // admin typed the trunk 0
+assert.equal(phoneToE164('+201012345678'), EXPECTED); // pasted E.164
+assert.equal(phoneToE164('0101 234 5678'), EXPECTED); // spaced
+assert.equal(phoneToE164('(010) 1234-5678'), EXPECTED);
 assert.equal(normalizePhone('+20 101 234 5678'), '1012345678');
 assert.equal(isValidPhone('1012345678'), true);
 assert.equal(isValidPhone('101234567'), false); // 9 digits
 assert.equal(isValidPhone(''), false);
-assert.throws(() => phoneToLoginEmail('12345'), /phone_must_be_10_digits/);
-
-// --- the login box's one branch ------------------------------------------
-// The portal takes a phone OR an email in a single field. Getting the
-// discrimination wrong locks a real user out of their own account, so it is
-// worth more than the four lines it costs.
-
-// Staff: every shape an admin might have given them, all one account.
-assert.equal(toLoginCredential('1012345678'), EXPECTED);
-assert.equal(toLoginCredential('01012345678'), EXPECTED);
-assert.equal(toLoginCredential('+20 101 234 5678'), EXPECTED);
-assert.equal(toLoginCredential('  1012345678  '), EXPECTED); // pasted with spaces
-
-// Admins and managers: passed through untouched.
-assert.equal(toLoginCredential('joseph@blueribbon-inc.com'), 'joseph@blueribbon-inc.com');
-assert.equal(toLoginCredential(' Admin@Example.com '), 'Admin@Example.com');
-
-// The one that matters: normalizePhone strips non-digits, so an address
-// whose local part is ten digits reduces to a valid-looking phone. Without
-// the '@' test this would be rewritten to 201012345678@ohouse.internal and
-// that user could never sign in.
-assert.equal(
-  toLoginCredential('1012345678@gmail.com'),
-  '1012345678@gmail.com',
-  'an email must never be rewritten as a phone',
-);
-
-// Not a phone and not an address: hand it to GoTrue and let it refuse,
-// rather than guessing.
-assert.equal(toLoginCredential('12345'), '12345');
-assert.equal(toLoginCredential(''), '');
+assert.throws(() => phoneToE164('12345'), /phone_must_be_10_digits/);
 
 // --- dashboard arithmetic -------------------------------------------------
 // Only the fields isLate() reads; the rest of Assignment is irrelevant here.
@@ -238,12 +208,13 @@ assert.deepEqual(roundPlaces('nope'), []);
 // Save sends only what changed; a cleared cell is an explicit unassign.
 assert.deepEqual(
   changedCells(
-    { [`${G}|2026-09-21`]: 'u1', [`${G}|2026-09-22`]: 'u1' },
-    { [`${G}|2026-09-21`]: 'u1', [`${G}|2026-09-22`]: '', [`${P}|2026-09-22`]: 'u2' },
+    { [`${G}|2026-09-21`]: ['u1', 'u2'], [`${G}|2026-09-22`]: ['u1'] },
+    // Same two people ticked in the other order is no change.
+    { [`${G}|2026-09-21`]: ['u2', 'u1'], [`${G}|2026-09-22`]: [], [`${P}|2026-09-22`]: ['u2', 'u3'] },
   ),
   [
-    { round_template_id: G, date: '2026-09-22', assignee_id: null },
-    { round_template_id: P, date: '2026-09-22', assignee_id: 'u2' },
+    { round_template_id: G, date: '2026-09-22', assignee_ids: [] },
+    { round_template_id: P, date: '2026-09-22', assignee_ids: ['u2', 'u3'] },
   ],
 );
 
@@ -252,14 +223,14 @@ const planDays = ['2026-09-19', '2026-09-20', '2026-09-21'];
 const prevDays = ['2026-09-12', '2026-09-13', '2026-09-14'];
 assert.deepEqual(
   fillFromLastWeek(
-    { [`${G}|2026-09-21`]: 'kept' },
-    { [`${G}|2026-09-12`]: 'a', [`${G}|2026-09-13`]: 'b', [`${G}|2026-09-14`]: 'c' },
+    { [`${G}|2026-09-21`]: ['kept'] },
+    { [`${G}|2026-09-12`]: ['a'], [`${G}|2026-09-13`]: ['b', 'd'], [`${G}|2026-09-14`]: ['c'] },
     [G],
     planDays,
     prevDays,
     '2026-09-20',
   ),
-  { [`${G}|2026-09-20`]: 'b', [`${G}|2026-09-21`]: 'kept' },
+  { [`${G}|2026-09-20`]: ['b', 'd'], [`${G}|2026-09-21`]: ['kept'] },
 );
 
 // --- the tracker ---------------------------------------------------------------
@@ -323,6 +294,52 @@ for (const d of Object.values(dictionaries)) {
   assert.equal(refusalLabel('SOMETHING_NEW', d), d.refusalOther);
 }
 
+// --- several assignees, multi-day ----------------------------------------
+assert.equal(assigneeNames({ assignee_names: ['A', 'B'], inspector_name: 'B' }), 'A · B');
+assert.equal(assigneeNames({ assignee_names: [], inspector_name: 'B' }), 'B', 'view could not name them');
+assert.equal(assigneeNames({ assignee_names: null, inspector_name: null }), '');
+assert.equal(fmtPeriod('2026-09-23', null, 'en'), fmtDate('2026-09-23', 'en'));
+assert.equal(
+  fmtPeriod('2026-09-23', '2026-09-25', 'en'),
+  `${fmtDate('2026-09-23', 'en')} – ${fmtDate('2026-09-25', 'en')}`,
+);
+
+// --- daily report -----------------------------------------------------------
+// The place's department wins; a place shared by every department falls back
+// to the people's.
+assert.equal(roundDepartment('d-place', ['d-person']), 'd-place');
+assert.equal(roundDepartment(null, [null, 'd-person']), 'd-person');
+assert.equal(roundDepartment(undefined, []), null);
+assert.deepEqual(reportScore([{ status: 'done' }, { status: 'follow_up' }, { status: 'pending' }, { status: 'done' }]), {
+  done: 2,
+  total: 4,
+  pct: 50,
+});
+assert.deepEqual(reportScore([]), { done: 0, total: 0, pct: 0 });
+assert.deepEqual(
+  workDuration([
+    { event: 'created', at: '2026-09-27T05:00:00Z' },
+    { event: 'started', at: '2026-09-27T05:35:06Z' },
+    { event: 'submitted', at: '2026-09-27T05:38:32Z' },
+    { event: 'sent_back', at: '2026-09-27T06:00:00Z' },
+    { event: 'submitted', at: '2026-09-27T06:10:00Z' },
+  ]),
+  { start: '2026-09-27T05:35:06Z', end: '2026-09-27T05:38:32Z', minutes: 3 },
+  'first answer to FIRST submit',
+);
+assert.equal(workDuration([{ event: 'submitted', at: '2026-09-27T05:38:32Z' }]), null, 'a backfilled row has no start');
+
+// --- list search ----------------------------------------------------------
+// PostgREST's .or() syntax and ilike's wildcards never reach the query.
+assert.equal(ilikePattern(undefined), undefined);
+assert.equal(ilikePattern('  '), undefined);
+assert.equal(ilikePattern('Gym'), '*Gym*');
+assert.equal(ilikePattern('a,b.c(d)%_*'), '*a b c d*');
+assert.equal(ilikePattern('حمام السباحة'), '*حمام السباحة*');
+assert.ok(matchesQuery(undefined, 'x') && matchesQuery('', null));
+assert.ok(matchesQuery('POOL', null, 'Olympic Pool'));
+assert.ok(!matchesQuery('gym', 'Pool', undefined));
+
 console.log(
-  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal rules hold',
+  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal + search rules hold',
 );

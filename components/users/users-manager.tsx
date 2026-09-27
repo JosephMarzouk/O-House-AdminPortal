@@ -11,7 +11,7 @@ import {
   createStaff,
   resetStaffPassword,
 } from '@/lib/actions/users';
-import { normalizePhone, phoneToLoginEmail } from '@/lib/phone';
+import { normalizePhone, phoneToE164 } from '@/lib/phone';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,6 +36,7 @@ import {
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import { grantableRoles, STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
+import { matchesQuery } from '@/lib/search';
 import type { DepartmentOption } from '@/lib/options';
 
 export type UserRow = {
@@ -67,6 +68,7 @@ const MIN_PASSWORD = 8;
 const ROLE_ORDER: readonly Role[] = ['admin', ...STAFF_ROLES];
 
 export function UsersManager({
+  query,
   users,
   departments,
   dict,
@@ -74,6 +76,9 @@ export function UsersManager({
   currentUserId,
   callerRole,
 }: {
+  /** The page's ?q= search. It narrows the table only: the manager picker
+   *  in each row still offers every manager. */
+  query?: string;
   users: UserRow[];
   departments: DepartmentOption[];
   dict: Dictionary;
@@ -87,7 +92,11 @@ export function UsersManager({
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState('');
+  // What the person signs in with: a phone number (staff, the usual case) or
+  // an email address. One of the two, chosen here.
+  const [loginKind, setLoginKind] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<StaffRole>('cleaner');
 
@@ -105,7 +114,7 @@ export function UsersManager({
   const isAdminCaller = callerRole === 'admin';
 
   const digits = normalizePhone(phone);
-  const preview = digits.length === 10 ? phoneToLoginEmail(digits) : null;
+  const preview = digits.length === 10 ? phoneToE164(digits) : null;
 
   function roleLabel(r: Role) {
     return r === 'admin'
@@ -150,7 +159,10 @@ export function UsersManager({
     (r) => !ROLE_ORDER.includes(r),
   );
   const groups = [...ROLE_ORDER, ...extraRoles]
-    .map((role) => ({ role, rows: users.filter((u) => u.role === role) }))
+    .map((role) => ({
+      role,
+      rows: users.filter((u) => u.role === role && matchesQuery(query, u.name, u.phone, u.email)),
+    }))
     .filter((g) => g.rows.length > 0);
 
   function report(res: { ok: true } | { ok: false; error: string }) {
@@ -177,11 +189,17 @@ export function UsersManager({
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
-            const res = await createStaff({ name, phone, password, role });
+            const res = await createStaff({
+              name,
+              ...(loginKind === 'phone' ? { phone } : { email }),
+              password,
+              role,
+            });
             if (res.ok) {
               alert.success(dict.staffCreated);
               setName('');
               setPhone('');
+              setEmail('');
               setPassword('');
               setRole('cleaner');
               router.refresh();
@@ -195,27 +213,52 @@ export function UsersManager({
           <Label htmlFor="s-name">{dict.name}</Label>
           <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className="min-w-44 flex-1 space-y-1">
-          <Label htmlFor="s-phone">{dict.phone}</Label>
-          {/* "+20" is decoration, exactly as the staff app shows it — the field
-              holds the 10 national digits and normalizePhone strips a pasted
-              country code anyway, so nothing downstream changes. */}
-          <Input
-            id="s-phone"
-            dir="ltr"
-            prefix="+20"
-            inputMode="numeric"
-            placeholder="1012345678"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-          {/* Show the exact address the account will be created under. The app
-              builds this same string at login and validates nothing, so a
-              wrong digit here is an account that simply never signs in. */}
-          <p className="text-caption text-text/55" dir="ltr">
-            {preview ? `${dict.loginEmailPreview}: ${preview}` : dict.phoneHint}
-          </p>
+        <div className="min-w-36 space-y-1">
+          <Label htmlFor="s-login-kind">{dict.signInWith}</Label>
+          <Select
+            id="s-login-kind"
+            value={loginKind}
+            onChange={(e) => setLoginKind(e.target.value as 'phone' | 'email')}
+          >
+            <option value="phone">{dict.phone}</option>
+            <option value="email">{dict.email}</option>
+          </Select>
         </div>
+        {loginKind === 'phone' ? (
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-phone">{dict.phone}</Label>
+            {/* "+20" is decoration, exactly as the staff app shows it — the field
+                holds the 10 national digits and the API strips a pasted
+                country code anyway. */}
+            <Input
+              id="s-phone"
+              dir="ltr"
+              prefix="+20"
+              inputMode="numeric"
+              placeholder="1012345678"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+            {/* The exact number they will sign in with, so a wrong digit is
+                caught here rather than as an account that never signs in. */}
+            <p className="text-caption text-text/55" dir="ltr">
+              {preview ? `${dict.signInAs}: ${preview}` : dict.phoneHint}
+            </p>
+          </div>
+        ) : (
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-email">{dict.email}</Label>
+            <Input
+              id="s-email"
+              type="email"
+              dir="ltr"
+              autoComplete="off"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+        )}
         <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="s-role">{dict.role}</Label>
           {/* 'admin' is never on offer, and 'manager' only to an admin.

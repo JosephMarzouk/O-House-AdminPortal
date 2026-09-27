@@ -19,33 +19,65 @@ export const currentClub = cache(async (): Promise<PublicClub> => {
   return club;
 });
 
-/** The same lookup without notFound(), for the root layout: the not-found page renders inside it. */
+/** The same lookup without notFound(). */
 export const requestClub = cache(
   async (): Promise<PublicClub | null> => clubForHost(effectiveHost((await headers()).get('host'))),
 );
 
 /**
- * GET from the O House API as the signed-in user: their access token, and
- * X-Club so the API verifies it against this club's keys.
+ * Call the O House API as the signed-in user: their access token, and X-Club
+ * so the API verifies it against this club's key.
  *
  * The token is read from the session cookie without re-verifying it here —
- * the API verifies it (JWKS, issuer, profile) and so does Postgres behind it.
+ * the API verifies it (signature, issuer, profile) and Postgres checks the
+ * database token it mints behind that.
  */
-export async function apiGet<T>(path: string, accessToken: string): Promise<T> {
+export async function apiGet<T>(path: string, accessToken: string, extra: Record<string, string> = {}): Promise<T> {
+  return apiCall<T>('GET', path, accessToken, undefined, extra);
+}
+
+export async function apiPost<T>(path: string, accessToken: string, body: object): Promise<T> {
+  return apiCall<T>('POST', path, accessToken, body);
+}
+
+async function apiCall<T>(
+  method: 'GET' | 'POST',
+  path: string,
+  accessToken: string,
+  body?: object,
+  extra: Record<string, string> = {},
+): Promise<T> {
   const club = await currentClub();
   const res = await fetch(`${apiUrl()}${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, 'X-Club': club.slug },
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'X-Club': club.slug,
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...extra,
+    },
+    body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   });
   if (!res.ok) throw new ApiError(res.status, await res.text());
-  return (await res.json()) as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 export class ApiError extends Error {
+  /** The API's error code ({code, message} body), when it sent one. */
+  readonly code: string | null;
   constructor(
     readonly status: number,
     body: string,
   ) {
     super(`O House API ${status}: ${body.slice(0, 200)}`);
+    let code: string | null = null;
+    try {
+      code = (JSON.parse(body) as { code?: string }).code ?? null;
+    } catch {
+      // not JSON: no code
+    }
+    this.code = code;
   }
 }

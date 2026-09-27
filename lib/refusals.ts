@@ -12,6 +12,8 @@ export function refusalLabel(code: string, dict: Dictionary): string {
       return dict.refusalNotFound;
     case 'NOT_AUTHORIZED':
       return dict.refusalNotAuthorized;
+    case 'ASSIGNMENT_TAKEN':
+      return dict.refusalTaken;
     case 'MISSING_PHOTO':
       return dict.refusalMissingPhoto;
     case 'EMPTY_SUBMISSION':

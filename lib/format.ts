@@ -35,6 +35,28 @@ export function fmtDateTime(iso: string | null | undefined, locale: Locale): str
   });
 }
 
+/** A task's day, or "23 Sep 2026 – 25 Sep 2026" when it runs over several. */
+export function fmtPeriod(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  locale: Locale,
+): string {
+  return end ? `${fmtDate(start, locale)} – ${fmtDate(end, locale)}` : fmtDate(start, locale);
+}
+
+/**
+ * "Ahmed · Sara" — everyone a task was given to. Falls back to the owner's
+ * name for a row the view could not name (a caller who may not read the
+ * other profiles).
+ */
+export function assigneeNames(a: {
+  assignee_names?: string[] | null;
+  inspector_name?: string | null;
+}): string {
+  const names = (a.assignee_names ?? []).filter(Boolean);
+  return names.length > 0 ? names.join(' · ') : (a.inspector_name ?? '');
+}
+
 /**
  * "07:00 – 11:00". Postgres returns `time` as "HH:MM:SS"; the app slices to
  * 5 chars and so do we. Both ends must be present or there is no window —

@@ -287,7 +287,10 @@ invariant for the same reason.
 
 - The table is `submissions`; the concept is an **assignment/round**. Label
   it "Assignments" in the UI; never rename the table.
-- `inspector_id` means "the person assigned" (a cleaner or an inspector).
+- `inspector_id` means "the owner": the one person who took the round. A round
+  can be assigned to several people (`assignee_ids`); the first to act claims
+  it, and until then `inspector_id` is NULL. Show "Assigned: A, B · Submitted
+  by B".
 - `submissions.answers` is deprecated; live checklist state is `assignment_items`.
 - Roles: `admin | manager | inspector | cleaner`.
 - Everything that touches an assignment — creating, reviewing, scheduling a

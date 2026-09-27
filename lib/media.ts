@@ -1,6 +1,7 @@
 import 'server-only';
+import { cookies } from 'next/headers';
 import { apiGet, ApiError } from '@/lib/club';
-import { createClient } from '@/lib/supabase/server';
+import { ACCESS_COOKIE } from '@/lib/session';
 
 /**
  * Photos and signatures, as short-lived signed links from the O House API.
@@ -17,19 +18,19 @@ import { createClient } from '@/lib/supabase/server';
  */
 export type MediaLookup = (stored: string | null | undefined) => string | null;
 
+/** A camera clip rather than a photo: `….mp4`, before any signed-link query. */
+export const isVideo = (url: string) => /\.mp4(\?|$)/i.test(url);
+
 export async function roundMedia(assignmentId: string): Promise<MediaLookup> {
-  const supabase = await createClient();
-  // getSession, not getUser: this only forwards the token. The API verifies
-  // it against the club's keys, and Postgres verifies it again behind that.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return () => null;
+  // The sign-in cookie is only forwarded: the API verifies it, reads the
+  // round as this person, and signs only what RLS let them see.
+  const access = (await cookies()).get(ACCESS_COOKIE)?.value;
+  if (!access) return () => null;
 
   try {
     const { media } = await apiGet<{ media: Record<string, string | null> }>(
       `/assignments/${encodeURIComponent(assignmentId)}`,
-      session.access_token,
+      access,
     );
     return (stored) => (stored ? (media[stored] ?? null) : null);
   } catch (e) {

@@ -7,8 +7,15 @@ import { UsersManager } from '@/components/users/users-manager';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import type { Role } from '@/lib/types/database';
 import { toDepartmentOptions } from '@/lib/options';
+import { parseOne } from '@/lib/db/assignments';
+import { SearchBox } from '@/components/search-box';
 
-export default async function UsersPage() {
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const q = parseOne((await searchParams).q);
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
   const kicker = fmtDate(todayInCairo(), locale);
 
@@ -29,9 +36,12 @@ export default async function UsersPage() {
 
   return (
     <>
-      <PageHeader kicker={kicker} title={dict.navUsers} />
+      <PageHeader kicker={kicker} title={dict.navUsers}>
+        <SearchBox value={q} label={dict.search} />
+      </PageHeader>
       <PageBody>
         <UsersManager
+          query={q}
           dict={dict}
           locale={locale}
           currentUserId={me.id}

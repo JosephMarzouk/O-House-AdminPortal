@@ -47,11 +47,22 @@ export function isUuid(v: unknown): v is string {
   return typeof v === 'string' && UUID.test(v);
 }
 
-/** One cell of the week planner: a round template on a day, and who does it. */
-export type PlanCell = { round_template_id: string; date: string; assignee_id: string | null };
+/**
+ * One cell of the week planner: a round template on a day, and who does it.
+ * Several people: each gets the round's tasks, and whoever starts a task
+ * first owns it. Empty: the cell is cleared.
+ */
+export type PlanCell = { round_template_id: string; date: string; assignee_ids: string[] };
 
-/** The planner's state is keyed `${roundTemplateId}|${YYYY-MM-DD}` → assignee id, '' for nobody. */
+/** The planner's state is keyed `${roundTemplateId}|${YYYY-MM-DD}` → assignee ids, [] for nobody. */
 export const cellKey = (roundTemplateId: string, date: string) => `${roundTemplateId}|${date}`;
+
+/** Same people, whatever order they were ticked in. */
+export function sameIds(a: readonly string[] = [], b: readonly string[] = []): boolean {
+  if (a.length !== b.length) return false;
+  const s = new Set(a);
+  return b.every((x) => s.has(x));
+}
 
 /**
  * The cells whose assignee differs between what the server sent and what is
@@ -60,17 +71,16 @@ export const cellKey = (roundTemplateId: string, date: string) => `${roundTempla
  * and would make the summary it returns meaningless.
  */
 export function changedCells(
-  initial: Record<string, string>,
-  current: Record<string, string>,
+  initial: Record<string, string[]>,
+  current: Record<string, string[]>,
 ): PlanCell[] {
   const keys = new Set([...Object.keys(initial), ...Object.keys(current)]);
   const out: PlanCell[] = [];
   for (const key of keys) {
-    const before = initial[key] ?? '';
-    const after = current[key] ?? '';
-    if (before === after) continue;
+    const after = current[key] ?? [];
+    if (sameIds(initial[key], after)) continue;
     const [round_template_id, date] = key.split('|');
-    out.push({ round_template_id, date, assignee_id: after || null });
+    out.push({ round_template_id, date, assignee_ids: [...after] });
   }
   return out;
 }
@@ -82,20 +92,20 @@ export function changedCells(
  * Days before `firstEditable` are left alone; the past is read-only.
  */
 export function fillFromLastWeek(
-  current: Record<string, string>,
-  lastWeek: Record<string, string>,
+  current: Record<string, string[]>,
+  lastWeek: Record<string, string[]>,
   roundTemplateIds: string[],
   days: string[],
   lastWeekDays: string[],
   firstEditable: string,
-): Record<string, string> {
+): Record<string, string[]> {
   const next = { ...current };
   for (const rt of roundTemplateIds) {
     days.forEach((day, i) => {
       if (day < firstEditable) return;
       const key = cellKey(rt, day);
       const previous = lastWeek[cellKey(rt, lastWeekDays[i])];
-      if (!next[key] && previous) next[key] = previous;
+      if (!next[key]?.length && previous?.length) next[key] = previous;
     });
   }
   return next;

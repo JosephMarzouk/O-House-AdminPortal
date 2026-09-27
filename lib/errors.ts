@@ -22,15 +22,17 @@ export function errorMessage(dict: Dictionary, code: string): string {
     // users
     phone_invalid: dict.phoneInvalid,
     phone_taken: dict.phoneTaken,
+    email_invalid: dict.emailInvalid,
+    login_taken: dict.loginTaken,
     password_too_short: dict.passwordTooShort,
     role_not_allowed: dict.roleNotAllowed,
-    service_key_missing: dict.serviceKeyMissing,
     // assignments
     need_at_least_one_subtask: dict.needAtLeastOneSubtask,
     no_items_selected: dict.noItemsSelected,
     not_in_submitted_state: dict.notInSubmittedState,
     already_closed: dict.alreadyClosed,
     deadline_must_be_future: dict.deadlineMustBeFuture,
+    invalid_end_date: dict.invalidEndDate,
     // rounds + week plan (0013)
     need_at_least_one_place: dict.needAtLeastOnePlace,
     round_places_invalid: dict.roundPlacesInvalid,

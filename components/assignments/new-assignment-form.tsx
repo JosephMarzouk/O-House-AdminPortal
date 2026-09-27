@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { AssigneePicker } from '@/components/assignee-picker';
 import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
 import type { TemplateItem } from '@/lib/types/database';
@@ -24,7 +26,7 @@ export type PlaceOption = {
 
 export type StaffOption = { id: string; name: string };
 
-type FieldKey = 'place' | 'assignee' | 'title' | 'date' | 'from' | 'to' | 'items';
+type FieldKey = 'place' | 'assignee' | 'title' | 'date' | 'endDate' | 'from' | 'to' | 'items';
 
 export function NewAssignmentForm({
   places,
@@ -41,10 +43,13 @@ export function NewAssignmentForm({
   const [pending, startTransition] = useTransition();
 
   const [placeId, setPlaceId] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [titleAr, setTitleAr] = useState('');
   const [titleEn, setTitleEn] = useState('');
   const [date, setDate] = useState('');
+  // Off: a one-day task, the end date is the start date. On: pick the last day.
+  const [multiDay, setMultiDay] = useState(false);
+  const [endDate, setEndDate] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [items, setItems] = useState<TemplateItem[]>([]);
@@ -69,9 +74,12 @@ export function NewAssignmentForm({
   function validate(): Set<FieldKey> {
     const bad = new Set<FieldKey>();
     if (!placeId) bad.add('place');
-    if (!assigneeId) bad.add('assignee');
+    if (assigneeIds.length === 0) bad.add('assignee');
     if (!titleAr.trim() && !titleEn.trim()) bad.add('title');
     if (!date) bad.add('date');
+    // YYYY-MM-DD compares as text. The same day as the start is allowed
+    // (the server stores it as a one-day task).
+    if (multiDay && (!endDate || (date && endDate < date))) bad.add('endDate');
     if (!from) bad.add('from');
     if (!to) bad.add('to');
     // create_assignment happily accepts an empty p_items, but an assignment
@@ -88,6 +96,7 @@ export function NewAssignmentForm({
     assignee: dict.assignee,
     title: dict.assignmentTitleAr,
     date: dict.scheduledDate,
+    endDate: dict.endDate,
     from: dict.windowStart,
     to: dict.windowEnd,
     items: dict.subtasks,
@@ -119,10 +128,11 @@ export function NewAssignmentForm({
       const res = await createAssignment({
         templateId: place.id,
         siteId: place.siteId!,
-        assigneeId,
+        assigneeIds,
         titleAr,
         titleEn,
         scheduledDate: date,
+        endDate: multiDay ? endDate : undefined,
         windowStart: from,
         windowEnd: to,
         // Whole items, ids included: an item seeded from the place keeps its
@@ -169,21 +179,19 @@ export function NewAssignmentForm({
         </div>
 
         <div className="space-y-1">
-          <Label htmlFor="assignee">{dict.assignee}</Label>
-          <Select
+          <Label htmlFor="assignee">{dict.assignees}</Label>
+          <AssigneePicker
             id="assignee"
-            aria-invalid={invalid('assignee')}
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-          >
-            <option value="">{dict.selectAssignee}</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
+            staff={staff}
+            value={assigneeIds}
+            onChange={setAssigneeIds}
+            placeholder={dict.selectAssignee}
+            invalid={invalid('assignee')}
+          />
+          {err('assignee') ??
+            (assigneeIds.length > 1 && (
+              <p className="text-caption text-text/55">{dict.assigneesHint}</p>
             ))}
-          </Select>
-          {err('assignee')}
         </div>
 
         <div className="space-y-1">
@@ -217,6 +225,25 @@ export function NewAssignmentForm({
             onChange={(e) => setDate(e.target.value)}
           />
           {err('date')}
+          <label className="flex min-h-control items-center gap-2 text-sm">
+            <Checkbox checked={multiDay} onCheckedChange={(v) => setMultiDay(v === true)} />
+            {dict.multiDay}
+          </label>
+          {multiDay && (
+            <div className="space-y-1">
+              <Label htmlFor="endDate">{dict.endDate}</Label>
+              <Input
+                id="endDate"
+                type="date"
+                dir="ltr"
+                min={date || undefined}
+                aria-invalid={invalid('endDate')}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+              {err('endDate') ?? <p className="text-caption text-text/55">{dict.multiDayHint}</p>}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">

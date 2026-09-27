@@ -20,16 +20,20 @@ export type { ActionResult };
  *  'error_generic' rather than handing the driver's string to the browser. */
 function friendly(message: string): string {
   if (/New deadline must be in the future/i.test(message)) return 'deadline_must_be_future';
+  if (/INVALID_END_DATE/.test(message)) return 'invalid_end_date';
   return toErrorCode(message);
 }
 
 export type NewAssignmentInput = {
   templateId: string; // the place
   siteId: string; // its twin in `sites` — what the phone actually renders
-  assigneeId: string;
+  /** One or more. With several, the first to act on the phone owns the task. */
+  assigneeIds: string[];
   titleAr: string;
   titleEn: string;
   scheduledDate: string; // YYYY-MM-DD
+  /** The last day, for a task that runs over several days. Absent = one day. */
+  endDate?: string; // YYYY-MM-DD
   windowStart: string; // HH:MM
   windowEnd: string; // HH:MM
   items: TemplateItem[];
@@ -55,7 +59,7 @@ export async function createAssignment(
   if (
     !input.templateId ||
     !input.siteId ||
-    !input.assigneeId ||
+    input.assigneeIds.length === 0 ||
     !input.scheduledDate ||
     !input.windowStart ||
     !input.windowEnd ||
@@ -64,14 +68,18 @@ export async function createAssignment(
     return { ok: false, error: 'fields_required' };
   }
   if (input.items.length === 0) return { ok: false, error: 'need_at_least_one_subtask' };
+  if (input.endDate && input.endDate < input.scheduledDate) {
+    return { ok: false, error: 'invalid_end_date' };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('create_assignment', {
     p_title_ar: input.titleAr.trim(),
     p_title_en: input.titleEn.trim(),
     p_site_id: input.siteId,
-    p_assignee_id: input.assigneeId,
+    p_assignee_ids: input.assigneeIds,
     p_scheduled_date: input.scheduledDate,
+    ...(input.endDate ? { p_end_date: input.endDate } : {}),
     p_window_start: input.windowStart,
     p_window_end: input.windowEnd,
     p_items: templateItems(input.items),

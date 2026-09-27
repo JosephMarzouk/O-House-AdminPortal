@@ -6,11 +6,13 @@ import {
   StatusPendingIcon,
   StatusRejectedIcon,
 } from '@/components/icons';
-import { getAssignment, doneCount } from '@/lib/db/assignments';
+import { getAssignment, doneCount, eventsFor } from '@/lib/db/assignments';
+import { listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
-import { fmtDate, fmtDateTime, fmtWindow } from '@/lib/format';
+import { assigneeNames, fmtDateTime, fmtPeriod, fmtWindow } from '@/lib/format';
+import { StatusTimeline } from '@/components/status-timeline';
 import { answerLabel, correctLabel } from '@/lib/answers';
-import { roundMedia } from '@/lib/media';
+import { isVideo, roundMedia } from '@/lib/media';
 import { listRefusals } from '@/lib/db/sync';
 import { SyncRefusals } from '@/components/sync-refusals';
 import { StatusBadge } from '@/components/status-badge';
@@ -26,14 +28,18 @@ export default async function AssignmentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [dict, locale, a, media, refusals] = await Promise.all([
+  const [dict, locale, a, media, refusals, events, profiles] = await Promise.all([
     getDictionary(),
     getLocale(),
     getAssignment(id),
     roundMedia(id),
     listRefusals({ assignmentId: id }),
+    eventsFor([id]),
+    listProfiles(),
   ]);
   if (!a) notFound();
+  const names = new Map(profiles.map((p) => [p.id, p.name]));
+  const several = (a.assignee_ids ?? []).length > 1;
 
   const title =
     bilingual(locale, a.title_ar, a.title_en) ||
@@ -72,7 +78,7 @@ export default async function AssignmentDetailPage({
         subtitle={[
           bilingual(locale, a.round_title_ar, a.round_title_en),
           place,
-          fmtDate(a.scheduled_date, locale),
+          fmtPeriod(a.scheduled_date, a.end_date, locale),
           fmtWindow(a.window_start, a.window_end),
         ]
           .filter(Boolean)
@@ -87,9 +93,18 @@ export default async function AssignmentDetailPage({
       <PageBody>
         <dl className="flex flex-wrap gap-x-8 gap-y-4">
           <div>
-            <dt className="section-label">{dict.assignee}</dt>
-            <dd className="mt-1 text-lg">{a.inspector_name || dict.none}</dd>
+            <dt className="section-label">{several ? dict.assignedTo : dict.assignee}</dt>
+            <dd className="mt-1 text-lg">{assigneeNames(a) || dict.none}</dd>
           </div>
+          {/* Given to several: who took it (and so submits it), once someone has. */}
+          {several && (
+            <div>
+              <dt className="section-label">{a.submitted_at ? dict.submittedBy : dict.takenBy}</dt>
+              <dd className="mt-1 text-lg">
+                {a.inspector_name || <span className="text-text/55">{dict.notStartedYet}</span>}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="section-label">{dict.deadline}</dt>
             <dd className="mt-1 text-lg">{fmtDateTime(a.deadline, locale)}</dd>
@@ -194,20 +209,32 @@ export default async function AssignmentDetailPage({
                     {/* Photo evidence is permanent: view only, never a delete control. */}
                     {photos.length > 0 && (
                       <div className="flex gap-2">
-                        {photos.map((url) => (
-                          <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                            {/* Plain <img>: these are 5MB+ camera JPEGs from a
-                                public bucket, and next/image would proxy every
-                                one through the optimizer for a thumbnail. */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                        {photos.map((url) =>
+                          // A camera clip (the app's "Record a video"). The
+                          // signed link keeps the stored .mp4 path.
+                          isVideo(url) ? (
+                            <video
+                              key={url}
                               src={url}
-                              alt={dict.photo}
-                              loading="lazy"
-                              className="size-thumb rounded-card object-cover"
+                              controls
+                              preload="metadata"
+                              className="h-thumb max-w-64 rounded-card bg-ink"
                             />
-                          </a>
-                        ))}
+                          ) : (
+                            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                              {/* Plain <img>: these are 5MB+ camera JPEGs from a
+                                  public bucket, and next/image would proxy every
+                                  one through the optimizer for a thumbnail. */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={dict.photo}
+                                loading="lazy"
+                                className="size-thumb rounded-card object-cover"
+                              />
+                            </a>
+                          ),
+                        )}
                       </div>
                     )}
                   </Card>
@@ -229,6 +256,13 @@ export default async function AssignmentDetailPage({
             />
           </section>
         )}
+
+        <section>
+          <h2 className="text-heading">{dict.timeline}</h2>
+          <div className="mt-4">
+            <StatusTimeline events={events.get(id) ?? []} names={names} dict={dict} locale={locale} />
+          </div>
+        </section>
 
         <ReviewBar
           assignmentId={a.id!}
