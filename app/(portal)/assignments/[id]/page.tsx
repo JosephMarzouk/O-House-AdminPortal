@@ -8,6 +8,7 @@ import {
 } from '@/components/icons';
 import { getAssignment, doneCount, eventsFor } from '@/lib/db/assignments';
 import { listProfiles } from '@/lib/db/users';
+import { can, getProfile } from '@/lib/auth';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { assigneeNames, fmtDateTime, fmtPeriod, fmtWindow } from '@/lib/format';
 import { StatusTimeline } from '@/components/status-timeline';
@@ -28,7 +29,7 @@ export default async function AssignmentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [dict, locale, a, media, refusals, events, profiles] = await Promise.all([
+  const [dict, locale, a, media, refusals, events, profiles, me] = await Promise.all([
     getDictionary(),
     getLocale(),
     getAssignment(id),
@@ -36,6 +37,7 @@ export default async function AssignmentDetailPage({
     listRefusals({ assignmentId: id }),
     eventsFor([id]),
     listProfiles(),
+    getProfile(),
   ]);
   if (!a) notFound();
   const names = new Map(profiles.map((p) => [p.id, p.name]));
@@ -268,6 +270,8 @@ export default async function AssignmentDetailPage({
           assignmentId={a.id!}
           status={a.effective_status}
           items={a.items}
+          mayReview={can(me, 'review.edit')}
+          mayExtend={can(me, 'checklists.edit')}
           dict={dict}
           locale={locale}
         />

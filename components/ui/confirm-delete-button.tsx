@@ -26,43 +26,49 @@ export function ConfirmDeleteButton({
   dict,
   onDelete,
   label,
+  denied,
 }: {
   dict: Dictionary;
   onDelete: () => Promise<ActionResult>;
   label?: string;
+  /** No delete permission: greyed out, titled "no permission" (on a wrapper,
+   *  since a disabled button takes no pointer events). */
+  denied?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="text-magenta hover:bg-magenta/10"
-      aria-label={label ?? dict.remove}
-      disabled={pending}
-      // async, and the transition starts only once the promise has settled:
-      // starting it around the await would let React tear the pending state
-      // down while the dialog is still open.
-      onClick={async () => {
-        const ok = await alert.confirm({
-          title: dict.confirmDelete,
-          confirmLabel: dict.remove,
-          destructive: true,
-        });
-        if (!ok) return;
-        startTransition(async () => {
-          const res = await onDelete();
-          if (res.ok) {
-            alert.success(dict.saved);
-            router.refresh();
-          } else {
-            alert.error(errorMessage(dict, res.error));
-          }
-        });
-      }}
-    >
-      <TrashIcon />
-    </Button>
+    <span title={denied ? dict.noPermission : undefined} className="inline-flex">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="text-magenta hover:bg-magenta/10"
+        aria-label={label ?? dict.remove}
+        disabled={pending || denied}
+        // async, and the transition starts only once the promise has settled:
+        // starting it around the await would let React tear the pending state
+        // down while the dialog is still open.
+        onClick={async () => {
+          const ok = await alert.confirm({
+            title: dict.confirmDelete,
+            confirmLabel: dict.remove,
+            destructive: true,
+          });
+          if (!ok) return;
+          startTransition(async () => {
+            const res = await onDelete();
+            if (res.ok) {
+              alert.success(dict.saved);
+              router.refresh();
+            } else {
+              alert.error(errorMessage(dict, res.error));
+            }
+          });
+        }}
+      >
+        <TrashIcon />
+      </Button>
+    </span>
   );
 }

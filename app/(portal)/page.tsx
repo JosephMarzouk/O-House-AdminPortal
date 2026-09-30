@@ -1,4 +1,6 @@
-import { getProfile } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { can, getProfile } from '@/lib/auth';
+import { NoPermission } from '@/components/no-permission';
 import { getDashboardData } from '@/lib/dashboard';
 import { listRefusals } from '@/lib/db/sync';
 import { SyncRefusals } from '@/components/sync-refusals';
@@ -17,8 +19,32 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+const FIRST_PAGES: [string, string][] = [
+  ['/rounds', 'planner.view'],
+  ['/places', 'places.view'],
+  ['/departments', 'departments.view'],
+  ['/users', 'users.view'],
+  ['/roles', 'roles.view'],
+  ['/reports', 'reports.view'],
+  ['/club-settings', 'club_settings.view'],
+];
+
 export default async function DashboardPage() {
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
+  if (!can(me, 'checklists.view')) {
+    // Sign-in lands here; a role without the dashboard goes to its first
+    // page instead (the sidebar's order), and only one with none sees this.
+    const home = FIRST_PAGES.find(([, perm]) => can(me, perm));
+    if (home) redirect(home[0]);
+    return (
+      <>
+        <PageHeader kicker={fmtDate(todayInCairo(), locale)} title={dict.navDashboard} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
+      </>
+    );
+  }
   const [d, refusals] = await Promise.all([getDashboardData(locale, dict.none), listRefusals()]);
 
   const n = (v: number) => fmtNum(v, locale);
@@ -45,10 +71,13 @@ export default async function DashboardPage() {
         subtitle={dict.last30Days}
       />
       <PageBody>
-        {/* assignments_v is security_invoker, so a manager's rows are already
-            narrowed to their own reports. Say so, rather than letting a
-            team-sized figure read as club-wide. */}
-        {me?.role === 'manager' && <p className="text-sm text-text/55">{dict.dashboardScope}</p>}
+        {/* assignments_v is security_invoker, so a team or departments role's
+            rows are already narrowed to its scope. Say so, rather than
+            letting a team-sized figure read as club-wide. */}
+        {me?.access?.scope === 'team' && <p className="text-sm text-text/55">{dict.dashboardScope}</p>}
+        {me?.access?.scope === 'departments' && (
+          <p className="text-sm text-text/55">{dict.scopeDepartmentsNote}</p>
+        )}
 
         {/* Only when there is something to act on: an empty table is noise. */}
         {refusals.length > 0 && <SyncRefusals rows={refusals} dict={dict} locale={locale} />}

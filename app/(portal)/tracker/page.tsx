@@ -1,4 +1,4 @@
-import { canMoveTasks, getProfile } from '@/lib/auth';
+import { can, getProfile } from '@/lib/auth';
 import { itemCountsFor, listTrackerTasks, reviewItemsFor } from '@/lib/db/assignments';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import {
@@ -9,15 +9,16 @@ import {
   parseDay,
   todayInCairo,
 } from '@/lib/format';
-import type { BoardTask } from '@/lib/tracker';
+import { MOVE_PERMISSION, type BoardTask, type Move } from '@/lib/tracker';
 import { DayNav } from '@/components/tracker/day-nav';
 import { TaskBoard } from '@/components/tracker/task-board';
+import { NoPermission } from '@/components/no-permission';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 
 /**
- * The task tracker. Every portal role can follow it; only admins move cards
- * (canMoveTasks). RLS decides what each viewer sees — an admin everything, a
- * manager their own staff, an inspector their own tasks — through
+ * The task tracker. checklists.view follows it; review.edit approves and
+ * sends back, checklists.edit gives more time (MOVE_PERMISSION).
+ * RLS decides what each viewer sees — by the role's scope — through
  * assignments_v's security_invoker.
  */
 export default async function TrackerPage({
@@ -31,18 +32,25 @@ export default async function TrackerPage({
   // parseDay is the guard for the .or() filter listTrackerTasks builds.
   const day = parseDay(sp.date) ?? today;
 
-  const [dict, locale, me, { rows, total }] = await Promise.all([
-    getDictionary(),
-    getLocale(),
-    getProfile(),
-    listTrackerTasks(day),
-  ]);
+  const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
+  if (!can(me, 'checklists.view')) {
+    return (
+      <>
+        <PageHeader kicker={fmtDate(today, locale)} title={dict.navTracker} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
+      </>
+    );
+  }
+  const { rows, total } = await listTrackerTasks(day);
 
-  const canMove = canMoveTasks(me?.role);
+  const moves = Object.keys(MOVE_PERMISSION) as Move[];
+  const permitted = moves.filter((m) => can(me, MOVE_PERMISSION[m]));
   const ids = rows.map((r) => r.id).filter((id): id is string => !!id);
   // The send-back dialog lists a card's items, and only In Review cards can
-  // be sent back — so only theirs are fetched, and only for someone who can move.
-  const reviewIds = canMove
+  // be sent back — so only theirs are fetched, and only for someone who may.
+  const reviewIds = permitted.includes('send_back')
     ? rows.filter((r) => r.effective_status === 'submitted' && r.id).map((r) => r.id!)
     : [];
   const [counts, reviewItems] = await Promise.all([itemCountsFor(ids), reviewItemsFor(reviewIds)]);
@@ -74,8 +82,15 @@ export default async function TrackerPage({
       };
     });
 
+  const scope = me?.access?.scope;
   const scopeNote =
-    me?.role === 'manager' ? dict.trackerScope : me?.role === 'inspector' ? dict.trackerScopeOwn : null;
+    scope === 'team'
+      ? dict.trackerScope
+      : scope === 'departments'
+        ? dict.scopeDepartmentsNote
+        : scope === 'own'
+          ? dict.trackerScopeOwn
+          : null;
 
   return (
     <>
@@ -88,9 +103,13 @@ export default async function TrackerPage({
       </PageHeader>
 
       <PageBody className="space-y-4">
-        {(!canMove || scopeNote || total > rows.length) && (
+        {/* Nothing movable: view only. Some moves: the greyed ones are the
+            ones I lack (approve and send back are review.edit's). */}
+        {permitted.length < moves.length && (
+          <NoPermission dict={dict} text={permitted.length ? dict.greyedNoPermission : dict.viewOnly} />
+        )}
+        {(scopeNote || total > rows.length) && (
           <div className="space-y-1 text-sm text-text/55">
-            {!canMove && <p>{dict.trackerReadOnly}</p>}
             {scopeNote && <p>{scopeNote}</p>}
             {total > rows.length && (
               <p>
@@ -106,7 +125,7 @@ export default async function TrackerPage({
           key={day}
           tasks={tasks}
           reviewItems={Object.fromEntries(reviewItems)}
-          canMove={canMove}
+          permitted={permitted}
           dict={dict}
           locale={locale}
         />

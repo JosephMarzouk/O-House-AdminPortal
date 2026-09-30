@@ -44,10 +44,13 @@ export function SubtaskEditor({
   items,
   onChange,
   dict,
+  disabled = false,
 }: {
   items: TemplateItem[];
   onChange: (next: TemplateItem[]) => void;
   dict: Dictionary;
+  /** Read-only: the fieldset greys the native controls, the checkboxes are told. */
+  disabled?: boolean;
 }) {
   function patch(index: number, p: Partial<TemplateItem>) {
     onChange(items.map((it, i) => (i === index ? { ...it, ...p } : it)));
@@ -64,7 +67,7 @@ export function SubtaskEditor({
   }
 
   return (
-    <div className="space-y-3">
+    <fieldset disabled={disabled} className="min-w-0 space-y-3">
       {items.length === 0 && <p className="text-sm text-text/55">{dict.noData}</p>}
 
       <ul className="space-y-2">
@@ -105,6 +108,7 @@ export function SubtaskEditor({
               <div className="flex items-center gap-4 whitespace-nowrap text-sm">
                 <label className="flex min-h-control items-center gap-2">
                   <Checkbox
+                    disabled={disabled}
                     checked={item.requires_photo}
                     onCheckedChange={(v) => patch(i, { requires_photo: v === true })}
                   />
@@ -116,6 +120,7 @@ export function SubtaskEditor({
                     MISSING_PHOTO server-side. */}
                 <label className="flex min-h-control items-center gap-2">
                   <Checkbox
+                    disabled={disabled}
                     checked={item.critical}
                     onCheckedChange={(v) => patch(i, { critical: v === true })}
                   />
@@ -147,7 +152,7 @@ export function SubtaskEditor({
         <PlusIcon />
         {dict.addSubtask}
       </Button>
-    </div>
+    </fieldset>
   );
 }
 

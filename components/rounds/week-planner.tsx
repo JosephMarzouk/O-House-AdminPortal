@@ -21,6 +21,7 @@ import { addDays, fmtDate, fmtNum, fmtWeekday } from '@/lib/format';
 import { cellKey, changedCells, fillFromLastWeek, sameIds } from '@/lib/rounds';
 import { AssigneePicker } from '@/components/assignee-picker';
 import { errorMessage } from '@/lib/errors';
+import { NoPermission } from '@/components/no-permission';
 import { cn } from '@/lib/utils';
 import type { ScheduleResult } from '@/lib/types/database';
 
@@ -55,6 +56,7 @@ export function WeekPlanner({
   initial,
   lastWeek,
   started,
+  readOnly,
   dict,
   locale,
 }: {
@@ -69,6 +71,8 @@ export function WeekPlanner({
   lastWeek: Record<string, string[]>;
   /** cellKeys whose round already has a started task. */
   started: string[];
+  /** planner.view without planner.create: the week, but nothing to change. */
+  readOnly: boolean;
   dict: Dictionary;
   locale: Locale;
 }) {
@@ -78,7 +82,7 @@ export function WeekPlanner({
 
   const startedSet = useMemo(() => new Set(started), [started]);
   const changes = useMemo(() => changedCells(initial, cells), [initial, cells]);
-  const editable = (day: string) => day >= today;
+  const editable = (day: string) => !readOnly && day >= today;
   const title = (r: PlannerRound) => bilingual(locale, r.titleAr, r.titleEn) || dict.none;
 
   function setCell(roundId: string, day: string, assignees: string[]) {
@@ -160,7 +164,7 @@ export function WeekPlanner({
         compact
         className="min-w-36"
         aria-label={`${title(r)} — ${dict.wholeWeek}`}
-        disabled={pending}
+        disabled={pending || readOnly}
         value={PICK}
         onChange={(e) => setWholeWeek(r.id, e.target.value)}
       >
@@ -212,12 +216,16 @@ export function WeekPlanner({
           >
             <CaretRightIcon className="rtl:-scale-x-100" />
           </Button>
-          <Button variant="outline" disabled={pending} onClick={copyLastWeek}>
-            <CopyIcon />
-            {dict.copyLastWeek}
-          </Button>
+          <span title={readOnly ? dict.noPermission : undefined} className="inline-flex">
+            <Button variant="outline" disabled={pending || readOnly} onClick={copyLastWeek}>
+              <CopyIcon />
+              {dict.copyLastWeek}
+            </Button>
+          </span>
         </div>
       </div>
+      {/* Greyed rather than hidden, so the week reads the same for everyone. */}
+      {readOnly && <NoPermission dict={dict} text={dict.viewOnly} />}
 
       {rounds.length === 0 ? (
         <p className="text-text/55">{dict.noRounds}</p>

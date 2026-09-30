@@ -20,6 +20,9 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
 export function toErrorCode(message: string): string {
   if (/Only admins|permission denied|row-level security/i.test(message)) return 'not_authorized';
   if (/already registered|already been registered/i.test(message)) return 'phone_taken';
+  if (/LOCATION_ALREADY_SET/.test(message)) return 'location_already_set';
+  // create_assignment and schedule_rounds: the person's role can't be given checklists.
+  if (/INVALID_ASSIGNEE/.test(message)) return 'invalid_assignee';
   // 23503. The department or place still has staff or assignments pointing at
   // it — the one driver failure a user can actually resolve, so it keeps a
   // message of its own rather than collapsing into the generic one.

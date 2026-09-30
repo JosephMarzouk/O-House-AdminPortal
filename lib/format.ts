@@ -113,6 +113,17 @@ export function fmtWeekday(ymd: string, locale: Locale): string {
   });
 }
 
+/** "Thu, 24 Sep 2026" — a report day in the reports list; UTC as above. */
+export function fmtDay(ymd: string, locale: Locale): string {
+  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString(localeTag(locale), {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 /**
  * A `?date=` / `?week=` param as a real calendar day, or undefined.
  *

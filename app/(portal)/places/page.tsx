@@ -8,6 +8,8 @@ import { DeletePlaceButton } from '@/components/places/delete-place-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
 import { SearchBox } from '@/components/search-box';
+import { DeniedAction, NoPermission } from '@/components/no-permission';
+import { can, getProfile } from '@/lib/auth';
 import { parseOne } from '@/lib/db/assignments';
 import { matchesQuery } from '@/lib/search';
 import {
@@ -25,12 +27,24 @@ export default async function PlacesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const q = parseOne((await searchParams).q);
-  const [dict, locale, allPlaces, departments] = await Promise.all([
-    getDictionary(),
-    getLocale(),
-    listPlaces(),
-    listDepartments(),
-  ]);
+  const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
+  const kicker = fmtDate(todayInCairo(), locale);
+  if (!can(me, 'places.view')) {
+    return (
+      <>
+        <PageHeader kicker={kicker} title={dict.navPlaces} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
+      </>
+    );
+  }
+  // The sites / templates policies check the same keys; these only grey out.
+  const canCreate = can(me, 'places.create');
+  const canEdit = can(me, 'places.edit');
+  const canDelete = can(me, 'places.delete');
+
+  const [allPlaces, departments] = await Promise.all([listPlaces(), listDepartments()]);
   const deptById = new Map(departments.map((d) => [d.id, d]));
   // A handful of rows, so filtered here rather than in the query.
   const places = allPlaces.filter((p) => {
@@ -41,20 +55,27 @@ export default async function PlacesPage({
   return (
     <>
       <PageHeader
-        kicker={fmtDate(todayInCairo(), locale)}
+        kicker={kicker}
         title={dict.navPlaces}
         actions={
-          <Button className="relative" nativeButton={false} render={<Link href="/places/new" />}>
-            <PlusIcon />
-            {dict.newPlace}
-            <LinkPending />
-          </Button>
+          canCreate ? (
+            <Button className="relative" nativeButton={false} render={<Link href="/places/new" />}>
+              <PlusIcon />
+              {dict.newPlace}
+              <LinkPending />
+            </Button>
+          ) : (
+            <DeniedAction dict={dict} icon={<PlusIcon />} label={dict.newPlace} />
+          )
         }
       >
         <SearchBox value={q} label={dict.search} />
       </PageHeader>
 
       <PageBody>
+        {places.length > 0 && (!canEdit || !canDelete) && (
+          <NoPermission dict={dict} text={dict.greyedNoPermission} />
+        )}
         {places.length === 0 ? (
           <p className="text-text/55">{dict.noData}</p>
         ) : (
@@ -93,16 +114,25 @@ export default async function PlacesPage({
                     <TableCell className="text-end tabular-nums">{fmtNum(count, locale)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={dict.edit}
-                          nativeButton={false}
-                          render={<Link href={`/places/${p.id}`} />}
-                        >
-                          <PencilIcon />
-                        </Button>
-                        <DeletePlaceButton id={p.id} dict={dict} />
+                        {canEdit ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={dict.edit}
+                            nativeButton={false}
+                            render={<Link href={`/places/${p.id}`} />}
+                          >
+                            <PencilIcon />
+                          </Button>
+                        ) : (
+                          // The name still opens the place, read-only.
+                          <span title={dict.noPermission} className="inline-flex">
+                            <Button variant="ghost" size="icon" aria-label={dict.edit} disabled>
+                              <PencilIcon />
+                            </Button>
+                          </span>
+                        )}
+                        <DeletePlaceButton id={p.id} dict={dict} denied={!canDelete} />
                       </div>
                     </TableCell>
                   </TableRow>

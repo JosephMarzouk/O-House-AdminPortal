@@ -1,14 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import {
-  getProfile,
-  canEditClubPages,
-  canExportReports,
-  canManageUsers,
-  canSchedule,
-  canUsePortal,
-} from '@/lib/auth';
-import { getDictionary, getLocale } from '@/lib/i18n';
+import { can, getProfile } from '@/lib/auth';
+import { bilingual, getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
 import { SignOutButton } from '@/components/sign-out-button';
@@ -27,9 +20,11 @@ export default async function PortalLayout({ children }: { children: React.React
   // current_role() returning 'none' now guards against server-side.
   if (!profile) redirect('/login');
 
-  // Role gate lives here, not in the proxy: reading profiles.role on the edge
-  // would mean a query per request, including every asset.
-  if (!canUsePortal(profile.role)) {
+  // Role gate lives here, not in the proxy: reading the role on the edge
+  // would mean a query per request, including every asset. No access at all
+  // (inactive, or no role) fails this too.
+  const access = profile.access;
+  if (!access || !can(profile, 'portal.view')) {
     return (
       <main className="min-h-dvh">
         <PageHeader kicker={dict.appSubtitle} title={dict.appName} subtitle={dict.notAuthorized} />
@@ -39,20 +34,6 @@ export default async function PortalLayout({ children }: { children: React.React
       </main>
     );
   }
-
-  // The sidebar's Users row, and nothing else. What a manager may do once on
-  // that screen is decided there and in lib/actions/users.ts.
-  const manages = canManageUsers(profile.role);
-
-  // Every non-admin used to read as "Manager" here, which quietly mislabelled
-  // every inspector in the portal. Three roles reach this layout, so the label
-  // has to answer for three.
-  const roleLabel =
-    profile.role === 'admin'
-      ? dict.roleAdmin
-      : profile.role === 'manager'
-        ? dict.roleManager
-        : dict.roleInspector;
 
   return (
     // A column on phones (the sidebar's ink bar on top of the page), a row
@@ -64,12 +45,9 @@ export default async function PortalLayout({ children }: { children: React.React
         <PortalSidebar
           dict={dict}
           locale={locale}
-          canManageUsers={manages}
-          canSchedule={canSchedule(profile.role)}
-          canEditClubPages={canEditClubPages(profile.role)}
-          canExportReports={canExportReports(profile.role)}
+          permissions={access.permissions}
           userName={profile.name}
-          roleLabel={roleLabel}
+          roleLabel={bilingual(locale, access.role.name_ar, access.role.name_en)}
           initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
           initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
         />

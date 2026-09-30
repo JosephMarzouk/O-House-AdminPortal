@@ -9,6 +9,7 @@ import { ExtendDialog, RejectItemsDialog } from '@/components/assignments/review
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import type { AssignmentItem, EffectiveStatus } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
+import { NoPermission } from '@/components/no-permission';
 
 /**
  * The review actions as a floating bar — paper, 20px radius, the mid shadow —
@@ -22,12 +23,18 @@ export function ReviewBar({
   assignmentId,
   status,
   items,
+  mayReview,
+  mayExtend,
   dict,
   locale,
 }: {
   assignmentId: string;
   status: EffectiveStatus | null;
   items: AssignmentItem[];
+  /** review.edit: approve and reject. Without it they show, greyed out. */
+  mayReview: boolean;
+  /** checklists.edit: more time. */
+  mayExtend: boolean;
   dict: Dictionary;
   locale: Locale;
 }) {
@@ -42,6 +49,10 @@ export function ReviewBar({
   // the buttons never promise something the database will silently decline.
   const canReview = status === 'submitted';
   const canExtend = status !== 'submitted' && status !== 'approved' && status !== 'follow_up';
+  // Greyed for want of a permission: a title on the wrapper (a disabled
+  // button takes no pointer events) and one note for the bar.
+  const denied = (canReview && !mayReview) || (canExtend && !mayExtend);
+  const deniedTitle = (may: boolean) => (may ? undefined : dict.noPermission);
 
   function done() {
     alert.success(dict.saved);
@@ -62,12 +73,18 @@ export function ReviewBar({
     <div className="sticky bottom-6 flex flex-wrap items-center gap-2 rounded-tile bg-raised p-4 shadow-md shadow-(color:--color-shade)">
       {canReview && (
         <>
-          <Button disabled={pending} onClick={approve}>
-            {dict.approve}
-          </Button>
-          <Button variant="outline" disabled={pending} onClick={() => setRejectOpen(true)}>
-            {dict.reject}
-          </Button>
+          <span title={deniedTitle(mayReview)} className="inline-flex gap-2">
+            <Button disabled={pending || !mayReview} onClick={approve}>
+              {dict.approve}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={pending || !mayReview}
+              onClick={() => setRejectOpen(true)}
+            >
+              {dict.reject}
+            </Button>
+          </span>
           <RejectItemsDialog
             assignmentId={assignmentId}
             items={items}
@@ -82,9 +99,15 @@ export function ReviewBar({
 
       {canExtend && (
         <>
-          <Button variant="outline" disabled={pending} onClick={() => setExtendOpen(true)}>
-            {dict.extend}
-          </Button>
+          <span title={deniedTitle(mayExtend)} className="inline-flex">
+            <Button
+              variant="outline"
+              disabled={pending || !mayExtend}
+              onClick={() => setExtendOpen(true)}
+            >
+              {dict.extend}
+            </Button>
+          </span>
           <ExtendDialog
             assignmentId={assignmentId}
             open={extendOpen}
@@ -94,6 +117,8 @@ export function ReviewBar({
           />
         </>
       )}
+
+      {denied && <NoPermission dict={dict} />}
     </div>
   );
 }

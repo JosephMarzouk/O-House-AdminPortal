@@ -34,9 +34,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
-import { grantableRoles, STAFF_ROLES, type Role, type StaffRole } from '@/lib/types/database';
+import { can, mayManageUser, type Caller } from '@/lib/access';
 import { errorMessage } from '@/lib/errors';
 import { matchesQuery } from '@/lib/search';
+import { NoPermission } from '@/components/no-permission';
 import type { DepartmentOption } from '@/lib/options';
 
 export type UserRow = {
@@ -44,10 +45,13 @@ export type UserRow = {
   name: string;
   email: string;
   phone: string | null;
-  role: Role;
+  roleId: string;
   departmentId: string | null;
   managerId: string | null;
 };
+
+/** A role as this screen needs it. `canManage`: offered as someone's manager (canBeManager). */
+export type RoleOption = { id: string; key: string | null; nameAr: string; nameEn: string; canManage: boolean };
 
 /** Mirrors MIN_PASSWORD in lib/actions/users.ts. Duplicated rather than
  *  imported because that module is 'use server' and may export nothing but
@@ -55,41 +59,42 @@ export type UserRow = {
  *  the button. */
 const MIN_PASSWORD = 8;
 
-/**
- * Descending privilege — the order the table's sections run in, and the
- * order a row select offers.
- *
- * `admin` is on the front of STAFF_ROLES rather than in it: STAFF_ROLES is
- * the list the portal may GRANT, and admin is deliberately absent from that
- * (see lib/types/database.ts). Here the question is only what to display,
- * and admins have to be displayable — they exist, and an admin looking at
- * this screen should see the other admins.
- */
-const ROLE_ORDER: readonly Role[] = ['admin', ...STAFF_ROLES];
-
 export function UsersManager({
   query,
   users,
+  roles,
   departments,
   dict,
   locale,
-  currentUserId,
-  callerRole,
+  me,
 }: {
   /** The page's ?q= search. It narrows the table only: the manager picker
    *  in each row still offers every manager. */
   query?: string;
   users: UserRow[];
+  /** Every role, in sortRoles order: the order the table's sections run in. */
+  roles: RoleOption[];
   departments: DepartmentOption[];
   dict: Dictionary;
   locale: Locale;
-  currentUserId: string;
-  /** Admin or manager — canManageUsers is what got us here. It decides what
-   *  this screen offers; lib/actions/users.ts decides what it may do. */
-  callerRole: Role;
+  /** users.view is what got us here. It decides what this screen offers;
+   *  lib/actions/users.ts and the database decide what it may do. */
+  me: NonNullable<Caller>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  // What this caller may hand out — my_access().assignable, the database's
+  // own list, which never holds the Admin role. The same list decides whose
+  // role, department, manager and password they may change (mayManageUser).
+  const assignable = roles.filter((r) => me.access?.assignable.includes(r.id));
+  const canCreate = can(me, 'users.create') && assignable.length > 0;
+  // A role that covers chosen departments places people in those only
+  // (can_assign_role, set_user_department); everyone else in any, or none.
+  const myDepartments =
+    me.access?.scope === 'departments'
+      ? departments.filter((d) => me.access?.departments.includes(d.id))
+      : null;
 
   const [name, setName] = useState('');
   // What the person signs in with: a phone number (staff, the usual case) or
@@ -98,7 +103,10 @@ export function UsersManager({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<StaffRole>('cleaner');
+  // The least privileged default role, as before: Cleaner when it's on offer.
+  const defaultRole = (assignable.find((r) => r.key === 'cleaner') ?? assignable[0])?.id ?? '';
+  const [roleId, setRoleId] = useState(defaultRole);
+  const [departmentId, setDepartmentId] = useState(myDepartments?.[0]?.id ?? '');
 
   // The password dialog: which user, and which of its two beats we are on.
   // One dialog at the root rather than one per row — the table runs to every
@@ -107,63 +115,26 @@ export function UsersManager({
   const [confirming, setConfirming] = useState(false);
   const [newPassword, setNewPassword] = useState('');
 
-  // What this caller may hand out, and — the same list, on purpose — whose
-  // password they may set. An admin gets all three staff roles; a manager
-  // gets inspector and cleaner, never a peer. See grantableRoles.
-  const grantable = grantableRoles(callerRole);
-  const isAdminCaller = callerRole === 'admin';
-
   const digits = normalizePhone(phone);
   const preview = digits.length === 10 ? phoneToE164(digits) : null;
 
-  function roleLabel(r: Role) {
-    return r === 'admin'
-      ? dict.roleAdmin
-      : r === 'manager'
-        ? dict.roleManager
-        : r === 'inspector'
-          ? dict.roleInspector
-          : dict.roleCleaner;
-  }
+  const roleName = (r: RoleOption) => bilingual(locale, r.nameAr, r.nameEn);
+  const managerRoles = new Set(roles.filter((r) => r.canManage).map((r) => r.id));
 
-  function rolePlural(r: Role) {
-    return r === 'admin'
-      ? dict.roleAdminPlural
-      : r === 'manager'
-        ? dict.roleManagerPlural
-        : r === 'inspector'
-          ? dict.roleInspectorPlural
-          : r === 'cleaner'
-            ? dict.roleCleanerPlural
-            : // Not in ROLE_ORDER: a role the database grew and this file did
-              // not. Label it with the raw value rather than guessing.
-              r;
-  }
-
-  // The table is grouped by role, most-privileged first, rather than sorted
-  // flat. `order by role` in admin_staff_list is alphabetical — admin,
-  // cleaner, inspector, manager — which is not an order anyone reads a staff
-  // list in. ROLE_ORDER is, and it is the same list the row selects offer,
-  // so a role change moves the row into the section the select just named.
+  // The table is grouped by role, in the roles' own order (the defaults most
+  // privileged first, then custom roles), so a role change moves the row into
+  // the section the select just named.
   //
-  // Empty roles are dropped: a heading over nothing is noise, and the page
-  // already says how many of each there are by showing them.
+  // Empty roles are dropped: a heading over nothing is noise.
   //
-  // The section list is ROLE_ORDER plus anything the data holds that it does
-  // not, rather than ROLE_ORDER alone. profiles_role_check allows exactly the
-  // four roles below, so the tail is normally empty — but this project has
-  // twice shipped code whose idea of the database was out of date, and a flat
-  // `ROLE_ORDER.map` would drop a fifth role's accounts off this screen in
-  // silence rather than show them in a section nobody styled.
-  const extraRoles = [...new Set(users.map((u) => u.role))].filter(
-    (r) => !ROLE_ORDER.includes(r),
-  );
-  const groups = [...ROLE_ORDER, ...extraRoles]
-    .map((role) => ({
-      role,
-      rows: users.filter((u) => u.role === role && matchesQuery(query, u.name, u.phone, u.email)),
-    }))
-    .filter((g) => g.rows.length > 0);
+  // Anyone whose role isn't in the list (it can't happen while every role is
+  // readable) lands in a last, unnamed section rather than off the screen.
+  const known = new Set(roles.map((r) => r.id));
+  const shown = users.filter((u) => matchesQuery(query, u.name, u.phone, u.email));
+  const groups = [
+    ...roles.map((r) => ({ id: r.id, label: roleName(r), rows: shown.filter((u) => u.roleId === r.id) })),
+    { id: '', label: dict.none, rows: shown.filter((u) => !known.has(u.roleId)) },
+  ].filter((g) => g.rows.length > 0);
 
   function report(res: { ok: true } | { ok: false; error: string }) {
     if (res.ok) {
@@ -182,113 +153,142 @@ export function UsersManager({
     setNewPassword('');
   }
 
+  // Greyed rows get one note above the table, not one per row.
+  const someLocked = shown.some((u) => !mayManageUser(me, u));
+
   return (
     <>
-      <form
-        className="flex max-w-5xl flex-wrap items-start gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          startTransition(async () => {
-            const res = await createStaff({
-              name,
-              ...(loginKind === 'phone' ? { phone } : { email }),
-              password,
-              role,
+      {!canCreate ? (
+        <NoPermission dict={dict} text={dict.noPermissionAddStaff} />
+      ) : (
+        <form
+          className="flex max-w-5xl flex-wrap items-start gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            startTransition(async () => {
+              const res = await createStaff({
+                name,
+                ...(loginKind === 'phone' ? { phone } : { email }),
+                password,
+                roleId,
+                ...(myDepartments ? { departmentId } : {}),
+              });
+              if (res.ok) {
+                alert.success(dict.staffCreated);
+                setName('');
+                setPhone('');
+                setEmail('');
+                setPassword('');
+                setRoleId(defaultRole);
+                router.refresh();
+              } else {
+                report(res);
+              }
             });
-            if (res.ok) {
-              alert.success(dict.staffCreated);
-              setName('');
-              setPhone('');
-              setEmail('');
-              setPassword('');
-              setRole('cleaner');
-              router.refresh();
-            } else {
-              report(res);
-            }
-          });
-        }}
-      >
-        <div className="min-w-44 flex-1 space-y-1">
-          <Label htmlFor="s-name">{dict.name}</Label>
-          <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="min-w-36 space-y-1">
-          <Label htmlFor="s-login-kind">{dict.signInWith}</Label>
-          <Select
-            id="s-login-kind"
-            value={loginKind}
-            onChange={(e) => setLoginKind(e.target.value as 'phone' | 'email')}
+          }}
+        >
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-name">{dict.name}</Label>
+            <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="min-w-36 space-y-1">
+            <Label htmlFor="s-login-kind">{dict.signInWith}</Label>
+            <Select
+              id="s-login-kind"
+              value={loginKind}
+              onChange={(e) => setLoginKind(e.target.value as 'phone' | 'email')}
+            >
+              <option value="phone">{dict.phone}</option>
+              <option value="email">{dict.email}</option>
+            </Select>
+          </div>
+          {loginKind === 'phone' ? (
+            <div className="min-w-44 flex-1 space-y-1">
+              <Label htmlFor="s-phone">{dict.phone}</Label>
+              {/* "+20" is decoration, exactly as the staff app shows it — the field
+                  holds the 10 national digits and the API strips a pasted
+                  country code anyway. */}
+              <Input
+                id="s-phone"
+                dir="ltr"
+                prefix="+20"
+                inputMode="numeric"
+                placeholder="1012345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              {/* The exact number they will sign in with, so a wrong digit is
+                  caught here rather than as an account that never signs in. */}
+              <p className="text-caption text-text/55" dir="ltr">
+                {preview ? `${dict.signInAs}: ${preview}` : dict.phoneHint}
+              </p>
+            </div>
+          ) : (
+            <div className="min-w-44 flex-1 space-y-1">
+              <Label htmlFor="s-email">{dict.email}</Label>
+              <Input
+                id="s-email"
+                type="email"
+                dir="ltr"
+                autoComplete="off"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          )}
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-role">{dict.role}</Label>
+            {/* Only the roles this caller may give — never Admin. createStaff
+                and the API re-check (can_assign_role); this select is the
+                convenience, not the boundary. */}
+            <Select id="s-role" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+              {assignable.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {roleName(r)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {myDepartments && (
+            <div className="min-w-44 flex-1 space-y-1">
+              <Label htmlFor="s-dept">{dict.department}</Label>
+              <Select
+                id="s-dept"
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+              >
+                {myDepartments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {bilingual(locale, d.nameAr, d.nameEn)}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-pass">{dict.password}</Label>
+            <PasswordInput
+              id="s-pass"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              showLabel={dict.showPassword}
+              hideLabel={dict.hidePassword}
+            />
+          </div>
+          {/* pt aligns the 56px button with the 56px inputs under their labels. */}
+          <Button
+            type="submit"
+            disabled={pending || !roleId || (!!myDepartments && !departmentId)}
+            className="mt-4"
           >
-            <option value="phone">{dict.phone}</option>
-            <option value="email">{dict.email}</option>
-          </Select>
-        </div>
-        {loginKind === 'phone' ? (
-          <div className="min-w-44 flex-1 space-y-1">
-            <Label htmlFor="s-phone">{dict.phone}</Label>
-            {/* "+20" is decoration, exactly as the staff app shows it — the field
-                holds the 10 national digits and the API strips a pasted
-                country code anyway. */}
-            <Input
-              id="s-phone"
-              dir="ltr"
-              prefix="+20"
-              inputMode="numeric"
-              placeholder="1012345678"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            {/* The exact number they will sign in with, so a wrong digit is
-                caught here rather than as an account that never signs in. */}
-            <p className="text-caption text-text/55" dir="ltr">
-              {preview ? `${dict.signInAs}: ${preview}` : dict.phoneHint}
-            </p>
-          </div>
-        ) : (
-          <div className="min-w-44 flex-1 space-y-1">
-            <Label htmlFor="s-email">{dict.email}</Label>
-            <Input
-              id="s-email"
-              type="email"
-              dir="ltr"
-              autoComplete="off"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-        )}
-        <div className="min-w-44 flex-1 space-y-1">
-          <Label htmlFor="s-role">{dict.role}</Label>
-          {/* 'admin' is never on offer, and 'manager' only to an admin.
-              createStaff re-checks against the same list — this select is the
-              convenience, not the boundary. */}
-          <Select id="s-role" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
-            {grantable.map((r) => (
-              <option key={r} value={r}>
-                {roleLabel(r)}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="min-w-44 flex-1 space-y-1">
-          <Label htmlFor="s-pass">{dict.password}</Label>
-          <PasswordInput
-            id="s-pass"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            showLabel={dict.showPassword}
-            hideLabel={dict.hidePassword}
-          />
-        </div>
-        {/* pt aligns the 56px button with the 56px inputs under their labels. */}
-        <Button type="submit" disabled={pending} className="mt-4">
-          <PlusIcon />
-          {dict.newStaff}
-        </Button>
-      </form>
+            <PlusIcon />
+            {dict.newStaff}
+          </Button>
+        </form>
+      )}
 
+      {someLocked && <NoPermission dict={dict} text={dict.usersGreyedNote} />}
       <Table>
         <TableHeader>
           <TableRow>
@@ -303,39 +303,41 @@ export function UsersManager({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groups.map(({ role, rows }, groupIndex) => (
-            <Fragment key={role}>
+          {groups.map(({ id, label, rows }, groupIndex) => (
+            <Fragment key={id}>
               {/* A label row rather than a second <Table> per group: one
                   header, one set of column widths, so the selects below stay
                   in line down the whole page. Whitespace does the separating,
                   which is why this row carries no rule and no hover. */}
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell colSpan={6} className={groupIndex > 0 ? 'pt-8 pb-1' : 'pb-1'}>
-                  <span className="section-label">{rolePlural(role)}</span>
+                  <span className="section-label">{label}</span>
                   <span className="ms-2 text-caption tabular-nums text-text/50">{rows.length}</span>
                 </TableCell>
               </TableRow>
 
               {rows.map((u) => {
-                // An admin's own row keeps an 'admin' option purely so its
-                // select has something to display. The select is disabled
-                // there, so the option is never reachable from another row.
-                const isAdmin = u.role === 'admin';
-                const roleOptions: Role[] = isAdmin ? [...ROLE_ORDER] : [...STAFF_ROLES];
-                // The row's password button. Same list as the create form,
-                // because taking an account over and minting one are the same
-                // reach — so a manager's own row, and every admin's, is shown
-                // with the key greyed rather than hidden. resetStaffPassword
-                // enforces it; this only keeps the rule visible.
-                const canSetPassword = (grantable as readonly string[]).includes(u.role);
+                // Every control on the row — role, department, manager,
+                // password — is live only where can_manage_user would say yes:
+                // not me, and a current role I may assign, so never an Admin
+                // and never a peer. Greyed rather than hidden, so the rule
+                // stays visible; the database enforces it either way.
+                const manageable = mayManageUser(me, u);
+                // A disabled select still has to show the person's role.
+                const current = roles.find((r) => r.id === u.roleId);
+                const roleOptions = manageable ? assignable : current ? [current] : [];
 
                 return (
                   // Keyed by role as well as id, so a confirmed role change
                   // remounts the row in its new section with the selects
                   // re-seeded. Keyed by id alone, React would move the same
                   // DOM node and the uncontrolled selects would keep showing
-                  // whatever was last picked.
-                  <TableRow key={`${u.id}-${u.role}`}>
+                  // whatever was last picked. The "no permission" title sits
+                  // on the row: a disabled control shows none of its own.
+                  <TableRow
+                    key={`${u.id}-${u.roleId}`}
+                    title={manageable ? undefined : dict.noPermission}
+                  >
                 <TableCell className="font-semibold">{u.name || dict.none}</TableCell>
                 <TableCell dir="ltr">
                   {/* profiles.email is deliberately '' for phone accounts —
@@ -348,25 +350,18 @@ export function UsersManager({
                     compact
                     className="min-w-32"
                     aria-label={dict.changeRole}
-                    defaultValue={u.role}
-                    // Admin rows are frozen in both directions. Upward because
-                    // promotion mints an admin without going near the create
-                    // form; downward because demoting the last admin locks the
-                    // whole org out of role changes — and set_user_role guards
-                    // neither. Admins are made and unmade in Supabase.
-                    // ...and frozen for a manager on every row: set_user_role
-                    // is admin-only in the database (0010), so leaving this
-                    // live would only buy a raw error.
-                    disabled={pending || isAdmin || u.id === currentUserId || !isAdminCaller}
+                    defaultValue={u.roleId}
+                    // Admin rows are frozen in both directions: nothing
+                    // callable grants or removes the Admin role (assign_role
+                    // refuses it), so Admins are made and unmade in SQL.
+                    disabled={pending || !manageable}
                     onChange={(e) =>
-                      startTransition(async () =>
-                        report(await setUserRole(u.id, e.target.value as Role)),
-                      )
+                      startTransition(async () => report(await setUserRole(u.id, e.target.value)))
                     }
                   >
                     {roleOptions.map((r) => (
-                      <option key={r} value={r}>
-                        {roleLabel(r)}
+                      <option key={r.id} value={r.id}>
+                        {roleName(r)}
                       </option>
                     ))}
                   </Select>
@@ -378,20 +373,19 @@ export function UsersManager({
                     className="min-w-36"
                     aria-label={dict.changeDepartment}
                     defaultValue={u.departmentId ?? ''}
-                    // Frozen on admin rows for the same reason the role select
-                    // above is: an admin's place in the org is set in the
-                    // database by hand, not from a screen anyone on it can
-                    // reach. set_user_department enforces it too — this select
-                    // only keeps the rule visible.
-                    disabled={pending || isAdmin}
+                    // set_user_department enforces the same rule
+                    // (can_manage_user) — this select only keeps it visible.
+                    disabled={pending || !manageable}
                     onChange={(e) =>
                       startTransition(async () =>
                         report(await setUserDepartment(u.id, e.target.value || null)),
                       )
                     }
                   >
-                    <option value="">{dict.noDepartment}</option>
-                    {departments.map((d) => (
+                    {/* A departments role moves people between its own
+                        departments only, never out of them. */}
+                    {!myDepartments && <option value="">{dict.noDepartment}</option>}
+                    {(myDepartments ?? departments).map((d) => (
                       <option key={d.id} value={d.id}>
                         {bilingual(locale, d.nameAr, d.nameEn)}
                       </option>
@@ -405,7 +399,7 @@ export function UsersManager({
                     className="min-w-36"
                     aria-label={dict.changeManager}
                     defaultValue={u.managerId ?? ''}
-                    disabled={pending || isAdmin}
+                    disabled={pending || !manageable}
                     onChange={(e) =>
                       startTransition(async () =>
                         report(await setUserManager(u.id, e.target.value || null)),
@@ -413,8 +407,12 @@ export function UsersManager({
                     }
                   >
                     <option value="">{dict.noManager}</option>
+                    {/* People who can manage (canBeManager), plus whoever the
+                        manager is now, so the select can still show them. */}
                     {users
-                      .filter((m) => m.id !== u.id && (m.role === 'admin' || m.role === 'manager'))
+                      .filter(
+                        (m) => m.id !== u.id && (managerRoles.has(m.roleId) || m.id === u.managerId),
+                      )
                       .map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
@@ -428,7 +426,7 @@ export function UsersManager({
                     variant="ghost"
                     size="icon"
                     aria-label={dict.resetPassword}
-                    disabled={pending || !canSetPassword}
+                    disabled={pending || !manageable}
                     onClick={() => {
                       setResetting(u);
                       setConfirming(false);

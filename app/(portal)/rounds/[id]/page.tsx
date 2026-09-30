@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { canSchedule, getProfile } from '@/lib/auth';
+import { can, getProfile } from '@/lib/auth';
 import { listPlaces } from '@/lib/db/places';
 import { getRoundTemplate } from '@/lib/db/rounds';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
@@ -7,6 +7,7 @@ import { roundPlaces } from '@/lib/rounds';
 import { RoundTemplateForm } from '@/components/rounds/round-template-form';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
 import { toRoundPlaceOptions } from '@/lib/round-options';
+import { NoPermission } from '@/components/no-permission';
 
 export default async function EditRoundPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,15 +21,16 @@ export default async function EditRoundPage({ params }: { params: Promise<{ id: 
   if (!round) notFound();
 
   const title = bilingual(locale, round.title_ar, round.title_en) || dict.newRound;
-  if (!me || !canSchedule(me.role)) {
+  if (!can(me, 'planner.edit')) {
     return (
       <>
         <PageHeader
           kicker={<BackLink href="/rounds" label={dict.back} />}
           title={title}
-          subtitle={dict.adminOnly}
         />
-        <PageBody />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
       </>
     );
   }

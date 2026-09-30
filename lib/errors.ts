@@ -15,7 +15,8 @@ import type { Dictionary } from '@/lib/i18n/dictionaries';
 export function errorMessage(dict: Dictionary, code: string): string {
   const map: Record<string, string> = {
     // shared
-    not_authorized: dict.notAuthorized,
+    // One refused action, not the portal gate (that is notAuthorized, in the layout).
+    not_authorized: dict.noPermission,
     fields_required: dict.fieldsRequired,
     nothing_changed: dict.nothingChanged,
     still_referenced: dict.stillReferenced,
@@ -26,9 +27,22 @@ export function errorMessage(dict: Dictionary, code: string): string {
     login_taken: dict.loginTaken,
     password_too_short: dict.passwordTooShort,
     role_not_allowed: dict.roleNotAllowed,
+    department_required: dict.departmentRequired,
+    // roles
+    role_in_use: dict.roleInUse,
+    role_locked: dict.roleReadOnlyLocked,
+    own_role: dict.roleReadOnlyOwn,
+    not_a_subset: dict.roleNotASubset,
+    departments_required: dict.roleDepartmentsRequired,
+    name_taken: dict.roleNameTaken,
+    name_required: dict.roleNameRequired,
+    invalid_scope: dict.roleInvalidScope,
+    not_found: dict.roleNotFound,
+    default_role: dict.roleDefaultError,
     // assignments
     need_at_least_one_subtask: dict.needAtLeastOneSubtask,
     no_items_selected: dict.noItemsSelected,
+    reason_required: dict.reasonRequired,
     not_in_submitted_state: dict.notInSubmittedState,
     already_closed: dict.alreadyClosed,
     deadline_must_be_future: dict.deadlineMustBeFuture,
@@ -39,6 +53,9 @@ export function errorMessage(dict: Dictionary, code: string): string {
     invalid_assignee: dict.invalidAssignee,
     past_date: dict.pastDate,
     invalid_plan: dict.invalidPlan,
+    // club settings
+    location_invalid: dict.locationInvalid,
+    location_already_set: dict.locationAlreadySet,
   };
   return map[code] ?? dict.errorGeneric;
 }

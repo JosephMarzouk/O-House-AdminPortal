@@ -54,6 +54,17 @@ export const COLUMN_LABEL: Record<Column, keyof Dictionary> = {
 export type Move = 'approve' | 'send_back' | 'extend';
 
 /**
+ * The permission each move's function requires (private.require): approving
+ * and sending back are review, more time is checklists.edit. A move I lack
+ * stays on the card's menu, greyed out.
+ */
+export const MOVE_PERMISSION: Record<Move, string> = {
+  approve: 'review.edit',
+  send_back: 'review.edit',
+  extend: 'checklists.edit',
+};
+
+/**
  * Where a card may be dropped, and what that drop does. Review moves only —
  * the club's rule:
  *

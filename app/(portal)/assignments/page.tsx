@@ -10,7 +10,7 @@ import {
   type ItemCounts,
 } from '@/lib/db/assignments';
 import { listSites } from '@/lib/db/places';
-import { assignableStaff, listProfiles } from '@/lib/db/users';
+import { assignableStaff, listProfiles, staffAppRoles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import {
   assigneeNames,
@@ -23,6 +23,8 @@ import {
 import { STATUS, StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
 import { SearchBox } from '@/components/search-box';
+import { DeniedAction, NoPermission } from '@/components/no-permission';
+import { can, getProfile } from '@/lib/auth';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
@@ -58,9 +60,19 @@ export default async function AssignmentsPage({
   const showReview = !status || status === 'submitted';
   const showRest = status !== 'submitted';
 
-  const [dict, locale, review, rest, sites, profiles] = await Promise.all([
-    getDictionary(),
-    getLocale(),
+  const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
+  if (!can(me, 'checklists.view')) {
+    return (
+      <>
+        <PageHeader kicker={fmtDate(todayInCairo(), locale)} title={dict.navAssignments} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
+      </>
+    );
+  }
+
+  const [review, rest, sites, profiles, staffRoles] = await Promise.all([
     showReview
       ? listAssignments({ ...base, status: 'submitted' })
       : Promise.resolve({ rows: [], total: 0 }),
@@ -69,6 +81,7 @@ export default async function AssignmentsPage({
       : Promise.resolve({ rows: [], total: 0 }),
     listSites(),
     listProfiles(),
+    staffAppRoles(),
   ]);
 
   // One query per 100 ids for both tables together.
@@ -191,17 +204,21 @@ export default async function AssignmentsPage({
         kicker={fmtDate(todayInCairo(), locale)}
         title={dict.navAssignments}
         actions={
-          // nativeButton={false}: Base UI defaults to expecting a real
-          // <button>, and this renders an <a>.
-          <Button
-            className="relative"
-            nativeButton={false}
-            render={<Link href="/assignments/new" />}
-          >
-            <PlusIcon />
-            {dict.newAssignment}
-            <LinkPending />
-          </Button>
+          can(me, 'checklists.create') ? (
+            // nativeButton={false}: Base UI defaults to expecting a real
+            // <button>, and this renders an <a>.
+            <Button
+              className="relative"
+              nativeButton={false}
+              render={<Link href="/assignments/new" />}
+            >
+              <PlusIcon />
+              {dict.newAssignment}
+              <LinkPending />
+            </Button>
+          ) : (
+            <DeniedAction dict={dict} icon={<PlusIcon />} label={dict.newAssignment} />
+          )
         }
       >
         {/* The filter rows belong with the title rather than in the body:
@@ -242,7 +259,7 @@ export default async function AssignmentsPage({
               value: s.id,
               label: bilingual(locale, s.name_ar, s.name_en) || s.id,
             }))}
-            staff={assignableStaff(profiles).map((p) => ({ value: p.id, label: p.name }))}
+            staff={assignableStaff(profiles, staffRoles).map((p) => ({ value: p.id, label: p.name }))}
             labels={{
               place: dict.place,
               assignee: dict.assignee,

@@ -3,13 +3,22 @@ import { getDictionary, getLocale } from '@/lib/i18n';
 import { PlaceForm } from '@/components/places/place-form';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
 import { toDepartmentOptions } from '@/lib/options';
+import { NoPermission } from '@/components/no-permission';
+import { can, getProfile } from '@/lib/auth';
 
 export default async function NewPlacePage() {
-  const [dict, locale, departments] = await Promise.all([
-    getDictionary(),
-    getLocale(),
-    listDepartments(),
-  ]);
+  const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
+  if (!can(me, 'places.create')) {
+    return (
+      <>
+        <PageHeader kicker={<BackLink href="/places" label={dict.back} />} title={dict.newPlace} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
+      </>
+    );
+  }
+  const departments = await listDepartments();
 
   return (
     <>

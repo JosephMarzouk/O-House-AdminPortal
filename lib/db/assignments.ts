@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ilikePattern } from '@/lib/search';
+import type { ReportTask } from '@/lib/report';
 import type {
   Assignment,
   AssignmentItem,
@@ -229,6 +230,67 @@ export async function listTasksOnDay(day: string): Promise<{ rows: Assignment[];
 
   if (error) throw new Error(`listTasksOnDay: ${error.message}`);
   return { rows: data ?? [], total: count ?? data?.length ?? 0 };
+}
+
+/**
+ * The `n` nearest days before and after `day` that have a scheduled task —
+ * what an empty daily report offers instead of a dead end. Ascending, each.
+ *
+ * ponytail: judged on scheduled_date alone, so a multi-day task's middle days
+ * and the department filter are ignored (a hinted day can still be empty for
+ * one department). The row limit is the reach: a day past it hides the days
+ * behind it.
+ *
+ * `day` MUST come through parseDay() (lib/format.ts).
+ */
+export async function nearestDaysWithTasks(
+  day: string,
+  n = 3,
+): Promise<{ before: string[]; after: string[] }> {
+  const supabase = await createClient();
+  const [before, after] = await Promise.all([
+    supabase
+      .from('assignments_v')
+      .select('scheduled_date')
+      .lt('scheduled_date', day)
+      .order('scheduled_date', { ascending: false })
+      .limit(TRACKER_LIMIT),
+    supabase
+      .from('assignments_v')
+      .select('scheduled_date')
+      .gt('scheduled_date', day)
+      .order('scheduled_date', { ascending: true })
+      .limit(TRACKER_LIMIT),
+  ]);
+
+  const days = ({ data, error }: typeof before) => {
+    if (error) throw new Error(`nearestDaysWithTasks: ${error.message}`);
+    return [...new Set((data ?? []).map((r) => r.scheduled_date!))].slice(0, n);
+  };
+  return { before: days(before).reverse(), after: days(after) };
+}
+
+/**
+ * Every task that started on or before `today`, newest first, with only what
+ * the reports list needs to spread it over its days (lib/report.ts,
+ * daysFromTasks). RLS scopes it, as it does each day's report.
+ *
+ * `today` MUST come through todayInCairo() or parseDay() (lib/format.ts).
+ */
+export async function reportDays(today: string): Promise<ReportTask[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('assignments_v')
+    .select('id, scheduled_date, end_date, effective_status, template_id, source_template_id, inspector_id, assignee_ids')
+    .lte('scheduled_date', today)
+    .order('scheduled_date', { ascending: false })
+    // ponytail: the newest 1000 tasks (the Data API's own cap), no paging —
+    // months of one club. Past it the oldest listed day can come up short and
+    // older days drop off the list; their reports still open by URL.
+    .limit(1000);
+
+  if (error) throw new Error(`reportDays: ${error.message}`);
+  return data ?? [];
 }
 
 /**

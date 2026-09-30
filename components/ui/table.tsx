@@ -8,11 +8,12 @@ import { cn } from '@/lib/utils';
  * straight on the paper and its columns are the structure.
  *
  * Text is start-aligned; callers right-align numbers with `text-end
- * tabular-nums`.
+ * tabular-nums`. On paper nothing scrolls, so a slightly wide table runs into
+ * the margin rather than being cut off.
  */
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div data-slot="table-container" className="relative w-full overflow-x-auto print:overflow-visible">
       <table data-slot="table" className={cn('w-full text-sm', className)} {...props} />
     </div>
   );

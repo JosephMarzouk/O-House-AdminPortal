@@ -2,18 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { canSchedule, getProfile } from '@/lib/auth';
+import { can, getProfile } from '@/lib/auth';
 import { parseDay } from '@/lib/format';
 import { isUuid, roundPlaces, type PlanCell } from '@/lib/rounds';
 import type { RoundPlace, ScheduleResult } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
 /**
- * Both actions check the caller's role themselves as well as leaning on the
- * database: a Server Action is reachable by a direct POST whatever the page
- * showed, and a clear "not authorised" beats an RLS zero-row write that has to
- * be decoded. The database has the final word either way — round_templates_write
- * and schedule_rounds() admit admins and managers only (0013).
+ * Both actions check the caller's permission themselves as well as leaning on
+ * the database: a Server Action is reachable by a direct POST whatever the
+ * page showed, and a clear "not authorised" beats an RLS zero-row write that
+ * has to be decoded. The database has the final word either way — the
+ * round_templates policies and schedule_rounds() check the same planner.* keys.
  */
 
 export type RoundTemplateInput = {
@@ -35,7 +35,7 @@ export async function saveRoundTemplate(
   input: RoundTemplateInput,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const profile = await getProfile();
-  if (!canSchedule(profile?.role)) return { ok: false, error: 'not_authorized' };
+  if (!can(profile, input.id ? 'planner.edit' : 'planner.create')) return { ok: false, error: 'not_authorized' };
 
   const titleAr = input.titleAr.trim();
   const titleEn = input.titleEn.trim();
@@ -63,7 +63,6 @@ export async function saveRoundTemplate(
 /** schedule_rounds() raises these by name; everything else goes through the shared mapper. */
 function scheduleError(message: string): string {
   if (/PAST_DATE/.test(message)) return 'past_date';
-  if (/INVALID_ASSIGNEE/.test(message)) return 'invalid_assignee';
   if (/INVALID_PLAN/.test(message)) return 'invalid_plan';
   return toErrorCode(message);
 }
@@ -79,7 +78,7 @@ export async function saveWeekPlan(
   cells: PlanCell[],
 ): Promise<{ ok: true; result: ScheduleResult } | { ok: false; error: string }> {
   const profile = await getProfile();
-  if (!canSchedule(profile?.role)) return { ok: false, error: 'not_authorized' };
+  if (!can(profile, 'planner.create')) return { ok: false, error: 'not_authorized' };
   if (!Array.isArray(cells) || cells.length === 0) return { ok: false, error: 'nothing_changed' };
 
   const plan: PlanCell[] = [];

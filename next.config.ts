@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
   // Nothing gains from advertising the framework and version.
   poweredByHeader: false,
 
+  // Dev only. The dev terminal prints every Server Function call with its
+  // arguments, which put the sign-in password in clear text in the log.
+  logging: { serverFunctions: false },
+
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },

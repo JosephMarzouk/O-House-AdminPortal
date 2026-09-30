@@ -1,10 +1,12 @@
-import { canExportReports, getProfile } from '@/lib/auth';
+import Link from 'next/link';
+import { can, getProfile } from '@/lib/auth';
 import { currentClub } from '@/lib/club';
 import {
   EFFECTIVE_STATUSES,
   eventsFor,
   itemsFor,
   listTasksOnDay,
+  nearestDaysWithTasks,
   parseOne,
 } from '@/lib/db/assignments';
 import { listDepartments, listPlaces } from '@/lib/db/places';
@@ -23,11 +25,13 @@ import {
 import { answerLabel } from '@/lib/answers';
 import { isVideo, roundMedia, type MediaLookup } from '@/lib/media';
 import { isUuid } from '@/lib/rounds';
-import { reportScore, roundDepartment, workDuration } from '@/lib/report';
+import { reportScore, taskDepartment, workDuration } from '@/lib/report';
 import { StatusBadge } from '@/components/status-badge';
 import { StatusTimeline } from '@/components/status-timeline';
-import { PrintButton } from '@/components/print-button';
+import { DownloadPdfButton } from '@/components/download-pdf-button';
+import { LinkPending } from '@/components/ui/link-pending';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
+import { NoPermission } from '@/components/no-permission';
 import {
   Table,
   TableBody,
@@ -40,7 +44,7 @@ import {
 /**
  * The daily department report: everything assigned in one department on one
  * day — to whom, who did it, its status history and its answers — laid out to
- * print. "Export PDF" is the browser's print dialog (components/print-button).
+ * print. "Export PDF" downloads this page printed on the server (./pdf/route.ts).
  *
  * Modelled on the club's reference audit report: a header, a summary, then
  * one section per checklist with its score, duration and question/answer table.
@@ -56,11 +60,13 @@ export default async function DailyReportPage({
   const deptId = isUuid(deptParam) ? deptParam : null; // anything else = all departments
 
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
-  if (!me || !canExportReports(me.role)) {
+  if (!me || !can(me, 'reports.view')) {
     return (
       <>
-        <PageHeader kicker={fmtDate(day, locale)} title={dict.dailyReport} subtitle={dict.adminOnly} />
-        <PageBody />
+        <PageHeader kicker={fmtDate(day, locale)} title={dict.dailyReport} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
       </>
     );
   }
@@ -78,14 +84,10 @@ export default async function DailyReportPage({
   const names = new Map(profiles.map((p) => [p.id, p.name]));
   const dept = deptId ? departments.find((d) => d.id === deptId) : undefined;
 
-  const rows = tasks.rows.filter((a) => {
-    if (!deptId) return true;
-    const place = a.template_id ?? a.source_template_id;
-    const people = [a.inspector_id, ...(a.assignee_ids ?? [])].map((id) =>
-      id ? personDept.get(id) : null,
-    );
-    return roundDepartment(place ? placeDept.get(place) : null, people) === deptId;
-  });
+  const rows = tasks.rows.filter((a) => !deptId || taskDepartment(a, placeDept, personDept) === deptId);
+
+  // An empty day is usually "the checklists are on other days" — offer them.
+  const nearby = rows.length === 0 ? await nearestDaysWithTasks(day) : null;
 
   const ids = rows.map((a) => a.id!).filter(Boolean);
   const [items, events] = await Promise.all([itemsFor(ids), eventsFor(ids)]);
@@ -116,8 +118,10 @@ export default async function DailyReportPage({
 
   return (
     <>
-      {/* A4 with a small margin; the browser adds nothing else. */}
-      <style>{'@page { size: A4; margin: 12mm; }'}</style>
+      {/* A4 with a small margin; the browser adds nothing else. White paper:
+          the PDF prints backgrounds (the status tags need theirs), and the
+          screen's paper tint would come out as a grey box inside a white margin. */}
+      <style>{'@page { size: A4; margin: 12mm; } @media print { body { background: #fff; } }'}</style>
 
       <PageHeader
         kicker={
@@ -131,7 +135,7 @@ export default async function DailyReportPage({
           fmtDate(day, locale),
           `${dict.reportGeneratedBy} ${me.name} · ${fmtDateTime(new Date().toISOString(), locale)}`,
         ].join(' · ')}
-        actions={<PrintButton label={dict.exportPdf} />}
+        actions={<DownloadPdfButton date={day} dept={deptId ?? 'all'} label={dict.exportPdf} dict={dict} />}
       />
 
       <PageBody>
@@ -159,7 +163,24 @@ export default async function DailyReportPage({
         </section>
 
         {rows.length === 0 ? (
-          <p className="text-text/55">{dict.reportNoRounds}</p>
+          <div className="space-y-3">
+            <p className="text-text/55">{dict.reportNoRounds}</p>
+            {nearby && nearby.before.length + nearby.after.length > 0 && (
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-2 print:hidden">
+                <span className="text-text/55">{dict.reportNearbyDays}</span>
+                {[...nearby.before, ...nearby.after].map((d) => (
+                  <Link
+                    key={d}
+                    href={`/reports/daily?date=${d}&dept=${deptId ?? 'all'}`}
+                    className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
+                  >
+                    {fmtDate(d, locale)}
+                    <LinkPending />
+                  </Link>
+                ))}
+              </p>
+            )}
+          </div>
         ) : (
           <>
             {/* Overview: one line per checklist */}

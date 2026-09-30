@@ -17,13 +17,27 @@ import {
   weekStart,
 } from '../lib/format';
 import { parseCorrect, parseDecimal, templateItems } from '../lib/template-items';
-import { grantableRoles, STAFF_ROLES } from '../lib/types/database';
-import { canManageUsers, canMoveTasks, canSchedule, canUsePortal } from '../lib/auth';
+import {
+  assignableEnabled,
+  buildMatrix,
+  canBeManager,
+  can,
+  canManageRoles,
+  cellEnabled,
+  mayDeleteRole,
+  mayManageUser,
+  parseAccess,
+  roleReadOnly,
+  sortRoles,
+  type Access,
+} from '../lib/access';
 import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
-import { allowedMoves, COLUMN_OF } from '../lib/tracker';
+import { allowedMoves, COLUMN_OF, MOVE_PERMISSION } from '../lib/tracker';
+import { errorMessage } from '../lib/errors';
 import { refusalLabel } from '../lib/refusals';
 import { ilikePattern, matchesQuery } from '../lib/search';
-import { reportScore, roundDepartment, workDuration } from '../lib/report';
+import { parseLocation } from '../lib/club-location';
+import { daysFromTasks, reportScore, roundDepartment, workDuration } from '../lib/report';
 import { dictionaries } from '../lib/i18n/dictionaries';
 import type { Assignment } from '../lib/types/database';
 
@@ -246,43 +260,138 @@ assert.deepEqual(allowedMoves('expired', 'in_progress'), { in_progress: 'extend'
 for (const s of ['pending', 'in_progress', 'follow_up', 'approved'] as const) {
   assert.deepEqual(allowedMoves(s, s), {}, `${s} cannot be moved from the board`);
 }
-
-// --- who may administer whom ---------------------------------------------
-// The two questions grantableRoles answers are deliberately the same one:
-// which roles a caller may create, and whose password they may set.
-
-// An admin's reach is exactly what it was before managers arrived.
-assert.deepEqual([...grantableRoles('admin')], [...STAFF_ROLES]);
-
-// A manager reaches field staff and stops.
-assert.deepEqual([...grantableRoles('manager')], ['inspector', 'cleaner']);
-
-// Nobody mints a peer, and nobody mints an admin. These two are the whole
-// point of the function — 0010 in the database says the same thing.
-assert.ok(!grantableRoles('manager').includes('manager'), 'no peer minting');
-assert.ok(
-  !(grantableRoles('admin') as readonly string[]).includes('admin'),
-  'the portal never mints an admin',
-);
-
-// Unknown, missing and field roles all fall to the narrow list rather than
-// widening — the function must never fail open.
-for (const r of ['inspector', 'cleaner', 'nonsense', undefined, null]) {
-  assert.deepEqual([...grantableRoles(r)], ['inspector', 'cleaner'], `grantableRoles(${r})`);
+// Each move needs what its function requires: approve_assignment and
+// reject_items review.edit, extend_assignment checklists.edit.
+assert.deepEqual(MOVE_PERMISSION, {
+  approve: 'review.edit',
+  send_back: 'review.edit',
+  extend: 'checklists.edit',
+});
+// A refused action says "no permission", not the portal gate's sentence.
+for (const dict of Object.values(dictionaries)) {
+  assert.equal(errorMessage(dict, 'not_authorized'), dict.noPermission);
+  assert.notEqual(dict.noPermission, dict.notAuthorized);
 }
 
-// The Users screen's audience is narrower than the portal's.
-assert.ok(canManageUsers('admin') && canManageUsers('manager'));
-assert.ok(!canManageUsers('inspector'), 'an inspector is a portal user, not a staff admin');
-assert.ok(!canManageUsers('cleaner') && !canManageUsers(undefined));
-assert.ok(canUsePortal('inspector'), 'but an inspector does use the portal');
+// --- who may do what (custom roles) --------------------------------------
+// The database is the boundary (has_permission, the role RPCs); these are the
+// rules the portal draws itself from, and they must never fail open.
+const access = (a: Partial<Access> & { id?: string; key?: string | null }): Access => ({
+  role: { id: a.id ?? 'r-me', key: a.key ?? null, name_en: 'Me', name_ar: 'أنا', locked: a.key === 'admin' },
+  scope: a.scope ?? 'own',
+  departments: a.departments ?? [],
+  permissions: a.permissions ?? [],
+  assignable: a.assignable ?? [],
+});
+const admin = {
+  id: 'u-admin',
+  access: access({
+    id: 'r-admin',
+    key: 'admin',
+    scope: 'all',
+    permissions: ['portal.view', 'users.edit', 'roles.view', 'roles.create', 'roles.edit', 'roles.delete', 'places.edit'],
+    assignable: ['r-manager', 'r-cleaner', 'r-custom'],
+  }),
+};
+const teamLead = {
+  id: 'u-lead',
+  access: access({
+    id: 'r-manager',
+    key: 'manager',
+    scope: 'team',
+    permissions: ['portal.view', 'users.edit', 'roles.create', 'roles.edit'],
+    assignable: ['r-cleaner'],
+  }),
+};
 
-// Planning rounds is admin + manager (the database agrees); moving cards on
-// the tracker is admin only, by the club's rule.
-assert.ok(canSchedule('admin') && canSchedule('manager'));
-assert.ok(!canSchedule('inspector') && !canSchedule('cleaner') && !canSchedule(null));
-assert.ok(canMoveTasks('admin'));
-assert.ok(!canMoveTasks('manager') && !canMoveTasks('inspector') && !canMoveTasks(undefined));
+// my_access(): anything malformed is no access at all.
+assert.equal(parseAccess(null), null);
+assert.equal(parseAccess('x'), null);
+assert.equal(parseAccess({ role: { id: 'r' }, scope: 'everything' }), null, 'unknown scope');
+assert.equal(parseAccess({ scope: 'all', permissions: ['portal.view'] }), null, 'no role');
+assert.deepEqual(parseAccess({ role: { id: 'r' }, scope: 'own', permissions: ['a', 7] })?.permissions, ['a']);
+assert.deepEqual(parseAccess({ role: { id: 'r' }, scope: 'own' })?.assignable, []);
+
+// can(): the key, exactly; nobody signed in, or no role, can do nothing.
+assert.ok(can(admin, 'portal.view') && !can(admin, 'staff_app.view'));
+assert.ok(!can(null, 'portal.view') && !can(undefined, 'portal.view'));
+assert.ok(!can({ id: 'u', access: null }, 'portal.view'), 'inactive / no role');
+assert.ok(!can(admin, 'portal'), 'no prefix matching');
+
+// Managing roles needs the permission AND whole-club scope.
+assert.ok(canManageRoles(admin, 'create') && canManageRoles(admin, 'delete'));
+assert.ok(!canManageRoles(teamLead, 'create'), 'roles.create without scope all');
+
+// Read-only: the Admin role for everyone, your own role, or no rights.
+assert.equal(roleReadOnly(admin, { id: 'r-admin', locked: true }), 'locked');
+assert.equal(roleReadOnly(admin, { id: 'r-custom', locked: false }), null);
+const hr = { id: 'u-hr', access: access({ id: 'r-hr', scope: 'all', permissions: ['roles.edit'] }) };
+assert.equal(roleReadOnly(hr, { id: 'r-hr', locked: false }), 'own');
+assert.equal(roleReadOnly(teamLead, { id: 'r-cleaner', locked: false }), 'rights');
+assert.equal(roleReadOnly(null, { id: 'r-cleaner', locked: false }), 'rights');
+
+// Delete: custom roles only, never locked or your own.
+assert.ok(mayDeleteRole(admin, { id: 'r-custom', key: null, locked: false }));
+assert.ok(!mayDeleteRole(admin, { id: 'r-cleaner', key: 'cleaner', locked: false }), 'defaults stay');
+assert.ok(!mayDeleteRole(admin, { id: 'r-admin', key: 'admin', locked: true }));
+assert.ok(!mayDeleteRole(teamLead, { id: 'r-custom', key: null, locked: false }), 'no roles.delete');
+
+// The matrix: only what I hold is live; staff_app.view is a trait anyone
+// managing roles may give; a ticked cell stays live so it can be taken away.
+assert.ok(cellEnabled(admin, 'places.edit', false, true));
+assert.ok(!cellEnabled(admin, 'reports.view', false, true), "can't give what I don't hold");
+assert.ok(cellEnabled(admin, 'reports.view', true, true), '…but can take it away');
+assert.ok(cellEnabled(admin, 'staff_app.view', false, true), 'staff_app.view is a trait');
+assert.ok(!cellEnabled(admin, 'places.edit', true, false), 'read-only role');
+
+// "Can create users with these roles" is live only for a role that can create
+// or edit users; which roles it may list is not limited by its own power.
+assert.ok(assignableEnabled(new Set(['portal.view', 'users.create'])));
+assert.ok(assignableEnabled(new Set(['users.edit'])));
+assert.ok(!assignableEnabled(new Set(['portal.view', 'users.view', 'checklists.view'])), 'view only');
+assert.ok(!assignableEnabled(new Set()));
+
+// buildMatrix: sections and rows in catalog order, null where no key exists.
+const perm = (key: string, section: string, sort: number) => {
+  const [module, action] = key.split('.') as [string, 'view' | 'create' | 'edit' | 'delete'];
+  return { key, section, module, action, label_en: key, label_ar: key, sort };
+};
+const matrix = buildMatrix([
+  perm('reports.view', 'checklists', 40),
+  perm('portal.view', 'access', 10),
+  perm('checklists.edit', 'checklists', 30),
+  perm('checklists.view', 'checklists', 20),
+]);
+assert.deepEqual(matrix.map((s) => s.section), ['access', 'checklists']);
+assert.deepEqual(matrix[1].rows.map((r) => r.module), ['checklists', 'reports']);
+assert.equal(matrix[1].rows[0].cells.edit?.key, 'checklists.edit');
+assert.equal(matrix[1].rows[0].cells.create, null, 'no checklists.create in this catalog');
+assert.equal(matrix[1].rows[1].cells.delete, null);
+
+// Defaults first, most privileged first; then custom roles by name.
+assert.deepEqual(
+  sortRoles([
+    { key: null, name_en: 'Night supervisor' },
+    { key: 'cleaner', name_en: 'Cleaner' },
+    { key: null, name_en: 'Head of Sports' },
+    { key: 'admin', name_en: 'Admin' },
+  ]).map((r) => r.name_en),
+  ['Admin', 'Cleaner', 'Head of Sports', 'Night supervisor'],
+);
+
+// can_manage_user: not me, and their current role one I may assign — so
+// never an Admin, and never a peer.
+assert.ok(mayManageUser(teamLead, { id: 'u-x', roleId: 'r-cleaner' }));
+assert.ok(!mayManageUser(teamLead, { id: 'u-y', roleId: 'r-manager' }), 'no peer');
+assert.ok(!mayManageUser(admin, { id: 'u-z', roleId: 'r-admin' }), 'never an Admin');
+assert.ok(!mayManageUser(admin, { id: 'u-admin', roleId: 'r-manager' }), 'never myself');
+assert.ok(!mayManageUser(hr, { id: 'u-x', roleId: 'r-cleaner' }), 'no users.edit');
+
+// The manager picker: a team or the whole club, and someone to manage.
+assert.ok(canBeManager({ scope: 'team', permissions: ['users.edit'] }));
+assert.ok(canBeManager({ scope: 'all', permissions: ['checklists.view'] }));
+assert.ok(!canBeManager({ scope: 'own', permissions: ['users.edit', 'checklists.view'] }));
+assert.ok(!canBeManager({ scope: 'team', permissions: ['staff_app.view'] }));
 
 // --- sync refusals (SY-10) -----------------------------------------------
 // Every code the API can record reads as something a supervisor can act on,
@@ -329,6 +438,29 @@ assert.deepEqual(
 );
 assert.equal(workDuration([{ event: 'submitted', at: '2026-09-27T05:38:32Z' }]), null, 'a backfilled row has no start');
 
+// The reports list: each task on every day of its period up to today, newest
+// first, filtered by the same department rule as the day's report.
+{
+  const task = (id: string, from: string, to: string | null, status: 'approved' | 'pending' | null, place: string | null, owner: string | null) => ({
+    id, scheduled_date: from, end_date: to, effective_status: status,
+    template_id: place, source_template_id: null, inspector_id: owner, assignee_ids: owner ? [owner] : [],
+  });
+  const tasks = [
+    task('a', '2026-09-28', '2026-10-02', 'pending', 'p-pool', null), // runs past today
+    task('b', '2026-09-28', null, 'approved', 'p-shared', 'u-gym'),   // shared place: the owner's department
+    task('c', '2026-09-24', null, null, 'p-pool', null),             // no status: counted, not badged
+  ];
+  const placeDept = new Map<string, string | null>([['p-pool', 'd-pool'], ['p-shared', null]]);
+  const personDept = new Map<string, string | null>([['u-gym', 'd-gym']]);
+  const all = daysFromTasks(tasks, '2026-09-29', null, placeDept, personDept);
+  assert.deepEqual(all.map((d) => [d.day, d.total]), [['2026-09-29', 1], ['2026-09-28', 2], ['2026-09-24', 1]], 'capped at today');
+  assert.deepEqual(all[1].byStatus, { pending: 1, approved: 1 });
+  assert.deepEqual(all[2].byStatus, {});
+  assert.deepEqual(daysFromTasks(tasks, '2026-09-29', 'd-gym', placeDept, personDept).map((d) => d.day), ['2026-09-28']);
+  assert.deepEqual(daysFromTasks(tasks, '2026-09-29', 'd-pool', placeDept, personDept).map((d) => [d.day, d.total]), [['2026-09-29', 1], ['2026-09-28', 1], ['2026-09-24', 1]]);
+  assert.deepEqual(daysFromTasks(tasks, '2026-09-23', null, placeDept, personDept), [], 'nothing before it started');
+}
+
 // --- list search ----------------------------------------------------------
 // PostgREST's .or() syntax and ilike's wildcards never reach the query.
 assert.equal(ilikePattern(undefined), undefined);
@@ -340,6 +472,18 @@ assert.ok(matchesQuery(undefined, 'x') && matchesQuery('', null));
 assert.ok(matchesQuery('POOL', null, 'Olympic Pool'));
 assert.ok(!matchesQuery('gym', 'Pool', undefined));
 
+// --- club location --------------------------------------------------------
+// What Google Maps copies, and what the table's checks would refuse anyway.
+assert.deepEqual(parseLocation('30.0444, 31.2357', 200), { lat: 30.0444, lng: 31.2357, radiusM: 200 });
+assert.deepEqual(parseLocation(' -33.9,18.4 ', 50), { lat: -33.9, lng: 18.4, radiusM: 50 });
+for (const bad of ['', '30.0444', '30.0444 31.2357', '30,31,32', 'a, b', '91, 0', '0, 181', '30.0444, ']) {
+  assert.equal(parseLocation(bad, 200), null, bad);
+}
+assert.equal(parseLocation('30, 31', 49), null);
+assert.equal(parseLocation('30, 31', 2001), null);
+assert.equal(parseLocation('30, 31', 200.5), null);
+assert.equal(parseLocation('30, 31', NaN), null);
+
 console.log(
-  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal + search rules hold',
+  'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal + search + location rules hold',
 );

@@ -18,11 +18,14 @@ export function ClubPagesEditor({
   pageKey,
   bodyEn,
   bodyAr,
+  readOnly,
 }: {
   dict: Dictionary;
   pageKey: ClubPageKey;
   bodyEn: string;
   bodyAr: string;
+  /** Without club_settings.edit: the text, but no way to change it. */
+  readOnly: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -59,6 +62,7 @@ export function ClubPagesEditor({
             dir="ltr"
             rows={6}
             maxLength={20000}
+            readOnly={readOnly}
             value={en}
             onChange={(e) => setEn(e.target.value)}
           />
@@ -70,13 +74,17 @@ export function ClubPagesEditor({
             dir="rtl"
             rows={6}
             maxLength={20000}
+            readOnly={readOnly}
             value={ar}
             onChange={(e) => setAr(e.target.value)}
           />
         </div>
-        <Button type="submit" disabled={pending || !dirty}>
-          {dict.save}
-        </Button>
+        {/* Greyed rather than hidden; the page carries the "view only" note. */}
+        <span title={readOnly ? dict.noPermission : undefined} className="inline-flex">
+          <Button type="submit" disabled={pending || !dirty || readOnly}>
+            {dict.save}
+          </Button>
+        </span>
       </form>
     </Card>
   );

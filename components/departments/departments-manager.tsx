@@ -19,13 +19,19 @@ import {
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 import { ConfirmDeleteButton } from '@/components/ui/confirm-delete-button';
 import { errorMessage } from '@/lib/errors';
+import { NoPermission } from '@/components/no-permission';
 import type { DepartmentOption } from '@/lib/options';
 
 export function DepartmentsManager({
   departments,
+  canCreate,
+  canDelete,
   dict,
 }: {
   departments: DepartmentOption[];
+  /** departments.create / .delete: without them the controls are greyed out. */
+  canCreate: boolean;
+  canDelete: boolean;
   dict: Dictionary;
 }) {
   const router = useRouter();
@@ -39,6 +45,7 @@ export function DepartmentsManager({
           from the list below, not a box. */}
       <form
         className="flex max-w-3xl flex-wrap items-end gap-3"
+        title={canCreate ? undefined : dict.noPermission}
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
@@ -56,22 +63,35 @@ export function DepartmentsManager({
       >
         <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="d-ar">{dict.departmentNameAr}</Label>
-          <Input id="d-ar" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          <Input
+            id="d-ar"
+            disabled={!canCreate}
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
+          />
         </div>
         <div className="min-w-44 flex-1 space-y-1">
           <Label htmlFor="d-en">{dict.departmentNameEn}</Label>
-          <Input id="d-en" dir="ltr" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
+          <Input
+            id="d-en"
+            dir="ltr"
+            disabled={!canCreate}
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+          />
         </div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !canCreate}>
           <PlusIcon />
           {dict.create}
         </Button>
+        {!canCreate && <NoPermission dict={dict} className="basis-full" />}
       </form>
 
       {departments.length === 0 ? (
         <p className="text-text/55">{dict.noData}</p>
       ) : (
-        <div className="max-w-3xl">
+        <div className="max-w-3xl space-y-2">
+          {!canDelete && <NoPermission dict={dict} text={dict.greyedNoPermission} />}
           <Table>
             <TableHeader>
               <TableRow>
@@ -90,7 +110,11 @@ export function DepartmentsManager({
                         this department; the shared button reports that as
                         still_referenced rather than as the driver's own
                         sentence, which named the constraint. */}
-                    <ConfirmDeleteButton dict={dict} onDelete={() => deleteDepartment(d.id)} />
+                    <ConfirmDeleteButton
+                      dict={dict}
+                      onDelete={() => deleteDepartment(d.id)}
+                      denied={!canDelete}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

@@ -5,12 +5,16 @@ import { createClient } from '@/lib/supabase/server';
 import { templateItems } from '@/lib/template-items';
 import type { TemplateItem } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
+import { can, getProfile } from '@/lib/auth';
 
 /**
  * Every write goes through a SECURITY DEFINER RPC. This is not a style
  * choice: `submissions` has NO RLS UPDATE policy and `assignment_items` has
  * no INSERT/UPDATE/DELETE policy at all, so a direct .update() would silently
  * affect zero rows rather than erroring.
+ *
+ * Each action checks the key its RPC requires (private.require) first, so a
+ * refusal reads "no permission"; the RPC checks again and is the authority.
  */
 
 export type { ActionResult };
@@ -21,6 +25,7 @@ export type { ActionResult };
 function friendly(message: string): string {
   if (/New deadline must be in the future/i.test(message)) return 'deadline_must_be_future';
   if (/INVALID_END_DATE/.test(message)) return 'invalid_end_date';
+  if (/REASON_REQUIRED/.test(message)) return 'reason_required';
   return toErrorCode(message);
 }
 
@@ -56,6 +61,7 @@ export type NewAssignmentInput = {
 export async function createAssignment(
   input: NewAssignmentInput,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!can(await getProfile(), 'checklists.create')) return { ok: false, error: 'not_authorized' };
   if (
     !input.templateId ||
     !input.siteId ||
@@ -97,6 +103,7 @@ export async function createAssignment(
 }
 
 export async function approveAssignment(id: string, score?: number): Promise<ActionResult> {
+  if (!can(await getProfile(), 'review.edit')) return { ok: false, error: 'not_authorized' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('approve_assignment', {
     p_assignment_id: id,
@@ -119,19 +126,22 @@ export async function approveAssignment(id: string, score?: number): Promise<Act
   return { ok: true };
 }
 
-/** The reason is optional (notes migration): reject_items stores a blank one as NULL. */
+/** The reason is required: refused here, and again by reject_items in the database. */
 export async function rejectItems(
   id: string,
   itemIds: string[],
-  reason?: string,
+  reason: string,
 ): Promise<ActionResult> {
+  if (!can(await getProfile(), 'review.edit')) return { ok: false, error: 'not_authorized' };
   if (itemIds.length === 0) return { ok: false, error: 'no_items_selected' };
+  const trimmed = reason?.trim();
+  if (!trimmed) return { ok: false, error: 'reason_required' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('reject_items', {
     p_assignment_id: id,
     p_item_ids: itemIds,
-    ...(reason?.trim() ? { p_reason: reason.trim() } : {}),
+    p_reason: trimmed,
   });
   if (error) return { ok: false, error: friendly(error.message) };
 
@@ -146,6 +156,7 @@ export async function extendAssignment(
   newDeadlineIso: string,
   note?: string,
 ): Promise<ActionResult> {
+  if (!can(await getProfile(), 'checklists.edit')) return { ok: false, error: 'not_authorized' };
   const supabase = await createClient();
   const { error } = await supabase.rpc('extend_assignment', {
     p_assignment_id: id,

@@ -65,38 +65,40 @@ for exactly this.
 To demote an admin, the same `update` in reverse. Do not add an RPC for
 either — an RPC that can grant `admin` is the thing `0010` exists to remove.
 
-## Who can sign into the portal
+## Roles and permissions (since 29 Sep)
 
-`admin`, `manager` and `inspector`. `cleaner` is the one role that stays on
-the phone app: `canUsePortal` in `lib/auth.ts` blocks it server-side in the
-portal layout, and `0011` leaves it out of every policy and RPC that the
-portal's screens depend on.
+The four roles above are now only the **defaults**. Each club edits them and
+adds its own on the Roles screen; what a role may do is a set of permissions
+from a fixed catalog, plus a scope (own work, team, chosen departments, whole
+club). The migrations and the rules are in `o-house-api` (its README →
+"Roles"); the step 2 `update … set role = 'admin'` still works, because a
+trigger sets `role_id` from the text.
 
-Note the layout gate only decides whether pages *render*. Server Actions are
-POST endpoints that never re-enter it, so the database half — `0011` — is
-what actually holds. Both lists have to agree.
+**Who can sign into the portal:** any role holding `portal.view`. The layout
+asks `can(me, 'portal.view')` (`lib/access.ts`); `getProfile()` loads
+`my_access()` once per request.
+
+**What a screen offers** is `can(me, '<module>.<action>')`, the same keys the
+database checks with `has_permission()`. A page the person may not open shows
+"You don't have permission to open this page"; a control they may not use
+stays visible, greyed out, with a red note (`components/no-permission.tsx`).
+Server Actions check the same key first, and the database refuses regardless:
+the layout gate only decides what *renders*.
 
 ## Who administers whom
 
-The Users screen is open to `admin` and `manager` (`canManageUsers` in
-`lib/auth.ts`). What each of them may reach is one function,
-`grantableRoles` in `lib/types/database.ts`, and it answers two questions
-with one list on purpose — which roles you may create, and whose password you
-may set. Creating an account and taking one over are the same reach by two
-routes; `0010` is the argument for why granting one without the other closes
-nothing.
+One list answers both questions, as before: which roles you may create, and
+whose role, department, manager and password you may change. It is
+`my_access().assignable`: the roles ticked for your role under "Can create
+users with these roles" (every non-Admin role, for an Admin). `mayManageUser`
+in `lib/access.ts` mirrors the database's `can_manage_user`: `users.edit`, not
+yourself, and their current role on your list. So nobody touches an Admin, and
+a Manager cannot touch another Manager unless Manager is ticked for them.
 
-| Caller | May create / reset | May not touch |
-|---|---|---|
-| `admin` | manager, inspector, cleaner | other admins |
-| `manager` | inspector, cleaner | admins, other managers |
-
-Both rows still *see* every account on the screen, admins included — the key
-button is greyed on the ones they may not set. Roles themselves stay admin-only
-(`set_user_role`, `0010`); department and manager have been admin+manager
-since `0009`. Account creation and password resets have no SQL path at all —
-both run through the service-role key in `lib/actions/users.ts`, which is
-where those two checks live. `pnpm check` asserts the table above.
+Account creation and password resets go through the API (`POST /admin/staff`,
+`…/:id/password`), which asks `can_assign_role` / `can_manage_user` as the
+caller before writing with its secret key. `pnpm check` asserts the portal's
+half of these rules.
 
 ## Phone numbers are admin-only
 

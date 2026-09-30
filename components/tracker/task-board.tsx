@@ -51,14 +51,15 @@ type ReviewItem = { id: string; text_ar: string; text_en: string };
 export function TaskBoard({
   tasks,
   reviewItems,
-  canMove,
+  permitted,
   dict,
   locale,
 }: {
   tasks: BoardTask[];
   /** Checklist items of the In Review cards, for the send-back dialog. */
   reviewItems: Record<string, ReviewItem[]>;
-  canMove: boolean;
+  /** The moves my permissions allow (MOVE_PERMISSION). The rest are greyed out. */
+  permitted: Move[];
   dict: Dictionary;
   locale: Locale;
 }) {
@@ -73,6 +74,7 @@ export function TaskBoard({
   );
 
   const n = (v: number) => fmtNum(v, locale);
+  const may = (move: Move | undefined) => !!move && permitted.includes(move);
 
   const byColumn = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,7 +111,7 @@ export function TaskBoard({
     setOver(null);
     if (!task) return;
     const move = allowedMoves(task.effective, task.raw)[column];
-    if (move) perform(task, move);
+    if (move && may(move)) perform(task, move);
   }
 
   const moveLabel: Record<Move, string> = {
@@ -138,7 +140,7 @@ export function TaskBoard({
       <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:snap-none md:px-0">
         {COLUMNS.map((column) => {
           const cards = byColumn[column];
-          const target = dragging ? allowedMoves(dragging.effective, dragging.raw)[column] : undefined;
+          const target = may(dragging ? allowedMoves(dragging.effective, dragging.raw)[column] : undefined);
           return (
             <section
               key={column}
@@ -180,7 +182,10 @@ export function TaskBoard({
 
               {cards.map((t) => {
                 const moves = Object.entries(allowedMoves(t.effective, t.raw)) as [Column, Move][];
-                const movable = canMove && moves.length > 0 && busy !== t.id;
+                // The menu lists every move, greyed where I lack the
+                // permission; dragging only offers the ones I may make.
+                const hasMenu = moves.length > 0 && busy !== t.id;
+                const movable = hasMenu && moves.some(([, move]) => may(move));
                 const pct = t.total > 0 ? Math.round((t.done / t.total) * 100) : 0;
                 return (
                   <article
@@ -220,7 +225,7 @@ export function TaskBoard({
                         )}
                       </div>
 
-                      {movable && (
+                      {hasMenu && (
                         <Menu.Root>
                           <Menu.Trigger
                             aria-label={dict.moveTo}
@@ -234,8 +239,10 @@ export function TaskBoard({
                                 {moves.map(([column, move]) => (
                                   <Menu.Item
                                     key={column}
+                                    disabled={!may(move)}
+                                    title={may(move) ? undefined : dict.noPermission}
                                     onClick={() => perform(t, move)}
-                                    className="flex min-h-control cursor-pointer items-center rounded-control px-3 text-sm outline-none data-highlighted:bg-text/7"
+                                    className="flex min-h-control cursor-pointer items-center rounded-control px-3 text-sm outline-none data-highlighted:bg-text/7 data-disabled:cursor-not-allowed data-disabled:opacity-45"
                                   >
                                     {moveLabel[move]}
                                   </Menu.Item>

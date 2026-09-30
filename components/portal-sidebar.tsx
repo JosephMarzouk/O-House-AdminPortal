@@ -14,6 +14,7 @@ import {
   ListIcon,
   MapPinIcon,
   ReportIcon,
+  ShieldIcon,
   SidebarIcon,
   SignOutIcon,
   TranslateIcon,
@@ -49,10 +50,7 @@ export const SIDEBAR_COOKIE = 'sidebar';
 export function PortalSidebar({
   dict,
   locale,
-  canManageUsers,
-  canSchedule,
-  canEditClubPages,
-  canExportReports,
+  permissions,
   userName,
   roleLabel,
   initialCollapsed,
@@ -60,13 +58,8 @@ export function PortalSidebar({
 }: {
   dict: Dictionary;
   locale: Locale;
-  canManageUsers: boolean;
-  /** Admins and managers: the Rounds screen plans work for other people. */
-  canSchedule: boolean;
-  /** Admins: the staff app's About and Policies text. */
-  canEditClubPages: boolean;
-  /** Admins and managers: the daily department report. */
-  canExportReports: boolean;
+  /** The signed-in role's permissions (my_access). Each row needs its view key. */
+  permissions: string[];
   userName: string;
   roleLabel: string;
   initialCollapsed: boolean;
@@ -89,22 +82,20 @@ export function PortalSidebar({
     }; samesite=lax`;
   }
 
+  // A row shows only with its screen's view permission. The pages and the
+  // database check again: this only spares a role the dead ends.
   const items = [
-    { href: '/', label: dict.navDashboard, Icon: HouseIcon },
-    { href: '/tracker', label: dict.navTracker, Icon: KanbanIcon },
-    { href: '/assignments', label: dict.navAssignments, Icon: ClipboardIcon },
-    // Admins and managers: planning a week assigns other people's work, and
-    // schedule_rounds() refuses anyone else in the database too.
-    ...(canSchedule ? [{ href: '/rounds', label: dict.navRounds, Icon: CalendarIcon }] : []),
-    { href: '/places', label: dict.navPlaces, Icon: MapPinIcon },
-    { href: '/departments', label: dict.navDepartments, Icon: BuildingsIcon },
-    // Admins and managers. An inspector is a portal user but not a staff
-    // administrator, and the page and the RPC behind it both say so too —
-    // this row only spares them a dead end.
-    ...(canManageUsers ? [{ href: '/users', label: dict.navUsers, Icon: UsersIcon }] : []),
-    ...(canExportReports ? [{ href: '/reports', label: dict.navReports, Icon: ReportIcon }] : []),
-    ...(canEditClubPages ? [{ href: '/club-pages', label: dict.navClubPages, Icon: InfoIcon }] : []),
-  ];
+    { href: '/', label: dict.navDashboard, Icon: HouseIcon, perm: 'checklists.view' },
+    { href: '/tracker', label: dict.navTracker, Icon: KanbanIcon, perm: 'checklists.view' },
+    { href: '/assignments', label: dict.navAssignments, Icon: ClipboardIcon, perm: 'checklists.view' },
+    { href: '/rounds', label: dict.navRounds, Icon: CalendarIcon, perm: 'planner.view' },
+    { href: '/places', label: dict.navPlaces, Icon: MapPinIcon, perm: 'places.view' },
+    { href: '/departments', label: dict.navDepartments, Icon: BuildingsIcon, perm: 'departments.view' },
+    { href: '/users', label: dict.navUsers, Icon: UsersIcon, perm: 'users.view' },
+    { href: '/roles', label: dict.navRoles, Icon: ShieldIcon, perm: 'roles.view' },
+    { href: '/reports', label: dict.navReports, Icon: ReportIcon, perm: 'reports.view' },
+    { href: '/club-settings', label: dict.navClubPages, Icon: InfoIcon, perm: 'club_settings.view' },
+  ].filter((item) => permissions.includes(item.perm));
 
   /**
    * The drawer's contents, for either surface. `rail` is the collapsed 64px

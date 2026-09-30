@@ -3,10 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
+import { can, getProfile } from '@/lib/auth';
 
 export type { ActionResult };
 
+// Each checks the departments policy's key first, so a refusal reads "no
+// permission"; the policy is still the authority.
 export async function createDepartment(nameAr: string, nameEn: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'departments.create')) return { ok: false, error: 'not_authorized' };
   if (!nameAr.trim() && !nameEn.trim()) return { ok: false, error: 'fields_required' };
   const supabase = await createClient();
   const { error } = await supabase
@@ -18,6 +22,7 @@ export async function createDepartment(nameAr: string, nameEn: string): Promise<
 }
 
 export async function deleteDepartment(id: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'departments.delete')) return { ok: false, error: 'not_authorized' };
   const supabase = await createClient();
   // profiles.department_id and templates.department_id are plain references
   // with no ON DELETE, so Postgres refuses while anything still points here.

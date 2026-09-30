@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { PencilIcon, PlusIcon } from '@/components/icons';
-import { canSchedule, getProfile } from '@/lib/auth';
+import { can, getProfile } from '@/lib/auth';
 import { listPlaces } from '@/lib/db/places';
 import { listRoundTemplates, listRounds, startedRoundIds } from '@/lib/db/rounds';
-import { assignableStaff, listProfiles } from '@/lib/db/users';
+import { assignableStaff, listProfiles, staffAppRoles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { addDays, fmtDate, fmtNum, fmtWindow, parseDay, todayInCairo, weekStart } from '@/lib/format';
 import { cellKey, roundPlaces } from '@/lib/rounds';
@@ -13,6 +13,7 @@ import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
 import { Tag } from '@/components/ui/tag';
 import { SearchBox } from '@/components/search-box';
+import { DeniedAction, NoPermission } from '@/components/no-permission';
 import { parseOne } from '@/lib/db/assignments';
 import { matchesQuery } from '@/lib/search';
 import {
@@ -35,13 +36,16 @@ export default async function RoundsPage({
   const today = todayInCairo();
   const kicker = fmtDate(today, locale);
 
-  // Courtesy, not the control: round_templates_write and schedule_rounds()
-  // refuse everyone but admins and managers in the database.
-  if (!me || !canSchedule(me.role)) {
+  // Courtesy, not the control: the round_templates policies and
+  // schedule_rounds() check the planner.* keys in the database too. With
+  // planner.view alone the week and the templates are shown read-only.
+  if (!can(me, 'planner.view')) {
     return (
       <>
-        <PageHeader kicker={kicker} title={dict.navRounds} subtitle={dict.adminOnly} />
-        <PageBody />
+        <PageHeader kicker={kicker} title={dict.navRounds} />
+        <PageBody>
+          <NoPermission page dict={dict} />
+        </PageBody>
       </>
     );
   }
@@ -50,12 +54,16 @@ export default async function RoundsPage({
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const lastWeekDays = days.map((d) => addDays(d, -7));
 
-  const [templates, rounds, profiles, places] = await Promise.all([
+  const canPlan = can(me, 'planner.create');
+  const canEdit = can(me, 'planner.edit');
+
+  const [templates, rounds, profiles, places, staffRoles] = await Promise.all([
     listRoundTemplates(),
     // Last week too, for "copy last week".
     listRounds(lastWeekDays[0], days[6]),
     listProfiles(),
     listPlaces(),
+    staffAppRoles(),
   ]);
 
   const thisWeek = rounds.filter((r) => r.scheduled_date >= days[0]);
@@ -85,7 +93,7 @@ export default async function RoundsPage({
   // The assignable staff, plus anyone already holding a cell who no longer
   // is (deactivated, or moved to another role) — so the picker can still show
   // their name rather than an empty cell that looks unplanned.
-  const assignable = assignableStaff(profiles);
+  const assignable = assignableStaff(profiles, staffRoles);
   const assignableIds = new Set(assignable.map((p) => p.id));
   const holders = new Set(Object.values(initial).flat());
   const staff = [
@@ -116,11 +124,15 @@ export default async function RoundsPage({
         title={dict.navRounds}
         subtitle={dict.roundsIntro}
         actions={
-          <Button className="relative" nativeButton={false} render={<Link href="/rounds/new" />}>
-            <PlusIcon />
-            {dict.newRound}
-            <LinkPending />
-          </Button>
+          canPlan ? (
+            <Button className="relative" nativeButton={false} render={<Link href="/rounds/new" />}>
+              <PlusIcon />
+              {dict.newRound}
+              <LinkPending />
+            </Button>
+          ) : (
+            <DeniedAction dict={dict} icon={<PlusIcon />} label={dict.newRound} />
+          )
         }
       />
 
@@ -138,6 +150,7 @@ export default async function RoundsPage({
           initial={initial}
           lastWeek={lastWeek}
           started={startedKeys}
+          readOnly={!canPlan}
           dict={dict}
           locale={locale}
         />
@@ -147,6 +160,9 @@ export default async function RoundsPage({
           <div className="mt-4">
             <SearchBox value={q} label={dict.search} />
           </div>
+          {!canEdit && listed.length > 0 && (
+            <NoPermission dict={dict} text={dict.greyedNoPermission} className="mt-4" />
+          )}
           <div className="mt-4">
             {listed.length === 0 ? (
               <p className="text-text/55">{q ? dict.noData : dict.noRounds}</p>
@@ -166,13 +182,19 @@ export default async function RoundsPage({
                     return (
                       <TableRow key={t.id}>
                         <TableCell>
-                          <Link
-                            href={`/rounds/${t.id}`}
-                            className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
-                          >
-                            {bilingual(locale, t.title_ar, t.title_en) || dict.none}
-                            <LinkPending />
-                          </Link>
+                          {canEdit ? (
+                            <Link
+                              href={`/rounds/${t.id}`}
+                              className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
+                            >
+                              {bilingual(locale, t.title_ar, t.title_en) || dict.none}
+                              <LinkPending />
+                            </Link>
+                          ) : (
+                            <span className="font-semibold">
+                              {bilingual(locale, t.title_ar, t.title_en) || dict.none}
+                            </span>
+                          )}
                           <div className="text-caption text-text/55">
                             {dict.placeCount.replace('{n}', fmtNum(stops.length, locale))}
                           </div>
@@ -194,15 +216,23 @@ export default async function RoundsPage({
                           </Tag>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={dict.edit}
-                            nativeButton={false}
-                            render={<Link href={`/rounds/${t.id}`} />}
-                          >
-                            <PencilIcon />
-                          </Button>
+                          {canEdit ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={dict.edit}
+                              nativeButton={false}
+                              render={<Link href={`/rounds/${t.id}`} />}
+                            >
+                              <PencilIcon />
+                            </Button>
+                          ) : (
+                            <span title={dict.noPermission} className="inline-flex">
+                              <Button variant="ghost" size="icon" aria-label={dict.edit} disabled>
+                                <PencilIcon />
+                              </Button>
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

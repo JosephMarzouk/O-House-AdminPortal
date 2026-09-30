@@ -35,7 +35,10 @@ export type Database = {
           must_change_password: boolean;
           name: string;
           phone: string | null;
+          /** A mirror of role_id for the old clients (custom roles read 'cleaner'). Never decide on it. */
           role: string;
+          /** The person's role (custom roles). Changed only through assign_role. */
+          role_id: string;
         };
         Insert: {
           active?: boolean;
@@ -49,6 +52,7 @@ export type Database = {
           name?: string;
           phone?: string | null;
           role?: string;
+          role_id?: string;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
         Relationships: [];
@@ -297,6 +301,20 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /** The club's zone: one row at most, written once by set_club_location (admins). */
+      club_location: {
+        Row: {
+          id: boolean;
+          lat: number;
+          lng: number;
+          radius_m: number;
+          set_by: string | null;
+          set_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       /**
        * What a phone's outbox parked, and why (SY-6, SY-10). Written only by
        * record_sync_refusal (the API, as the user). Readable by the staff
@@ -333,6 +351,78 @@ export type Database = {
           actor_id: string | null;
           at: string;
           note: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /**
+       * The permission catalog, seeded by migrations only: key = module.action.
+       * Everyone signed in reads it and the role tables below; writes go
+       * through create_role / update_role / delete_role / assign_role.
+       */
+      permissions: {
+        Row: {
+          key: string;
+          section: string;
+          module: string;
+          action: PermissionAction;
+          label_en: string;
+          label_ar: string;
+          sort: number;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** A club's roles. `key` names the four defaults; custom roles have none. */
+      roles: {
+        Row: {
+          id: string;
+          key: 'admin' | 'manager' | 'inspector' | 'cleaner' | null;
+          name_en: string;
+          name_ar: string;
+          scope: RoleScope;
+          /** The Admin role: nobody edits, deletes or assigns it. */
+          locked: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      role_permissions: {
+        Row: { role_id: string; permission_key: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** The departments of a role whose scope is 'departments'. */
+      role_departments: {
+        Row: { role_id: string; department_id: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** Which roles a role may create users with or assign. The Admin role's list is a rule, not rows. */
+      role_assignable: {
+        Row: { role_id: string; assignable_role_id: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** Every role change and assignment. Readable with roles.view. */
+      role_audit: {
+        Row: {
+          id: number;
+          at: string;
+          actor: string | null;
+          action: string;
+          role_id: string | null;
+          target_user: string | null;
+          before: Json | null;
+          after: Json | null;
         };
         Insert: never;
         Update: never;
@@ -389,7 +479,7 @@ export type Database = {
         Returns: undefined;
       };
       reject_items: {
-        Args: { p_assignment_id: string; p_item_ids: string[]; p_reason?: string };
+        Args: { p_assignment_id: string; p_item_ids: string[]; p_reason: string };
         Returns: undefined;
       };
       extend_assignment: {
@@ -411,17 +501,22 @@ export type Database = {
         Args: { p_key: ClubPageKey; p_body_en: string; p_body_ar: string };
         Returns: undefined;
       };
+      /** Admin only, once; raises LOCATION_ALREADY_SET after that. */
+      set_club_location: {
+        Args: { p_lat: number; p_lng: number; p_radius_m: number };
+        Returns: undefined;
+      };
       attach_item_photo: { Args: { p_item_id: string; p_storage_path: string }; Returns: undefined };
       submit_assignment: {
         Args: { p_assignment_id: string; p_signature_path: string; p_completed_at?: string; p_note?: string };
         Returns: undefined;
       };
       /**
-       * The Users screen's rows. SECURITY DEFINER; admins and managers only
-       * (0012), and it raises for anyone else. `phone` comes back populated
-       * for an admin and null for a manager, which makes this the only route
-       * to profiles.phone now that 0011 took the column off the table's
-       * grant.
+       * The Users screen's rows: the caller's staff list. SECURITY DEFINER;
+       * needs users.view and raises without it. `phone` is populated only
+       * with phones.view, which makes this the only route to profiles.phone
+       * now that 0011 took the column off the table's grant. `role` is the
+       * mirror; the role itself is profiles.role_id.
        */
       admin_staff_list: {
         Args: never;
@@ -437,7 +532,46 @@ export type Database = {
           must_change_password: boolean;
         }[];
       };
-      set_user_role: { Args: { target_user_id: string; new_role: Role }; Returns: undefined };
+      /**
+       * The caller's role, scope, permissions and the roles they may assign,
+       * or null without an active role. Parse with parseAccess (lib/access.ts).
+       */
+      my_access: { Args: never; Returns: Json };
+      /**
+       * Roles need roles.create / roles.edit and scope 'all'. Raise NAME_REQUIRED,
+       * NAME_TAKEN, INVALID_SCOPE, DEPARTMENTS_REQUIRED, NOT_A_SUBSET, and on
+       * update NOT_FOUND, ROLE_LOCKED, OWN_ROLE.
+       */
+      create_role: {
+        Args: {
+          p_name_en: string;
+          p_name_ar: string;
+          p_scope: RoleScope;
+          p_permissions: string[];
+          p_department_ids: string[];
+          p_assignable_role_ids: string[];
+        };
+        Returns: string;
+      };
+      update_role: {
+        Args: {
+          p_role_id: string;
+          p_name_en: string;
+          p_name_ar: string;
+          p_scope: RoleScope;
+          p_permissions: string[];
+          p_department_ids: string[];
+          p_assignable_role_ids: string[];
+        };
+        Returns: undefined;
+      };
+      /** Also raises DEFAULT_ROLE and ROLE_IN_USE. */
+      delete_role: { Args: { p_role_id: string }; Returns: undefined };
+      /** can_manage_user(p_user_id), and the new role one the caller may assign. */
+      assign_role: { Args: { p_user_id: string; p_role_id: string }; Returns: undefined };
+      can_assign_role: { Args: { p_role_id: string; p_department_id?: string | null }; Returns: boolean };
+      can_manage_user: { Args: { p_user_id: string }; Returns: boolean };
+      has_permission: { Args: { p_key: string }; Returns: boolean };
       set_user_department: { Args: { target_user_id: string; new_department_id: string | null }; Returns: undefined };
       set_user_manager: { Args: { target_user_id: string; new_manager_id: string | null }; Returns: undefined };
       set_action_status: { Args: { p_action_id: string; p_status: 'open' | 'closed' }; Returns: undefined };
@@ -457,42 +591,19 @@ export type Database = {
 /* Domain unions — text columns with CHECK constraints, not PG enums.  */
 /* ------------------------------------------------------------------ */
 
-/** profiles.role. `cleaner` and `inspector` are identical at the DB level. */
-export type Role = 'admin' | 'manager' | 'inspector' | 'cleaner';
-
 /**
- * The roles the portal may hand out. `admin` is deliberately absent: an admin
- * is the account that can mint accounts, so minting one from inside the portal
- * would let a single compromised session escalate itself permanently. New
- * admins are made in the Supabase dashboard, by someone holding the project
- * keys — a deliberately slower, better-witnessed path.
- *
- * Lives here rather than in lib/actions/users.ts because a 'use server' module
- * may export nothing but async functions, and both the guard and the <select>
- * need to read the same list.
+ * roles.scope — whose work a role sees. Your own work is always visible.
+ *   own          only your own
+ *   team         your direct reports (profiles.manager_id)
+ *   departments  work in the role's role_departments
+ *   all          everything
  */
-export const STAFF_ROLES = ['manager', 'inspector', 'cleaner'] as const;
-export type StaffRole = (typeof STAFF_ROLES)[number];
+export const ROLE_SCOPES = ['own', 'team', 'departments', 'all'] as const;
+export type RoleScope = (typeof ROLE_SCOPES)[number];
 
-export function isStaffRole(role: string): role is StaffRole {
-  return (STAFF_ROLES as readonly string[]).includes(role);
-}
-
-/**
- * The staff roles a caller may hand out — and, identically, the roles whose
- * password that caller may set. One function because they are one question:
- * creating an account and taking one over are the same reach by two routes,
- * and 0010's whole argument is that granting one without the other closes
- * nothing.
- *
- * An admin gets STAFF_ROLES, which is exactly what isStaffRole already gated
- * on, so the admin path is unchanged. A manager may not mint or take over a
- * peer — that would let one manager quietly multiply itself — and no caller
- * reaches 'admin' at all, which stays the Supabase dashboard's job.
- */
-export function grantableRoles(callerRole: string | undefined | null): readonly StaffRole[] {
-  return callerRole === 'admin' ? STAFF_ROLES : (['inspector', 'cleaner'] as const);
-}
+/** permissions.action — the matrix's four columns, in order. */
+export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete'] as const;
+export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 
 /**
  * submissions.status — the CHECK-legal stored values. `follow_up` (0013): the
@@ -592,9 +703,14 @@ export type Profile = Tables<'profiles'>;
  * is unreachable through the table and comes only from admin_staff_list().
  * A `select('*')` anywhere on profiles now fails with a permission error,
  * which is why this string exists rather than being inlined twice.
+ *
+ * role_id (custom roles) needs a column grant like the rest the day 0011's
+ * column grants are restored: without `grant select (role_id)` every read
+ * through this list fails. (Live on 29 Sep the table-wide grant is back, so
+ * it reads.)
  */
 export const PROFILE_COLUMNS =
-  'id, name, email, role, created_at, department_id, manager_id, active, must_change_password, locale';
+  'id, name, email, role, role_id, created_at, department_id, manager_id, active, must_change_password, locale';
 
 /** A profile as the portal can read it: everything but the phone number. */
 export type PortalProfile = Omit<Profile, 'phone'>;
@@ -611,3 +727,5 @@ export type SubmissionEventRow = Tables<'submission_events'>;
 export const CLUB_PAGE_KEYS = ['about', 'policies'] as const;
 export type ClubPageKey = (typeof CLUB_PAGE_KEYS)[number];
 export type ClubPage = Tables<'club_pages'>;
+export type Permission = Tables<'permissions'>;
+export type RoleRow = Tables<'roles'>;

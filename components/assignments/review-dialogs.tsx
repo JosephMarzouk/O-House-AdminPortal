@@ -98,14 +98,13 @@ export function RejectItemsDialog({
         </ul>
 
         <div className="space-y-1">
-          <Label htmlFor={`reject-reason-${assignmentId}`}>
-            {dict.rejectReason} <span className="text-text/55">({dict.optional})</span>
-          </Label>
+          <Label htmlFor={`reject-reason-${assignmentId}`}>{dict.rejectReason}</Label>
           <Textarea
             id={`reject-reason-${assignmentId}`}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
+            required
           />
         </div>
 
@@ -115,7 +114,7 @@ export function RejectItemsDialog({
           </Button>
           {/* The one destructive button in the portal: rejecting sends
               work back, so it wears magenta. */}
-          <Button variant="destructive" disabled={pending} onClick={submit}>
+          <Button variant="destructive" disabled={pending || !reason.trim()} onClick={submit}>
             {dict.reject}
           </Button>
         </DialogFooter>

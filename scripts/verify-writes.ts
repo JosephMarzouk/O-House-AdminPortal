@@ -21,7 +21,7 @@
  */
 import { installNodeWebSocket } from '../lib/node-ws';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { STAFF_ROLES, type Database } from '../lib/types/database';
+import type { Database } from '../lib/types/database';
 
 installNodeWebSocket(); // must run before createClient — see lib/node-ws.ts
 
@@ -315,13 +315,8 @@ async function checkStaff() {
   if (pwErr) fail('auth.admin.updateUserById', pwErr.message);
   else pass('auth.admin.updateUserById', 'password reset accepted');
 
-  // The portal must never mint an admin. The DB does not stop it — the code
-  // does — so assert the guard exists rather than that the write fails.
-  if ((STAFF_ROLES as readonly string[]).includes('admin')) {
-    fail('STAFF_ROLES', "'admin' is grantable from the portal");
-  } else {
-    pass('STAFF_ROLES', `grantable roles: ${STAFF_ROLES.join(', ')}`);
-  }
+  // Nobody mints an admin from the portal: the database refuses it now
+  // (assign_role / can_assign_role never offer the Admin role).
 }
 
 async function teardown() {

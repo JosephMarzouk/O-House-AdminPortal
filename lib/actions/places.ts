@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { templateItems } from '@/lib/db/places';
 import type { TemplateItem } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
+import { can, getProfile } from '@/lib/auth';
 
 export type { ActionResult };
 
@@ -33,6 +34,11 @@ export type PlaceInput = {
  * touched nothing. The same is true of a row that no longer exists.
  */
 export async function savePlace(input: PlaceInput): Promise<ActionResult> {
+  // The sites / templates policies' keys, checked first so a refusal reads
+  // "no permission" rather than the zero-row "nothing changed" below.
+  if (!can(await getProfile(), input.id ? 'places.edit' : 'places.create')) {
+    return { ok: false, error: 'not_authorized' };
+  }
   if (!input.nameAr.trim() && !input.nameEn.trim()) return { ok: false, error: 'fields_required' };
 
   const supabase = await createClient();
@@ -105,6 +111,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
 }
 
 export async function deletePlace(id: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'places.delete')) return { ok: false, error: 'not_authorized' };
   const supabase = await createClient();
   // Only the template goes. The sites row stays: submissions.site_id points at
   // it and past assignments would lose their location.
