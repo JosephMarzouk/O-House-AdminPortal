@@ -19,7 +19,15 @@ export const dbSession = cache(async (): Promise<{ token: string; userId: string
       'x-ohouse-portal-key': process.env.OHOUSE_GATEWAY_KEY ?? '',
     });
   } catch (e) {
-    if (e instanceof ApiError && (e.status === 401 || e.status === 403)) return null;
+    if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+      // Logged because the caller only sees "no session" and signs the user
+      // out (app/session-ended). 403 GATEWAY_REQUIRED means this server's
+      // OHOUSE_GATEWAY_KEY is not the API's PORTAL_GATEWAY_KEY: every sign-in
+      // will fail until the variables are fixed. Status and code only: never
+      // the token or the key.
+      console.error(`[auth] db-token refused: ${e.status} ${e.code ?? ''}`.trim());
+      return null;
+    }
     throw e;
   }
 });

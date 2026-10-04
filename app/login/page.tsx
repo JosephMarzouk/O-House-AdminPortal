@@ -19,8 +19,11 @@ import { LoginForm } from '@/components/login-form';
  * in, not just :root, so this one attribute re-skins the card, its inputs and
  * its text without touching what the user chose for the rest of the portal.
  */
-export default async function LoginPage() {
-  const [dict, club] = await Promise.all([getDictionary(), requestClub()]);
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ ended?: string }> }) {
+  const [dict, club, sp] = await Promise.all([getDictionary(), requestClub(), searchParams]);
+  // Set by app/session-ended: the portal signed this user out because their
+  // profile would not load. Without a word here it looks like a random logout.
+  const ended = sp.ended === '1';
 
   return (
     // grid + place-items-center does the centring and needs no mx-auto, so it
@@ -48,6 +51,14 @@ export default async function LoginPage() {
           <h1 className="mt-4 text-title">{dict.appName}</h1>
           <p className="mt-1 text-base text-text/55">{dict.signIn}</p>
         </div>
+
+        {/* cyan-tint, not magenta: an explanation, not an alarm (magenta is
+            reserved for errors). */}
+        {ended && (
+          <p className="mt-6 rounded-card bg-cyan-tint px-3 py-2 text-sm text-text" role="status">
+            {dict.sessionEnded}
+          </p>
+        )}
 
         <div className="mt-8">
           <LoginForm dict={dict} />

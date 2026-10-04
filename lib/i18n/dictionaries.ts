@@ -33,6 +33,7 @@ export const dictionaries = {
     signInLocked: 'محاولات خاطئة كثيرة. حاول مرة أخرى بعد ١٥ دقيقة.',
     signInMissingFields: 'أدخل رقم الهاتف أو البريد الإلكتروني وكلمة المرور.',
     notAuthorized: 'هذا الحساب لا يملك صلاحية الدخول إلى لوحة الإدارة.',
+    sessionEnded: 'تم تسجيل خروجك لأننا لم نتمكن من تحميل حسابك. سجّل الدخول مرة أخرى، وإذا تكرر ذلك فأبلغ المسؤول.',
     // One vocabulary for a missing permission, inside the portal (with
     // noPermission, under reports). notAuthorized above is the portal gate only.
     noPermissionPage: 'ليست لديك صلاحية لفتح هذه الصفحة.',
@@ -470,6 +471,7 @@ export const dictionaries = {
     signInLocked: 'Too many wrong passwords. Try again in 15 minutes.',
     signInMissingFields: 'Enter your phone number or email, and your password.',
     notAuthorized: 'This account does not have access to the admin portal.',
+    sessionEnded: "You were signed out because your account couldn't be loaded. Sign in again; if it keeps happening, tell your administrator.",
     // One vocabulary for a missing permission, inside the portal (with
     // noPermission, under reports). notAuthorized above is the portal gate only.
     noPermissionPage: 'You don’t have permission to open this page.',

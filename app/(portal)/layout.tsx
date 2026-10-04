@@ -18,10 +18,13 @@ export default async function PortalLayout({ children }: { children: React.React
     requestClub(),
   ]);
 
-  // the proxy already bounced anonymous traffic; this catches the case where
-  // a session exists but the profiles row does not — the state that
-  // current_role() returning 'none' now guards against server-side.
-  if (!profile) redirect('/login');
+  // The proxy already bounced anonymous traffic, so a missing profile here
+  // means a session whose profile would not load: no profiles row, a refused
+  // database token, or the API refusing this server (a gateway-key mismatch).
+  // Not '/login': the proxy let this request through because the access cookie
+  // has not expired, and it would send /login straight back here, forever.
+  // /session-ended ends the session first (app/session-ended/route.ts).
+  if (!profile) redirect('/session-ended');
 
   // Role gate lives here, not in the proxy: reading the role on the edge
   // would mean a query per request, including every asset. No access at all

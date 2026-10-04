@@ -38,6 +38,12 @@ export const getProfile = cache(async (): Promise<Me | null> => {
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.userId).single(),
     supabase.rpc('my_access'),
   ]);
-  if (error || !data) return null;
+  if (error || !data) {
+    // A database token the database refuses (dbSigningKey not imported in the
+    // club's Supabase project), or a login with no profile row. The portal
+    // signs the user out over it, so say why in the server log.
+    console.error(`[auth] profile not loaded: ${error ? `${error.code} ${error.message}` : 'no row'}`);
+    return null;
+  }
   return { ...data, access: access.error ? null : parseAccess(access.data) };
 });
