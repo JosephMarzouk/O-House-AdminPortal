@@ -23,6 +23,7 @@ import {
 import { useSignOut } from '@/lib/use-sign-out';
 import { setLocale } from '@/lib/actions/locale';
 import { ThemeToggle } from '@/components/theme-toggle';
+import type { StaticImageData } from 'next/image';
 import { BrandMark } from '@/components/brand-mark';
 import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,7 @@ export function PortalSidebar({
   roleLabel,
   initialCollapsed,
   initialTheme,
+  logo,
 }: {
   dict: Dictionary;
   locale: Locale;
@@ -64,6 +66,8 @@ export function PortalSidebar({
   roleLabel: string;
   initialCollapsed: boolean;
   initialTheme: Theme;
+  /** The club's logo (lib/brand.ts). */
+  logo: StaticImageData;
 }) {
   const pathname = usePathname();
   const signOut = useSignOut();
@@ -128,9 +132,7 @@ export function PortalSidebar({
           onClick={onNavigate}
           className={cn('flex min-w-0 items-center gap-3 px-3', rail && 'justify-center px-0')}
         >
-          {/* No rounded-card any more: the mark is drawn in currentColor, so
-              there is no longer a box to round off. */}
-          <BrandMark className="size-logo shrink-0" />
+          <BrandMark logo={logo} className="size-logo shrink-0" />
           {!rail && (
             <div className="min-w-0">
               <div className="truncate text-brand">{dict.appName}</div>
@@ -266,7 +268,7 @@ export function PortalSidebar({
         </Drawer.Root>
 
         <Link href="/" className="flex min-w-0 items-center gap-2">
-          <BrandMark className="size-logo shrink-0" />
+          <BrandMark logo={logo} className="size-logo shrink-0" />
           <span className="truncate text-brand">{dict.appName}</span>
         </Link>
       </header>

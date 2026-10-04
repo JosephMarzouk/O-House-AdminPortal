@@ -86,7 +86,7 @@ export function AssigneePicker({
                 }
                 className="group flex min-h-control cursor-pointer items-center gap-3 rounded-control px-3 text-sm outline-none data-highlighted:bg-text/7"
               >
-                <span className="flex size-4 shrink-0 items-center justify-center rounded-card border border-divider bg-surface group-data-checked:border-cyan group-data-checked:bg-cyan group-data-checked:text-on-brand">
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-card border border-divider bg-surface group-data-checked:border-cyan group-data-checked:bg-cyan group-data-checked:text-on-cyan">
                   <Menu.CheckboxItemIndicator>
                     <CheckIcon weight="bold" className="size-icon-sm" />
                   </Menu.CheckboxItemIndicator>

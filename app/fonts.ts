@@ -1,20 +1,22 @@
-import { Cairo } from 'next/font/google';
+import { Cairo, Montserrat } from 'next/font/google';
 
 /**
- * Cairo is the portal's only family, for both scripts.
+ * Montserrat for Latin, Cairo for Arabic.
  *
- * It replaced a Source Serif 4 + Noto Naskh Arabic pair. That pair worked by
- * per-glyph fallback — Latin from the serif, Arabic from the Naskh — which
- * meant a single line mixing a name and a count was set in two typefaces with
- * different weight axes (Latin shipped 400/600, Arabic 400/700, so Arabic at
- * 600 silently resolved to 700). Cairo covers Arabic, Latin and the
- * Arabic-Indic digits `fmtNum` emits under ar-EG, so there is one face, one
- * weight axis, and nothing to fall through to.
+ * Montserrat is the clubs' brand face (the members' app and the staff app use
+ * it). It has no Arabic glyphs, so --font-ui (app/tokens.css) lists Cairo
+ * next and the browser takes each Arabic glyph from it. Both are variable
+ * builds with the same 300–700 range, so the old Source Serif / Noto Naskh
+ * trap (Arabic at 600 silently resolving to 700) does not come back.
  *
- * The variable build is deliberate: every weight from one file, so 400 body
- * and 600 headings cost no extra request. Cairo has no italic — nothing in
- * the portal sets italic, so there is no face to miss.
+ * Latin subset only for Montserrat: nothing Arabic should ever render in it.
  */
+export const montserrat = Montserrat({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-montserrat',
+});
+
 export const cairo = Cairo({
   subsets: ['arabic', 'latin'],
   display: 'swap',

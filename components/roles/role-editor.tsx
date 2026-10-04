@@ -220,7 +220,7 @@ export function RoleEditor({
 
   const tabClass =
     'relative inline-flex h-control items-center gap-2 rounded-control px-4 text-sm font-semibold transition-colors ' +
-    'bg-surface text-text/70 hover:bg-text/7 hover:text-text data-active:bg-cyan data-active:text-on-brand';
+    'bg-surface text-text/70 hover:bg-text/7 hover:text-text data-active:bg-cyan data-active:text-on-cyan';
 
   return (
     <section className="min-w-0 flex-1 space-y-8">

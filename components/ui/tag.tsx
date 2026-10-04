@@ -23,8 +23,8 @@ export type TagTone =
 const TONES: Record<TagTone, string> = {
   pending: 'bg-surface text-text/60',
   in_progress: 'bg-cyan-tint text-cyan-dark',
-  submitted: 'bg-accent-700 text-on-brand',
-  approved: 'bg-cyan text-on-brand',
+  submitted: 'bg-accent-700 text-on-cyan',
+  approved: 'bg-cyan text-on-cyan',
   rejected: 'bg-accent2-700 text-on-brand',
   expired: 'border border-magenta bg-transparent text-magenta',
   follow_up: 'bg-magenta-tint text-magenta-deep',

@@ -1,4 +1,6 @@
 import { BrandMark } from '@/components/brand-mark';
+import { brandFor } from '@/lib/brand';
+import { requestClub } from '@/lib/club';
 import { getDictionary } from '@/lib/i18n';
 import { LoginForm } from '@/components/login-form';
 
@@ -18,7 +20,7 @@ import { LoginForm } from '@/components/login-form';
  * its text without touching what the user chose for the rest of the portal.
  */
 export default async function LoginPage() {
-  const dict = await getDictionary();
+  const [dict, club] = await Promise.all([getDictionary(), requestClub()]);
 
   return (
     // grid + place-items-center does the centring and needs no mx-auto, so it
@@ -40,10 +42,9 @@ export default async function LoginPage() {
             stays start-aligned, because its labels sit above their fields and
             centring those would break the reading line. */}
         <div className="text-center">
-          {/* Drawn, not loaded: the PNG this replaced had the navy ground
-              baked in, which showed as a square against the card. The mark
-              takes its colour from text-text on the main above. */}
-          <BrandMark className="mx-auto size-logo-lg" />
+          {/* The club's logo: light artwork, readable because this card is
+              dark for everybody (data-theme above). */}
+          <BrandMark logo={brandFor(club?.slug).logo} className="mx-auto size-logo-lg" />
           <h1 className="mt-4 text-title">{dict.appName}</h1>
           <p className="mt-1 text-base text-text/55">{dict.signIn}</p>
         </div>

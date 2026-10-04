@@ -18,19 +18,31 @@ should return nothing but comments in `globals.css`.
 
 ## Colour — named by role, never by hue
 
-| Token | Utility | Hex | Role |
+**The brand roles are per club** (since 30 Sep). One deployment serves every
+club, so `ink`, the `cyan` family, `on-cyan`, the `accent-*` ramp and the login
+gradient are overridden per request by [`lib/brand.ts`](lib/brand.ts), the
+portal's copy of the staff app's `lib/tenant.dart`. The values below are O House's
+(O West's palette), which `app/tokens.css` keeps as the default. Each club's
+values come from the members' app palettes by one rule: ink = primary 500, cyan =
+secondary 500, cyan-dark = the lightest secondary shade from 600 at 4.5:1 on
+paper, cyan-tint = secondary 50, on-cyan = white unless that is under 3:1 (RYZE's
+orange), then ink. "cyan" is a role name kept from O West; for RYZE and KODE it
+is orange.
+
+| Token | Utility | Hex (O House) | Role |
 |---|---|---|---|
-| ink | `bg-ink` | `#0E213F` | The drawer, and the top of the login gradient. **The only dark surface.** |
-| cyan | `bg-cyan` / `text-cyan` | `#0088B0` | Every primary action, active nav, focus rings, selection. |
-| cyan-dark | `text-cyan-dark` | `#006786` | Link and accent *paragraph* text (base cyan is only 3:1 on paper), pressed primaries, "submitted". |
-| cyan-tint | `bg-cyan-tint` | `#E9F8FF` | Tinted fills: in-progress tag, info banners, selected rows. |
+| ink | `bg-ink` | `#1D2749` | The drawer, and the start of the login gradient. **The only dark surface.** |
+| cyan | `bg-cyan` / `text-cyan` | `#229BA8` | Every primary action, active nav, focus rings, selection. Never text on paper. |
+| cyan-dark | `text-cyan-dark` | `#17717E` | Link and accent text on paper (base cyan is under 3:1 there for every club), pressed primaries, "submitted", ghost buttons. |
+| cyan-tint | `bg-cyan-tint` | `#E5F4F5` | Tinted fills: in-progress tag, info banners, selected rows. |
+| on-cyan | `text-on-cyan` | `#FFFFFF` | Text and icons on a `cyan` or accent-ramp fill: primary buttons, checked boxes, the approved and submitted tags. RYZE: its ink. |
 | magenta | `bg-magenta` / `text-magenta` | `#AA0B56` | **Reserved.** Rejected, expired/overdue, follow-up, destructive, errors. Nothing else. |
 | magenta-tint | `bg-magenta-tint` | `#FFF1F4` | Ground for the overdue tile and error banners. |
 | magenta-deep | `text-magenta-deep` | `#4B1528` | Text sitting on magenta-tint. |
 | paper | `bg-paper` | `#F3F2F2` | The page ground. |
 | surface | `bg-surface` | `#EAE9E9` | Input fill, cards, table header ground. |
 | raised | `bg-raised` | `#F3F2F2` | A panel floating *above* the page: stat tiles, the review bar, dialogs, the login card. |
-| on-brand | `text-on-brand` | `#F3F2F2` | Text and icons sitting **on** an ink, cyan or magenta fill. |
+| on-brand | `text-on-brand` | `#F3F2F2` | Text and icons sitting **on** an ink or magenta fill (a cyan fill takes `on-cyan`). |
 | text | `text-text` | `#201E1D` | Body ink. |
 | divider | `border-divider` | text @ 16% | Hairlines, input borders. |
 | shade | `shadow-(color:--color-shade)` | ink @ 22% | The shadow tint. See the shadow note below — it is not optional decoration. |
@@ -42,14 +54,15 @@ captions · `/50` section labels · `bg-text/8` row rules · `bg-text/4` row hov
 Full ramps (`neutral-*`, `accent-*`, `accent2-*`, 100–900) exist for the odd
 hover or pressed step; prefer a ramp step over an ad-hoc alpha.
 
-**On ink the tones invert and cyan stops working.** Measured against `#0E213F`:
-`cyan` is 3.9:1 and must never be a label there; `accent-300` is 11:1 and is the
-accent step for dark surfaces; `paper/70` is 7.6:1 and is the resting text tone.
-A solid cyan pill is not a way round it either — `paper` on `cyan` is 3.6:1.
+**On ink the tones invert and cyan stops working.** `cyan` must never be a label
+on ink; `accent-300` is the accent step for dark surfaces, and `paper/70` is the
+resting text tone. Check a new club's ramp on its own ink before shipping it: the
+numbers differ per club (KODE's ink is a mid blue, not a navy).
 
-Rules: never both accents in one small component. No amber, orange, green or
-yellow — "approved" is cyan, "warning" is a neutral tag, "rejected/overdue" is
-magenta. That is the whole vocabulary.
+Rules: never both accents in one small component. The only accent is the club's
+brand ("cyan"), whatever its hue. "Approved" is cyan, "warning" is a neutral tag,
+"rejected/overdue" is magenta. That is the whole vocabulary. Magenta is shared by
+every club.
 
 ## Two themes
 
@@ -80,15 +93,15 @@ invariant tokens.
 | `raised` | `#F3F2F2` | `#1A2F52` | On light a tile floats by shadow alone; on dark a shadow cannot separate two dark blues, so tone has to. |
 | `text` | `#201E1D` | `#E8EBF0` | 16.3:1 on the dark ground. |
 | `divider` | text @ 16% | `#E8EBF0` @ 16% | Same 16% rule, inverted. |
-| `cyan-dark` | `#006786` | `#99E0FF` | Link and accent text. The reason this token exists — base cyan is unreadable on paper — inverts on dark, and the fix is the other end of the ramp. 13.4:1. |
+| `cyan-dark` | `#17717E` | `#91D0D8` | Link and accent text. The reason this token exists, base cyan being unreadable on paper, inverts on dark, and the fix is the other end of the ramp: secondary 200 for every club (lib/brand.ts). |
 | `magenta` | `#AA0B56` | `#FF90B1` | Alarm text, same inversion. 9.2:1. |
-| `cyan-tint` | `#E9F8FF` | `#0D2F42` | |
+| `cyan-tint` | `#E5F4F5` | `#136370` | Secondary 50 / 900 for every club. |
 | `magenta-tint` | `#FFF1F4` | `#3A1020` | |
 | `magenta-deep` | `#4B1528` | `#FFC0D0` | The text on the tint above. |
 | `shade` | ink @ 22% | black @ 55% | |
 
 The dark elevation ladder, darkest first:
-`paper #050D1A` → `ink #0E213F` (the drawer) → `surface #16294A` → `raised #1A2F52`.
+`paper #050D1A` → `ink` (the drawer, the club's) → `surface #16294A` → `raised #1A2F52`.
 
 Two things the palette alone does not reach:
 
@@ -107,21 +120,21 @@ must never stand in for a role: the chart axis used to be
 `var(--color-neutral-700)` and stayed dark on a dark page. It is now a
 `color-mix` of `text`.
 
-## Type — one family
+## Type — Montserrat for Latin, Cairo for Arabic
 
-Cairo, the variable build (`wght` 200–1000), loaded through `next/font/google`
-in `app/fonts.ts` and self-hosted from there. One face covers Arabic, Latin and
-the Arabic-Indic digits `fmtNum` emits under `ar-EG`, so there is no fallback
-stack and no second family to keep in step. **Never add a second family.**
+Montserrat, the clubs' brand face (the members' app and the staff app use it),
+for Latin, and Cairo for Arabic and the Arabic-Indic digits `fmtNum` emits
+under `ar-EG`. Both are variable builds loaded through `next/font/google` in
+`app/fonts.ts`. `--font-ui` lists Montserrat first, then Cairo; Montserrat has no
+Arabic glyphs, so each Arabic glyph falls through to Cairo. **No third family.**
 
-Cairo ships no italic, and nothing in the portal sets italic. If a design ever
-wants emphasis, it is weight or colour, not a synthesised oblique.
+Both share the 300–700 range the portal uses, so the old trap does not come
+back. That trap was a Source Serif 4 + Noto Naskh Arabic pair with different
+static weights (Latin 400/600, Arabic 400/700), where Arabic at 600 silently
+resolved to 700.
 
-This replaced a Source Serif 4 + Noto Naskh Arabic pair that worked by per-glyph
-fallback. That pair set one mixed line in two typefaces with different weight
-axes — Latin 400/600, Arabic 400/700 — so Arabic at 600 silently resolved to
-700. A single variable axis is what fixes that, and is why the build is variable
-rather than two static weights.
+Neither face is used in italic, and nothing in the portal sets italic. If a
+design ever wants emphasis, it is weight or colour, not a synthesised oblique.
 
 | Utility | Size / line / weight / tracking | Use |
 |---|---|---|
@@ -213,10 +226,12 @@ no drawer to sit beside and nothing to read down.
    (surface, divider border, 16px, 56px). Hover border `text/45`, focus
    border cyan, invalid via `aria-invalid` → magenta border.
 9. **Login**, the one screen with its own grammar and the one screen that is
-   **dark for everybody**: the system's only gradient, `--gradient-login`,
-   running down the blue ramp from `ink` through `accent-900` and `accent-800`
-   to `cyan-dark`, with a centred `max-w-dialog` `raised` card on it at
-   `rounded-tile` and `shadow-lg`. The card carries the mark at `size-logo-lg`
+   **dark for everybody**: the system's only gradient, `--gradient-login`, the
+   club's brand gradient from the members' app (its ink to its gradient colour,
+   top-left to bottom-right, at the palette's stops; lib/brand.ts), with a
+   centred `max-w-dialog` `raised` card on it at
+   `rounded-tile` and `shadow-lg`. The card carries the club's logo
+   (`components/brand-mark.tsx`, light artwork, so it only sits on dark) at `size-logo-lg`
    with the wordmark at `text-title` under it, because there is no drawer here
    to carry them. It opts in with `data-theme="dark"` on its own `<main>` —
    plus `text-text` on the same element, because `<body>` sets `color` outside
@@ -240,9 +255,9 @@ no drawer to sit beside and nothing to read down.
 
 ## Component states — themed, never browser default
 
-- **Button** `primary`: cyan fill, paper text, hover `accent-600`, pressed
+- **Button** `primary`: cyan fill, `on-cyan` text, hover `accent-600`, pressed
   `accent-700`, 56px. `outline`: transparent, divider border, cyan-dark text,
-  hover `text/7`, pressed `text/14`. `ghost`: cyan text, hover `cyan/10`.
+  hover `text/7`, pressed `text/14`. `ghost`: cyan-dark text, hover `cyan/10`.
   `destructive`: magenta fill — the only non-status magenta. Disabled: 45%.
 - **Focus**: `outline: 2px solid cyan; offset 2px` on every focusable element
   (set globally). Inputs swap the outline for the cyan border.

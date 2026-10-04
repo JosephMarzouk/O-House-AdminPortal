@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { can, getProfile } from '@/lib/auth';
+import { brandFor } from '@/lib/brand';
+import { requestClub } from '@/lib/club';
 import { bilingual, getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
@@ -8,11 +10,12 @@ import { SignOutButton } from '@/components/sign-out-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const [profile, dict, locale, store] = await Promise.all([
+  const [profile, dict, locale, store, club] = await Promise.all([
     getProfile(),
     getDictionary(),
     getLocale(),
     cookies(),
+    requestClub(),
   ]);
 
   // the proxy already bounced anonymous traffic; this catches the case where
@@ -50,6 +53,7 @@ export default async function PortalLayout({ children }: { children: React.React
           roleLabel={bilingual(locale, access.role.name_ar, access.role.name_en)}
           initialCollapsed={store.get(SIDEBAR_COOKIE)?.value === 'collapsed'}
           initialTheme={parseTheme(store.get(THEME_COOKIE)?.value)}
+          logo={brandFor(club?.slug).logo}
         />
       </div>
       {/* No padding here: PageHeader and PageBody bring their own gutters, so

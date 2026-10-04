@@ -10,6 +10,11 @@
    Source of truth: the Flutter staff app's theme.dart and the
    Broadsheet spec (DESIGN.md at the repo root). Keep the two in step.
 
+   BRAND COLOURS ARE PER CLUB. The ink, cyan family, on-cyan, the accent
+   ramp and the login gradient below are O House's (O West's palette), the
+   default; lib/brand.ts overrides them for the club each request is for
+   (app/layout.tsx). Change a club's colours there, not here.
+
    `@theme static` rather than `@theme`: the chart module reads
    var(--color-cyan) from JavaScript strings Tailwind cannot see, so
    every variable has to be emitted whether or not a utility uses it.
@@ -19,10 +24,10 @@
   /* ---------- Colour, named by role. Never reach outside this list. ---------- */
   --color-*: initial;
 
-  --color-ink: #0e213f; /* the brand ground — the only dark surface: the drawer, and the login gradient */
-  --color-cyan: #0088b0; /* every primary action, links, active nav, focus */
-  --color-cyan-dark: #006786; /* link/paragraph text (base cyan is only 3:1 on paper), pressed primaries, "submitted" */
-  --color-cyan-tint: #e9f8ff; /* tinted fills: in-progress, info banners, selected rows */
+  --color-ink: #1d2749; /* the brand ground — the only dark surface: the drawer, and the login gradient */
+  --color-cyan: #229ba8; /* every primary action, links, active nav, focus */
+  --color-cyan-dark: #17717e; /* link/paragraph text (base cyan is only 3:1 on paper), pressed primaries, "submitted" */
+  --color-cyan-tint: #e5f4f5; /* tinted fills: in-progress, info banners, selected rows */
   --color-magenta: #aa0b56; /* RESERVED: rejected, overdue/expired, destructive, errors */
   --color-magenta-tint: #fff1f4; /* ground for the rejected/overdue tile and error banners */
   --color-magenta-deep: #4b1528; /* label text sitting on magenta-tint */
@@ -39,6 +44,10 @@
                   has to, since a shadow alone cannot separate two dark greys. */
   --color-on-brand: #f3f2f2;
   --color-raised: #f3f2f2;
+  /* Text and icons on a cyan (or accent-ramp) fill. White for most clubs;
+     a club whose accent is too light for white (RYZE's orange) sets its ink
+     here through lib/brand.ts. Theme-invariant, like the fill under it. */
+  --color-on-cyan: #ffffff;
 
   /* The shadow tint. Not merely --shadow-*'s colour: those tokens are inlined
      into the utility at build time and cannot be re-pointed, so this is fed in
@@ -57,15 +66,15 @@
   --color-neutral-800: #444141;
   --color-neutral-900: #2d2b2b; /* dialog backdrop at 50%, shadow tint */
 
-  --color-accent-100: #e9f8ff;
-  --color-accent-200: #cbeeff;
-  --color-accent-300: #99e0ff;
-  --color-accent-400: #62c5ee;
-  --color-accent-500: #38a6cf;
-  --color-accent-600: #1186ac; /* primary hover */
-  --color-accent-700: #006786;
-  --color-accent-800: #004961;
-  --color-accent-900: #0a303e;
+  --color-accent-100: #bde3e7;
+  --color-accent-200: #91d0d8;
+  --color-accent-300: #66bcc8;
+  --color-accent-400: #3aa8b7;
+  --color-accent-500: #229ba8;
+  --color-accent-600: #1e8d9a; /* primary hover */
+  --color-accent-700: #1b7f8c;
+  --color-accent-800: #17717e;
+  --color-accent-900: #136370;
 
   --color-accent2-100: #fff1f4;
   --color-accent2-200: #ffdee6;
@@ -77,13 +86,12 @@
   --color-accent2-800: #790e3d; /* destructive hover */
   --color-accent2-900: #4b1528;
 
-  /* ---------- Type. One family, both scripts. ---------- */
+  /* ---------- Type. Montserrat for Latin, Cairo for Arabic. ---------- */
   --font-*: initial;
-  /* Cairo covers Arabic, Latin and Arabic-Indic digits in a single variable
-     face, so there is no per-glyph fallback and no second family to keep in
-     step. The leading var is set on <html> by next/font (app/fonts.ts); the
-     names after it are the cold-cache fallback. */
-  --font-ui: var(--font-cairo), "Cairo", system-ui, sans-serif;
+  /* Montserrat (the clubs' brand face) has no Arabic glyphs, so each Arabic
+     glyph falls through to Cairo (app/fonts.ts). The vars are set on <html>
+     by next/font; the names after them are the cold-cache fallback. */
+  --font-ui: var(--font-montserrat), var(--font-cairo), "Montserrat", "Cairo", system-ui, sans-serif;
 
   --text-*: initial;
   --text-display: 34px; /* page title */
@@ -161,13 +169,7 @@
      utilities because Tailwind carries a single `via` stop and this needs
      two. --gradient-* is not a Tailwind namespace so it generates no utility;
      `@theme static` emits it anyway, the same mechanism the charts rely on. */
-  --gradient-login: linear-gradient(
-    to bottom,
-    var(--color-ink) 0%,
-    var(--color-accent-900) 34%,
-    var(--color-accent-800) 67%,
-    var(--color-cyan-dark) 100%
-  );
+  --gradient-login: linear-gradient(to bottom right, #1d2749 27%, #189aa7 88%);
 
   /* ---------- Elevation. Ink-tinted; only these three. ---------- */
   --shadow-*: initial;
@@ -211,11 +213,11 @@
   /* Text roles. cyan-dark and magenta exist because base cyan and magenta
      are unreadable on paper; on a dark ground the problem inverts and the
      fix is the opposite end of each ramp. */
-  --color-cyan-dark: #99e0ff; /* links and accent text — 13.4:1 (was 2.2:1) */
+  --color-cyan-dark: #91d0d8; /* links and accent text: secondary 200 (per club in lib/brand.ts) */
   --color-magenta: #ff90b1; /* alarm text — 9.2:1 (was 2.5:1) */
 
   /* Tints, and the text that sits on them. */
-  --color-cyan-tint: #0d2f42;
+  --color-cyan-tint: #136370; /* secondary 900 (per club in lib/brand.ts) */
   --color-magenta-tint: #3a1020;
   --color-magenta-deep: #ffc0d0; /* 10.8:1 on the tint above */
 

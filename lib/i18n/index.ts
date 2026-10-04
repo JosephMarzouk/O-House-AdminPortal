@@ -1,4 +1,6 @@
 import { cookies } from 'next/headers';
+import { brandFor } from '@/lib/brand';
+import { requestClub } from '@/lib/club';
 import { dictionaries, defaultLocale, isLocale, type Dictionary, type Locale } from './dictionaries';
 
 export const LOCALE_COOKIE = 'locale';
@@ -17,6 +19,12 @@ export async function getLocale(): Promise<Locale> {
   return isLocale(value) ? value : defaultLocale;
 }
 
+/**
+ * The strings for this request, with the club's own app name ("RYZE House")
+ * in place of the default: one deployment serves every club, and appName
+ * reaches the sidebar, the login card and the not-authorised page from here.
+ */
 export async function getDictionary(): Promise<Dictionary> {
-  return dictionaries[await getLocale()];
+  const [locale, club] = await Promise.all([getLocale(), requestClub()]);
+  return { ...dictionaries[locale], appName: brandFor(club?.slug).appName[locale] };
 }

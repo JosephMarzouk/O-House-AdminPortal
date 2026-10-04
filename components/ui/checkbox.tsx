@@ -14,7 +14,7 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
         'peer relative flex size-4 shrink-0 items-center justify-center rounded-card border border-divider bg-surface',
         'transition-colors after:absolute after:-inset-x-3 after:-inset-y-2',
         'hover:border-text/45 disabled:cursor-not-allowed disabled:opacity-45',
-        'data-checked:border-cyan data-checked:bg-cyan data-checked:text-on-brand',
+        'data-checked:border-cyan data-checked:bg-cyan data-checked:text-on-cyan',
         className,
       )}
       {...props}
