@@ -55,7 +55,6 @@ export function errorMessage(dict: Dictionary, code: string): string {
     invalid_plan: dict.invalidPlan,
     // club settings
     location_invalid: dict.locationInvalid,
-    sender_required: dict.reportMailSenderRequired,
     location_already_set: dict.locationAlreadySet,
   };
   return map[code] ?? dict.errorGeneric;

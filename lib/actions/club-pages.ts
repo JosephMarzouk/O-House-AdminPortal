@@ -69,7 +69,6 @@ export async function saveReportMail(
   if (!REPORT_MAIL_FREQUENCIES.includes(frequency)) return { ok: false, error: 'error_generic' };
   const from = parseEmails(String(sender ?? ''));
   if (from.bad || from.emails.length > 1) return { ok: false, error: 'email_invalid' };
-  if (frequency !== 'off' && from.emails.length === 0) return { ok: false, error: 'sender_required' };
   const lists: Record<string, string[]> = {};
   for (const [dept, text] of Object.entries(recipients ?? {})) {
     if (dept !== 'all' && !isUuid(dept)) return { ok: false, error: 'error_generic' };
