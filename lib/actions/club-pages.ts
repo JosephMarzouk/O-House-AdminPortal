@@ -5,7 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 import { can, getProfile } from '@/lib/auth';
 import { parseLocation } from '@/lib/club-location';
-import type { ClubPageKey } from '@/lib/types/database';
+import { parseEmails } from '@/lib/report';
+import { isUuid } from '@/lib/rounds';
+import { REPORT_MAIL_FREQUENCIES, type ClubPageKey, type ReportMailFrequency } from '@/lib/types/database';
 
 /**
  * set_club_page() is the whole guard: it requires club_settings.edit, and the
@@ -45,6 +47,41 @@ export async function setClubLocation(coords: string, radius: number): Promise<A
     p_lat: zone.lat,
     p_lng: zone.lng,
     p_radius_m: zone.radiusM,
+  });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+  revalidatePath('/club-settings');
+  return { ok: true };
+}
+
+/**
+ * The report emails: how often, the club mailbox they are sent from (one
+ * per club, whoever is signed in), and each department's addresses as typed
+ * (one textarea each, keyed by department id, plus 'all': one email with
+ * every department, e.g. the general manager). set_report_mail() is the
+ * guard (club_settings.edit + reports.view) and replaces the whole list.
+ */
+export async function saveReportMail(
+  frequency: ReportMailFrequency,
+  sender: string,
+  recipients: Record<string, string>,
+): Promise<ActionResult> {
+  if (!can(await getProfile(), 'club_settings.edit')) return { ok: false, error: 'not_authorized' };
+  if (!REPORT_MAIL_FREQUENCIES.includes(frequency)) return { ok: false, error: 'error_generic' };
+  const from = parseEmails(String(sender ?? ''));
+  if (from.bad || from.emails.length > 1) return { ok: false, error: 'email_invalid' };
+  if (frequency !== 'off' && from.emails.length === 0) return { ok: false, error: 'sender_required' };
+  const lists: Record<string, string[]> = {};
+  for (const [dept, text] of Object.entries(recipients ?? {})) {
+    if (dept !== 'all' && !isUuid(dept)) return { ok: false, error: 'error_generic' };
+    const { emails, bad } = parseEmails(String(text));
+    if (bad) return { ok: false, error: 'email_invalid' };
+    if (emails.length) lists[dept] = emails;
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_report_mail', {
+    p_frequency: frequency,
+    p_sender: from.emails[0] ?? '',
+    p_recipients: lists,
   });
   if (error) return { ok: false, error: toErrorCode(error.message) };
   revalidatePath('/club-settings');

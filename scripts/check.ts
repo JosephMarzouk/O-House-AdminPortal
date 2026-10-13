@@ -37,7 +37,7 @@ import { errorMessage } from '../lib/errors';
 import { refusalLabel } from '../lib/refusals';
 import { ilikePattern, matchesQuery } from '../lib/search';
 import { parseLocation } from '../lib/club-location';
-import { daysFromTasks, reportScore, roundDepartment, workDuration } from '../lib/report';
+import { daysFromTasks, parseEmails, reportEnd, reportParams, reportScore, reportSummary, roundDepartment, workDuration } from '../lib/report';
 import { dictionaries } from '../lib/i18n/dictionaries';
 import type { Assignment } from '../lib/types/database';
 
@@ -437,6 +437,45 @@ assert.deepEqual(
   'first answer to FIRST submit',
 );
 assert.equal(workDuration([{ event: 'submitted', at: '2026-09-27T05:38:32Z' }]), null, 'a backfilled row has no start');
+// A range report (the weekly email): at most Saturday to Friday, never backwards.
+assert.equal(reportEnd('2026-10-10', '2026-10-16'), '2026-10-16', 'a week');
+assert.equal(reportEnd('2026-10-10', '2026-10-17'), '2026-10-10', 'eight days falls back to one');
+assert.equal(reportEnd('2026-10-10', '2026-10-09'), '2026-10-10', 'backwards falls back to one');
+assert.equal(reportEnd('2026-10-10', undefined), '2026-10-10');
+// The routes' ?date=&to=&dept=: a day, a week at most, a department id or all.
+{
+  const p = (q: string) => reportParams(new URLSearchParams(q));
+  const HK = '86a8851d-dc64-4209-9ed7-344ee99a4b7f';
+  assert.deepEqual(p(`date=2026-10-10&dept=${HK}`), { date: '2026-10-10', to: '2026-10-10', dept: HK });
+  assert.deepEqual(p('date=2026-10-10&to=2026-10-16'), { date: '2026-10-10', to: '2026-10-16', dept: 'all' });
+  assert.equal(p('date=2026-10-10&to=2026-10-17'), null, 'past a week');
+  assert.equal(p('date=2026-10-10&to=bad'), null);
+  assert.equal(p('date=2026-10-10&dept=x'), null);
+  assert.equal(p('dept=all'), null);
+}
+// The email's summary: statuses most-first, who handed in, whose are not done.
+// Done follows the status, so the brief never contradicts its own counts.
+assert.deepEqual(
+  reportSummary([
+    { effective_status: 'approved', inspector_name: 'Mona', assignee_names: ['Mona'] },
+    { effective_status: 'approved', inspector_name: 'Mona', assignee_names: ['Mona', 'Omar'] },
+    { effective_status: 'submitted', inspector_name: 'Omar', assignee_names: ['Omar'] },
+    { effective_status: 'expired', inspector_name: 'Sara', assignee_names: ['Sara', 'Nour'] },
+    { effective_status: 'pending', inspector_name: 'Sara', assignee_names: [] },
+  ]),
+  {
+    total: 5,
+    byStatus: [{ status: 'approved', n: 2 }, { status: 'submitted', n: 1 }, { status: 'expired', n: 1 }, { status: 'pending', n: 1 }],
+    doneBy: [{ name: 'Mona', n: 2 }, { name: 'Omar', n: 1 }],
+    notDoneBy: ['Sara', 'Nour'],
+  },
+);
+assert.deepEqual(reportSummary([]), { total: 0, byStatus: [], doneBy: [], notDoneBy: [] });
+// Report email recipients, as typed or pasted from Outlook.
+assert.deepEqual(parseEmails(' A@Club.com\nb@club.com; a@club.com ,\n\n'), { emails: ['a@club.com', 'b@club.com'], bad: null });
+assert.deepEqual(parseEmails(''), { emails: [], bad: null });
+assert.equal(parseEmails('a@club.com\nAhmed <b@club.com>').bad, 'ahmed', 'a display name is not an address');
+assert.equal(parseEmails('a@club').bad, 'a@club');
 
 // The reports list: each task on every day of its period up to today, newest
 // first, filtered by the same department rule as the day's report.

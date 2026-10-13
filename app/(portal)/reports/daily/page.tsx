@@ -5,12 +5,11 @@ import {
   EFFECTIVE_STATUSES,
   eventsFor,
   itemsFor,
-  listTasksOnDay,
   nearestDaysWithTasks,
   parseOne,
 } from '@/lib/db/assignments';
-import { listDepartments, listPlaces } from '@/lib/db/places';
-import { listProfiles } from '@/lib/db/users';
+import { listDepartments } from '@/lib/db/places';
+import { reportRows } from '@/lib/db/report';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import {
   assigneeNames,
@@ -25,7 +24,7 @@ import {
 import { answerLabel } from '@/lib/answers';
 import { isVideo, roundMedia, type MediaLookup } from '@/lib/media';
 import { isUuid } from '@/lib/rounds';
-import { reportScore, taskDepartment, workDuration } from '@/lib/report';
+import { reportEnd, reportScore, workDuration } from '@/lib/report';
 import { StatusBadge } from '@/components/status-badge';
 import { StatusTimeline } from '@/components/status-timeline';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
@@ -56,6 +55,9 @@ export default async function DailyReportPage({
 }) {
   const sp = await searchParams;
   const day = parseDay(sp.date) ?? todayInCairo();
+  // A range (the weekly email): Saturday to Friday at most. Absent: one day.
+  const to = reportEnd(day, parseDay(sp.to));
+  const ranged = to !== day;
   const deptParam = parseOne(sp.dept);
   const deptId = isUuid(deptParam) ? deptParam : null; // anything else = all departments
 
@@ -71,20 +73,15 @@ export default async function DailyReportPage({
     );
   }
 
-  const [club, tasks, places, profiles, departments] = await Promise.all([
+  const [club, report, departments] = await Promise.all([
     currentClub(),
-    listTasksOnDay(day),
-    listPlaces(),
-    listProfiles(),
+    reportRows(day, to, deptId),
     listDepartments(),
   ]);
 
-  const placeDept = new Map(places.map((p) => [p.id, p.department_id]));
-  const personDept = new Map(profiles.map((p) => [p.id, p.department_id]));
+  const { rows, profiles } = report;
   const names = new Map(profiles.map((p) => [p.id, p.name]));
   const dept = deptId ? departments.find((d) => d.id === deptId) : undefined;
-
-  const rows = tasks.rows.filter((a) => !deptId || taskDepartment(a, placeDept, personDept) === deptId);
 
   // An empty day is usually "the checklists are on other days" — offer them.
   const nearby = rows.length === 0 ? await nearestDaysWithTasks(day) : null;
@@ -129,13 +126,15 @@ export default async function DailyReportPage({
             <BackLink href="/reports" label={dict.back} />
           </span>
         }
-        title={`${dict.dailyReport} — ${dept ? bilingual(locale, dept.name_ar, dept.name_en) : dict.allDepartments}`}
+        title={`${ranged ? dict.weeklyReport : dict.dailyReport} — ${dept ? bilingual(locale, dept.name_ar, dept.name_en) : dict.allDepartments}`}
         subtitle={[
           bilingual(locale, club.name.ar, club.name.en),
-          fmtDate(day, locale),
+          ranged ? fmtPeriod(day, to, locale) : fmtDate(day, locale),
           `${dict.reportGeneratedBy} ${me.name} · ${fmtDateTime(new Date().toISOString(), locale)}`,
         ].join(' · ')}
-        actions={<DownloadPdfButton date={day} dept={deptId ?? 'all'} label={dict.exportPdf} dict={dict} />}
+        actions={
+          <DownloadPdfButton date={day} to={ranged ? to : undefined} dept={deptId ?? 'all'} label={dict.exportPdf} dict={dict} />
+        }
       />
 
       <PageBody>
@@ -144,9 +143,9 @@ export default async function DailyReportPage({
           <h2 className="text-heading">{dict.reportSummary}</h2>
           <p className="mt-2 text-lg">
             {dict.totalChecklists}: <span className="tabular-nums font-semibold">{n(rows.length)}</span>
-            {tasks.total > tasks.rows.length && (
+            {report.total > report.fetched && (
               <span className="ms-3 text-caption text-text/55">
-                {dict.showingOf.replace('{n}', n(tasks.rows.length)).replace('{total}', n(tasks.total))}
+                {dict.showingOf.replace('{n}', n(report.fetched)).replace('{total}', n(report.total))}
               </span>
             )}
           </p>
@@ -209,7 +208,7 @@ export default async function DailyReportPage({
                           </TableCell>
                           <TableCell className="tabular-nums" dir="ltr">
                             {fmtWindow(a.window_start, a.window_end) ?? dict.none}
-                            {a.end_date && (
+                            {(ranged || a.end_date) && (
                               <div className="text-caption text-text/55">
                                 {fmtPeriod(a.scheduled_date, a.end_date, locale)}
                               </div>

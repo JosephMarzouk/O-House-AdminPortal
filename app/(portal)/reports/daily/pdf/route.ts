@@ -2,9 +2,8 @@ import type { NextRequest } from 'next/server';
 import puppeteer, { type Browser } from 'puppeteer-core';
 import { can, getProfile } from '@/lib/auth';
 import { listDepartments } from '@/lib/db/places';
-import { parseDay } from '@/lib/format';
 import { LOCALE_COOKIE } from '@/lib/i18n';
-import { isUuid } from '@/lib/rounds';
+import { reportParams } from '@/lib/report';
 import { ACCESS_COOKIE } from '@/lib/session';
 
 /**
@@ -58,19 +57,21 @@ function reportOrigin(request: NextRequest): string {
 export async function GET(request: NextRequest) {
   if (!can(await getProfile(), 'reports.view')) return new Response('Forbidden', { status: 403 });
 
-  const sp = request.nextUrl.searchParams;
-  const date = parseDay(sp.get('date') ?? undefined);
-  const dept = sp.get('dept') ?? 'all';
-  if (!date || (dept !== 'all' && !isUuid(dept))) return new Response('Bad request', { status: 400 });
+  // A day, or a range up to a week (the weekly email).
+  const params = reportParams(request.nextUrl.searchParams);
+  if (!params) return new Response('Bad request', { status: 400 });
+  const { date, to, dept } = params;
 
   const origin = reportOrigin(request);
-  const target = `${origin}/reports/daily?date=${date}&dept=${dept}`;
+  const target = `${origin}/reports/daily?date=${date}${to !== date ? `&to=${to}` : ''}&dept=${dept}`;
 
-  // "daily-report-2026-09-24-house-keeping.pdf": ASCII, so every browser keeps it.
+  // "daily-report-2026-09-24-house-keeping.pdf", "weekly-report-2026-10-10_2026-10-16-….pdf":
+  // ASCII, so every browser keeps it.
   const deptName =
     dept === 'all' ? '' : ((await listDepartments()).find((d) => d.id === dept)?.name_en ?? '');
   const slug = deptName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const filename = `daily-report-${date}${dept === 'all' ? '' : `-${slug || dept}`}.pdf`;
+  const period = to !== date ? `weekly-report-${date}_${to}` : `daily-report-${date}`;
+  const filename = `${period}${dept === 'all' ? '' : `-${slug || dept}`}.pdf`;
 
   let context;
   try {

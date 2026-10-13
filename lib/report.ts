@@ -1,10 +1,91 @@
-import { addDays } from '@/lib/format';
+import { addDays, parseDay } from '@/lib/format';
+import { isUuid } from '@/lib/rounds';
 import type { Assignment, EffectiveStatus, SubmissionEventRow } from '@/lib/types/database';
 
 /**
  * The pure rules behind the daily department report (app/(portal)/reports),
  * kept apart from the queries so scripts/check.ts can test them.
  */
+
+/** report_mail_recipients' own check, so the form refuses what the database would. */
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * A department's report recipients as typed: one per line (commas and
+ * semicolons too, as pasted from Outlook), lower-cased, deduplicated.
+ * `bad` is the first entry that is not an address.
+ */
+export function parseEmails(text: string): { emails: string[]; bad: string | null } {
+  const all = text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return { emails: [...new Set(all)], bad: all.find((e) => !EMAIL.test(e) || e.length > 254) ?? null };
+}
+
+/** A week: the weekly report email covers Saturday to Friday. */
+export const MAX_REPORT_DAYS = 7;
+
+/**
+ * A report's last day: `to` when it runs from `from` to at most a week on,
+ * else `from` (a one-day report). Both MUST come through parseDay().
+ */
+export function reportEnd(from: string, to: string | undefined): string {
+  return to && to >= from && to <= addDays(from, MAX_REPORT_DAYS - 1) ? to : from;
+}
+
+/**
+ * A report's query string (?date=&to=&dept=), as the PDF and the summary
+ * routes take it: null for anything malformed or a range past a week.
+ * `to` is the same day for a one-day report.
+ */
+export function reportParams(sp: URLSearchParams): { date: string; to: string; dept: string } | null {
+  const date = parseDay(sp.get('date') ?? undefined);
+  const dept = sp.get('dept') ?? 'all';
+  if (!date || (dept !== 'all' && !isUuid(dept))) return null;
+  const to = sp.has('to') ? parseDay(sp.get('to') ?? undefined) : date;
+  if (!to || reportEnd(date, to) !== to) return null;
+  return { date, to, dept };
+}
+
+/** The email's few lines: what happened, and who did it. The PDF has the rest. */
+export type ReportSummary = {
+  total: number;
+  /** Non-zero statuses, the most common first. */
+  byStatus: { status: EffectiveStatus; n: number }[];
+  /** Who submitted, with how many; the most first. */
+  doneBy: { name: string; n: number }[];
+  /** Whose checklists are not done (pending, in progress, expired). */
+  notDoneBy: string[];
+};
+
+/**
+ * Done = the status says it was handed in (submitted, approved, sent back,
+ * follow-up), never submitted_at alone: an old row can carry a submit time
+ * and still read expired, and the brief must agree with its own counts.
+ */
+const DONE: readonly EffectiveStatus[] = ['submitted', 'approved', 'rejected', 'follow_up'];
+
+export function reportSummary(
+  rows: Pick<Assignment, 'effective_status' | 'inspector_name' | 'assignee_names'>[],
+): ReportSummary {
+  const count = <K extends string>(keys: K[]) => {
+    const m = new Map<K, number>();
+    for (const k of keys) m.set(k, (m.get(k) ?? 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1]);
+  };
+  const isDone = (a: (typeof rows)[number]) => !!a.effective_status && DONE.includes(a.effective_status);
+  return {
+    total: rows.length,
+    byStatus: count(rows.map((a) => a.effective_status).filter((s): s is EffectiveStatus => !!s)).map(([status, n]) => ({ status, n })),
+    doneBy: count(rows.filter(isDone).map((a) => a.inspector_name || '—')).map(([name, n]) => ({ name, n })),
+    notDoneBy: [
+      ...new Set(
+        rows
+          .filter((a) => !isDone(a))
+          .flatMap((a) => ((a.assignee_names ?? []).filter(Boolean).length ? a.assignee_names! : [a.inspector_name]))
+          .filter((n): n is string => !!n),
+      ),
+    ],
+  };
+}
 
 /**
  * Which department a task belongs to in the report: its place's department,
@@ -48,7 +129,7 @@ export type ReportDay = { day: string; total: number; byStatus: Partial<Record<E
 /**
  * The reports list: every day up to `today` with a task on it, newest first,
  * with the same figures as that day's report. A multi-day task counts on each
- * of its days, as listTasksOnDay() finds it; `deptId` null = all departments.
+ * of its days, as listTasksBetween() finds it; `deptId` null = all departments.
  */
 export function daysFromTasks(
   rows: ReportTask[],

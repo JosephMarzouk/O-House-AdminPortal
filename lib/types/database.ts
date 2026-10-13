@@ -301,6 +301,36 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /** The report emails: one row. Written only by set_report_mail; read with club_settings.view. */
+      report_mail_settings: {
+        Row: { id: boolean; frequency: ReportMailFrequency; sender: string | null; set_by: string | null; updated_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      report_mail_recipients: {
+        /** No department: the "all departments" list (one email with every department). */
+        Row: { department_id: string | null; email: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /** One row per (period, department or none = all), written by the API's mail worker. */
+      report_mail_log: {
+        Row: {
+          period_start: string;
+          period_end: string;
+          department_id: string | null;
+          recipients: string[];
+          status: 'claimed' | 'sent' | 'failed';
+          attempts: number;
+          error: string | null;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       /** The club's zone: one row at most, written once by set_club_location (admins). */
       club_location: {
         Row: {
@@ -499,6 +529,11 @@ export type Database = {
       schedule_rounds: { Args: { p_plan: Json }; Returns: Json };
       set_club_page: {
         Args: { p_key: ClubPageKey; p_body_en: string; p_body_ar: string };
+        Returns: undefined;
+      };
+      /** club_settings.edit + reports.view. p_sender: the club mailbox (required unless off). p_recipients: { [departmentId]: emails[] }, the whole list. */
+      set_report_mail: {
+        Args: { p_frequency: ReportMailFrequency; p_sender: string; p_recipients: Json };
         Returns: undefined;
       };
       /** Admin only, once; raises LOCATION_ALREADY_SET after that. */
@@ -726,6 +761,9 @@ export type SyncRefusal = Tables<'sync_refusals'>;
 export type SubmissionEventRow = Tables<'submission_events'>;
 export const CLUB_PAGE_KEYS = ['about', 'policies'] as const;
 export type ClubPageKey = (typeof CLUB_PAGE_KEYS)[number];
+
+export const REPORT_MAIL_FREQUENCIES = ['off', 'daily', 'weekly'] as const;
+export type ReportMailFrequency = (typeof REPORT_MAIL_FREQUENCIES)[number];
 export type ClubPage = Tables<'club_pages'>;
 export type Permission = Tables<'permissions'>;
 export type RoleRow = Tables<'roles'>;

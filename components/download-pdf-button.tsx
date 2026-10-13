@@ -7,18 +7,21 @@ import { alert } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 
 /**
- * Downloads a day's report as a PDF file. The server prints it
+ * Downloads a day's (or a range's) report as a PDF file. The server prints it
  * (reports/daily/pdf/route.ts), which takes a few seconds, so the button says
  * so and holds still meanwhile.
  */
 export function DownloadPdfButton({
   date,
+  to,
   dept,
   label,
   dict,
   variant,
 }: {
   date: string;
+  /** The last day of a range report; absent for one day. */
+  to?: string;
   /** A department id, or 'all'. */
   dept: string;
   label: string;
@@ -30,7 +33,7 @@ export function DownloadPdfButton({
   async function download() {
     setPending(true);
     try {
-      const res = await fetch(`/reports/daily/pdf?date=${date}&dept=${dept}`);
+      const res = await fetch(`/reports/daily/pdf?date=${date}${to ? `&to=${to}` : ''}&dept=${dept}`);
       // A lapsed session is a redirect to the login page's HTML, not an error.
       if (!res.ok || res.headers.get('content-type') !== 'application/pdf') {
         alert.error(res.status === 403 ? dict.noPermission : dict.errorGeneric);

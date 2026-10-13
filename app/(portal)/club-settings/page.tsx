@@ -1,19 +1,22 @@
 import { can, getProfile } from '@/lib/auth';
 import { NoPermission } from '@/components/no-permission';
 import { createClient } from '@/lib/supabase/server';
-import { getDictionary, getLocale } from '@/lib/i18n';
-import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
+import { bilingual, getDictionary, getLocale } from '@/lib/i18n';
+import { fmtDate, fmtDateTime, fmtNum, todayInCairo } from '@/lib/format';
 import { mapsUrl } from '@/lib/club-location';
+import { listDepartments } from '@/lib/db/places';
 import { ClubLocationForm } from '@/components/club-location-form';
 import { ClubPagesEditor } from '@/components/club-pages-editor';
+import { ReportMailForm } from '@/components/report-mail-form';
 import { Card } from '@/components/ui/card';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { CLUB_PAGE_KEYS } from '@/lib/types/database';
 
 /**
- * Club settings: the club's location (set once, then read-only) and the staff
- * app's About and Policies text. club_settings.view opens it and
- * club_settings.edit edits the text (set_club_page checks the same). The
+ * Club settings: the club's location (set once, then read-only), the report
+ * emails, and the staff app's About and Policies text. club_settings.view
+ * opens it and club_settings.edit edits the text and the report emails
+ * (set_club_page and set_report_mail check the same). The
  * location is not a grantable permission: only the Admin role sets it
  * (set_club_location).
  */
@@ -37,13 +40,43 @@ export default async function ClubSettingsPage() {
   const canEditText = can(profile, 'club_settings.edit');
   const isAdmin = profile?.access?.role.key === 'admin';
 
-  const [pages, loc] = await Promise.all([
+  const [pages, loc, mail, recipients, mailLog, departments] = await Promise.all([
     supabase.from('club_pages').select('key, body_en, body_ar'),
     supabase.from('club_location').select('lat, lng, radius_m, set_by, set_at').maybeSingle(),
+    supabase.from('report_mail_settings').select('frequency, sender').maybeSingle(),
+    supabase.from('report_mail_recipients').select('department_id, email').order('email'),
+    // Newest first: the first row per department is its latest send.
+    supabase.from('report_mail_log').select('department_id, status, error, updated_at').order('updated_at', { ascending: false }).limit(200),
+    listDepartments(),
   ]);
   if (pages.error) throw new Error(pages.error.message);
-  if (loc.error) throw new Error(loc.error.message);
+  for (const r of [loc, mail, recipients, mailLog]) if (r.error) throw new Error(r.error.message);
   const location = loc.data;
+
+  // First the "all departments" list (no department id: one email with every
+  // department, e.g. the general manager), then one list per department.
+  const mailLists = [
+    { id: null, name: dict.reportMailAll, hint: dict.reportMailAllHint },
+    ...departments.map((d) => ({ id: d.id, name: bilingual(locale, d.name_ar, d.name_en), hint: null })),
+  ];
+  const mailDepartments = mailLists.map((d) => {
+    const last = mailLog.data?.find((l) => l.department_id === d.id);
+    const at = last ? fmtDateTime(last.updated_at, locale) : '';
+    return {
+      id: d.id ?? 'all',
+      name: d.name,
+      hint: d.hint,
+      emails: (recipients.data ?? []).filter((r) => r.department_id === d.id).map((r) => r.email),
+      last: !last
+        ? null
+        : last.status === 'sent'
+          ? dict.reportMailSent.replace('{date}', at)
+          : last.status === 'failed'
+            ? dict.reportMailFailed.replace('{date}', at).replace('{error}', last.error ?? '')
+            : dict.reportMailSending,
+      failed: last?.status === 'failed',
+    };
+  });
 
   let setByName = '—';
   if (location?.set_by) {
@@ -92,6 +125,13 @@ export default async function ClubSettingsPage() {
             <NoPermission dict={dict} text={dict.locationNotSet} />
           )}
         </Card>
+        <ReportMailForm
+          dict={dict}
+          frequency={mail.data?.frequency ?? 'off'}
+          sender={mail.data?.sender ?? ''}
+          departments={mailDepartments}
+          readOnly={!canEditText}
+        />
         <section className="space-y-4">
           <p className="max-w-3xl text-sm text-text/55">{dict.clubPagesHint}</p>
           {!canEditText && <NoPermission dict={dict} text={dict.viewOnly} />}

@@ -210,25 +210,29 @@ export async function itemsFor(ids: string[]): Promise<Map<string, AssignmentIte
 }
 
 /**
- * Every task whose period includes `day`: scheduled on it, or a multi-day
- * task running through it. RLS scopes it — a manager gets their reports'.
+ * Every task whose period overlaps `from`..`to`: scheduled in it, or a
+ * multi-day task running through it, once each. A day's report passes the
+ * same day twice. RLS scopes it — a manager gets their reports'.
  *
- * `day` MUST come through parseDay() (lib/format.ts): it is interpolated.
+ * Both MUST come through parseDay() (lib/format.ts): they are interpolated.
  */
-export async function listTasksOnDay(day: string): Promise<{ rows: Assignment[]; total: number }> {
+export async function listTasksBetween(from: string, to: string): Promise<{ rows: Assignment[]; total: number }> {
   const supabase = await createClient();
-  const { data, error, count } = await supabase
+  let query = supabase
     .from('assignments_v')
     .select('*', { count: 'exact' })
-    .lte('scheduled_date', day)
-    .or(`end_date.gte.${day},and(end_date.is.null,scheduled_date.eq.${day})`)
+    .lte('scheduled_date', to)
+    .or(`end_date.gte.${from},and(end_date.is.null,scheduled_date.gte.${from})`);
+  // A week reads day by day; a day by its time windows.
+  if (from !== to) query = query.order('scheduled_date');
+  const { data, error, count } = await query
     .order('window_start', { ascending: true, nullsFirst: false })
     .order('title_en')
     // ponytail: one department's day is tens of tasks; past this the report
     // says "n of total" rather than paging.
     .range(0, TRACKER_LIMIT - 1);
 
-  if (error) throw new Error(`listTasksOnDay: ${error.message}`);
+  if (error) throw new Error(`listTasksBetween: ${error.message}`);
   return { rows: data ?? [], total: count ?? data?.length ?? 0 };
 }
 
