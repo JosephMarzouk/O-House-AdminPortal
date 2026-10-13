@@ -108,16 +108,20 @@ export function PortalSidebar({
    * collapse button means nothing there, so its presence also drops that row.
    */
   function body(rail: boolean, onNavigate?: () => void) {
-    const rowClass = (active: boolean) =>
+    const rowClass = (active: boolean, danger = false) =>
       cn(
         // relative anchors <LinkPending />'s dot, which is absolute so it costs
         // no width in the collapsed rail.
-        'relative flex min-h-control items-center gap-3 rounded-control px-3 text-base transition-colors',
-        '[&_svg]:size-icon [&_svg]:shrink-0',
+        // Compact on purpose (35px rows, 15px icons): every row has to fit the
+        // drawer without it scrolling, down to a ~700px-tall laptop screen.
+        'relative flex min-h-7 items-center gap-3 rounded-control px-3 text-base transition-colors',
+        '[&_svg]:size-3 [&_svg]:shrink-0',
         rail && 'justify-center px-0',
         active
           ? 'bg-on-brand/10 font-semibold text-accent-300'
-          : 'text-on-brand/70 hover:bg-on-brand/7 hover:text-on-brand',
+          : danger
+            ? 'text-danger-on-ink hover:bg-on-brand/7'
+            : 'text-on-brand/70 hover:bg-on-brand/7 hover:text-on-brand',
       );
 
     return (
@@ -126,22 +130,35 @@ export function PortalSidebar({
             the logo stands alone — an initial beside it would be redundant —
             so the link needs an explicit name to replace the one the wordmark
             was giving it. */}
-        <Link
-          href="/"
-          aria-label={dict.appName}
-          onClick={onNavigate}
-          className={cn('flex min-w-0 items-center gap-3 px-3', rail && 'justify-center px-0')}
-        >
-          <BrandMark logo={logo} className="size-logo shrink-0" />
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/"
+            aria-label={dict.appName}
+            onClick={onNavigate}
+            className={cn('flex min-w-0 items-center gap-3 px-3', rail && 'justify-center px-0')}
+          >
+            <BrandMark logo={logo} className="size-logo shrink-0" />
+            {!rail && (
+              <div className="min-w-0">
+                <div className="truncate text-brand">{dict.appName}</div>
+                <div className="truncate text-caption text-on-brand/55">{dict.appSubtitle}</div>
+              </div>
+            )}
+          </Link>
+
+          {/* Who is signed in, right under the brand. Hidden in the rail. */}
           {!rail && (
-            <div className="min-w-0">
-              <div className="truncate text-brand">{dict.appName}</div>
-              <div className="truncate text-caption text-on-brand/55">{dict.appSubtitle}</div>
+            <div className="min-w-0 px-3">
+              <div className="truncate text-sm font-semibold">{userName}</div>
+              <div className="truncate text-caption text-on-brand/55">{roleLabel}</div>
             </div>
           )}
-        </Link>
+        </div>
 
-        <nav className="flex flex-col">
+        {/* flex-1 + justify-evenly: the nav takes all the room between the
+            brand block and the footer rows and spreads its rows evenly through
+            it, so no gap is left dead above the footer. */}
+        <nav className="flex flex-1 flex-col justify-evenly">
           {items.map(({ href, label, Icon }) => {
             // '/' needs its own case: every pathname startsWith('/'), so the
             // prefix rule would light up the dashboard on every route — and
@@ -168,14 +185,7 @@ export function PortalSidebar({
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col">
-          {!rail && (
-            <div className="mb-2 min-w-0 px-3">
-              <div className="truncate text-sm font-semibold">{userName}</div>
-              <div className="truncate text-caption text-on-brand/55">{roleLabel}</div>
-            </div>
-          )}
-
+        <div className="flex flex-col">
           <button
             type="button"
             disabled={pending}
@@ -197,7 +207,7 @@ export function PortalSidebar({
           <button
             type="button"
             title={rail ? dict.signOut : undefined}
-            className={rowClass(false)}
+            className={rowClass(false, true)}
             onClick={signOut}
           >
             <SignOutIcon />
@@ -249,7 +259,7 @@ export function PortalSidebar({
               <Drawer.Popup
                 className={cn(
                   'flex h-full w-sidebar max-w-lane flex-col overflow-y-auto overscroll-contain',
-                  'rounded-e-tile bg-ink px-3 py-6 text-on-brand shadow-lg shadow-(color:--color-shade) outline-none',
+                  'rounded-e-tile bg-ink px-3 py-4 text-on-brand shadow-lg shadow-(color:--color-shade) outline-none',
                   // Follows the finger while swiping, slides in and out from
                   // its own edge otherwise — mirrored for Arabic.
                   '[transform:translateX(var(--drawer-swipe-movement-x))] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
@@ -258,7 +268,7 @@ export function PortalSidebar({
                   'rtl:data-starting-style:[transform:translateX(100%)] rtl:data-ending-style:[transform:translateX(100%)]',
                 )}
               >
-                <Drawer.Content className="flex min-h-full flex-col gap-8">
+                <Drawer.Content className="flex min-h-full flex-col gap-3">
                   <Drawer.Title className="sr-only">{dict.appName}</Drawer.Title>
                   {body(false, () => setDrawerOpen(false))}
                 </Drawer.Content>
@@ -274,7 +284,7 @@ export function PortalSidebar({
       </header>
 
       <aside
-        // Four classes do the pinning, in order:
+        // Three classes do the pinning, in order:
         //
         // h-dvh    — the one that matters. The parent is `flex min-h-dvh`, and
         //   its default stretch would otherwise give this a height equal to the
@@ -287,11 +297,9 @@ export function PortalSidebar({
         //   relaxed to auto or a min-height.
         // sticky top-0 — so every nav icon stays on screen however far the page
         //   scrolls, which is the whole point.
-        // overflow-y-auto — replaces a blanket overflow-hidden. The clipping was
-        //   only ever needed horizontally, for labels during the width snap; left
-        //   vertical it would cut off the bottom rows on a short viewport, which
-        //   is exactly the failure this is meant to prevent. Now the drawer
-        //   scrolls itself only when the viewport is genuinely too short for it.
+        //
+        // The aside does not scroll: rows are compact (see rowClass) so all of
+        // them fit. overflow-x-hidden only clips labels during the width snap.
         //
         // No ancestor sets overflow (the flex row, body and html are all clean),
         // so sticky resolves against the viewport. Do not add one.
@@ -308,8 +316,8 @@ export function PortalSidebar({
         //
         // hidden md:flex — below md the ink bar above stands in for it.
         className={cn(
-          'sticky top-0 hidden h-dvh shrink-0 flex-col gap-8 self-start overflow-x-hidden overflow-y-auto md:flex',
-          'rounded-e-tile bg-ink px-3 py-6 text-on-brand',
+          'sticky top-0 hidden h-dvh shrink-0 flex-col gap-3 self-start overflow-hidden md:flex',
+          'rounded-e-tile bg-ink px-3 py-3 text-on-brand',
           collapsed ? 'w-rail' : 'w-sidebar',
         )}
       >
