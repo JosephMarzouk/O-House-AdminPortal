@@ -9,6 +9,17 @@ import { apiUrl } from '@/lib/club-registry';
  * No Next.js imports, so proxy.ts can use it as well as server actions.
  */
 
+/**
+ * What a refresh answer means for the session (F-28 / AUTH-04). Only a
+ * refused token ends it: 401 (expired, revoked, reused) or 400 (malformed).
+ * Anything else (a 503 while the database hiccups, a 429) is the API being
+ * unwell, not the person being signed out: keep the cookies and say so.
+ */
+export function refreshOutcome(status: number): 'renewed' | 'ended' | 'unavailable' {
+  if (status === 200) return 'renewed';
+  return status === 401 || status === 400 ? 'ended' : 'unavailable';
+}
+
 export const ACCESS_COOKIE = 'oh_at';
 export const REFRESH_COOKIE = 'oh_rt';
 const REFRESH_MAX_AGE_S = 30 * 24 * 60 * 60;

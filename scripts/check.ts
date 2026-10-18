@@ -39,6 +39,7 @@ import { ilikePattern, matchesQuery } from '../lib/search';
 import { parseLocation } from '../lib/club-location';
 import { daysFromTasks, parseEmails, reportEnd, reportParams, reportScore, reportSummary, roundDepartment, workDuration } from '../lib/report';
 import { dictionaries } from '../lib/i18n/dictionaries';
+import { refreshOutcome } from '../lib/session';
 import type { Assignment } from '../lib/types/database';
 
 // Storage path resolution moved to the O House API (media signing), and is
@@ -522,6 +523,12 @@ assert.equal(parseLocation('30, 31', 49), null);
 assert.equal(parseLocation('30, 31', 2001), null);
 assert.equal(parseLocation('30, 31', 200.5), null);
 assert.equal(parseLocation('30, 31', NaN), null);
+
+// F-28 / AUTH-04: only a refused refresh token ends a portal session.
+assert.equal(refreshOutcome(200), 'renewed');
+assert.equal(refreshOutcome(401), 'ended');
+assert.equal(refreshOutcome(400), 'ended');
+for (const s of [429, 500, 502, 503, 504]) assert.equal(refreshOutcome(s), 'unavailable', String(s));
 
 console.log(
   'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal + search + location rules hold',

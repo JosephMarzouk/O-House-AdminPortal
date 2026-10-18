@@ -5,6 +5,7 @@ import {
   authPost,
   expiresAt,
   REFRESH_COOKIE,
+  refreshOutcome,
   sessionCookies,
 } from '@/lib/session';
 
@@ -49,9 +50,13 @@ export async function proxy(request: NextRequest) {
   if (!signedIn && refresh) {
     try {
       const res = await authPost(club.slug, '/auth/refresh', { refreshToken: refresh });
-      if (res.status === 200 && res.data) {
+      const outcome = refreshOutcome(res.status);
+      if (outcome === 'renewed' && res.data) {
         fresh = sessionCookies(res.data);
         signedIn = true;
+      } else if (outcome === 'unavailable') {
+        // The API answered but is unwell: don't sign anyone out for it (F-28).
+        return new NextResponse('Service temporarily unavailable', { status: 503 });
       }
     } catch {
       // API unreachable: the page will say so; don't sign anyone out for it.
