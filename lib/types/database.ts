@@ -94,6 +94,15 @@ export type Database = {
           end_time: string | null;
           id: string;
           items: Json;
+          /**
+           * QR-locked places: checklists created from now on lock on the phone
+           * until this place's sticker is scanned. Copied onto each new
+           * checklist (submissions.qr_required), so turning it on never locks
+           * one already handed out.
+           */
+          qr_required: boolean;
+          /** The secret on the printed sticker (clubops:<clubSlug>:<qr_code>). Only replace_place_qr changes it. */
+          qr_code: string;
           site_id: string | null;
           start_time: string | null;
           time_windows: Json;
@@ -110,6 +119,8 @@ export type Database = {
           end_time?: string | null;
           id?: string;
           items?: Json;
+          /** No qr_code here on purpose: its default makes it, replace_place_qr changes it. */
+          qr_required?: boolean;
           site_id?: string | null;
           start_time?: string | null;
           time_windows?: Json;
@@ -128,6 +139,10 @@ export type Database = {
           created_by: string | null;
           /** The zone round this task was scheduled from (0013); null for a one-off assignment. */
           round_id: string | null;
+          /** A one-off multi-place task (create_task_group); null otherwise. Never set together with round_id. */
+          task_group_id: string | null;
+          /** Copied from the place at creation: the app keeps it locked until the place's QR is scanned. */
+          qr_required: boolean;
           extended_at: string | null;
           extended_by: string | null;
           extended_until: string | null;
@@ -386,6 +401,41 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      /** A one-off multi-place task from the New task form. Written only by create_task_group. */
+      task_groups: {
+        Row: {
+          id: string;
+          title_en: string;
+          title_ar: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      /**
+       * The scan log of QR-locked checklists: a good scan, a bad code, or a
+       * supervisor's unlock. Written only by record_place_scan and
+       * unlock_place; readable by whoever can see the checklist.
+       */
+      place_scans: {
+        Row: {
+          id: string;
+          assignment_id: string;
+          /** Who scanned; for an unlock, the supervisor who unlocked. */
+          user_id: string;
+          kind: PlaceScanKind;
+          /** The phone's clock (it may scan offline); now() for an unlock. */
+          scanned_at: string;
+          received_at: string;
+          /** The phone's idempotency key; null for an unlock. */
+          client_id: string | null;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       /**
        * The permission catalog, seeded by migrations only: key = module.action.
        * Everyone signed in reads it and the role tables below; writes go
@@ -396,7 +446,8 @@ export type Database = {
           key: string;
           section: string;
           module: string;
-          action: PermissionAction;
+          /** One of the matrix's four columns, or a key of its own (assignments.unlock_place). */
+          action: PermissionAction | (string & {});
           label_en: string;
           label_ar: string;
           sort: number;
@@ -462,7 +513,10 @@ export type Database = {
     Views: {
       /** Always read effective_status, never submissions.status. */
       assignments_v: {
-        Row: Omit<Database['public']['Tables']['submissions']['Row'], 'id' | 'inspector_id' | 'status'> & {
+        Row: Omit<
+          Database['public']['Tables']['submissions']['Row'],
+          'id' | 'inspector_id' | 'status' | 'task_group_id' | 'qr_required'
+        > & {
           id: string | null;
           inspector_id: string | null;
           status: string | null;
@@ -475,6 +529,20 @@ export type Database = {
           round_title_ar: string | null;
           /** assignee_ids' names, in the same order (profiles RLS applies). */
           assignee_names: string[] | null;
+          /* QR-locked places (20261028123023_qr_places), at the end of the view. */
+          qr_required: boolean | null;
+          /** coalesce(round_id, task_group_id): the checklists of one task. */
+          group_id: string | null;
+          group_title_en: string | null;
+          group_title_ar: string | null;
+          /** How many checklists share group_id; 1 without one. */
+          group_size: number | null;
+          /** sha256 of the place's qr_code when qr_required (the app's offline check), else null. */
+          qr_hash: string | null;
+          /** A good scan or a supervisor's unlock is logged for it. */
+          unlocked: boolean | null;
+          /** The place's number in the task's walk order (20261028140223_task_walk_order). */
+          group_position: number | null;
         };
         Insert: never;
         Update: never;
@@ -615,6 +683,32 @@ export type Database = {
       current_role: { Args: never; Returns: string };
       current_department_id: { Args: never; Returns: string };
       template_window_open: { Args: { p_template_id: string }; Returns: boolean };
+      /** assignments.unlock_place and the reviewers' scope. Logs kind 'unlock' as the caller. */
+      unlock_place: { Args: { p_assignment_id: string }; Returns: undefined };
+      /** places.edit. A new random qr_code: the printed sticker stops working at once. */
+      replace_place_qr: { Args: { p_template_id: string }; Returns: undefined };
+      /**
+       * checklists.create. One checklist per place of p_places (TaskGroupPlace[],
+       * walk order), each with its place's own title and items, sharing a new
+       * task_group_id, which it returns.
+       */
+      create_task_group: {
+        Args: {
+          p_title_en: string;
+          p_title_ar: string;
+          p_places: Json;
+          p_assignee_ids: string[];
+          p_scheduled_date: string;
+          p_end_date?: string | null;
+          p_task_note?: string | null;
+        };
+        Returns: string;
+      };
+      /** The app's scan, through the API. Idempotent on p_client_id. */
+      record_place_scan: {
+        Args: { p_assignment_id: string; p_code: string; p_scanned_at: string; p_client_id: string };
+        Returns: 'scan' | 'bad_code';
+      };
       template_claimed_by_caller: { Args: { p_template_id: string }; Returns: boolean };
     };
     Enums: Record<never, never>;
@@ -667,6 +761,12 @@ export type SubmissionEvent =
   | 'sent_back'
   | 'approved'
   | 'extended';
+
+/** place_scans.kind. */
+export type PlaceScanKind = 'scan' | 'bad_code' | 'unlock';
+
+/** One place of create_task_group's p_places, in walk order. Times are "HH:MM". */
+export type TaskGroupPlace = { template_id: string; window_start: string; window_end: string };
 
 /** assignment_items.status. `follow_up`: answered, but not with the correct answer. */
 export type ItemStatus = 'pending' | 'done' | 'rejected' | 'follow_up';
@@ -759,6 +859,7 @@ export type RoundTemplate = Tables<'round_templates'>;
 export type Round = Tables<'rounds'>;
 export type SyncRefusal = Tables<'sync_refusals'>;
 export type SubmissionEventRow = Tables<'submission_events'>;
+export type PlaceScan = Tables<'place_scans'>;
 export const CLUB_PAGE_KEYS = ['about', 'policies'] as const;
 export type ClubPageKey = (typeof CLUB_PAGE_KEYS)[number];
 

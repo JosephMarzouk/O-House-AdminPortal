@@ -368,6 +368,10 @@ assert.deepEqual(matrix[1].rows.map((r) => r.module), ['checklists', 'reports'])
 assert.equal(matrix[1].rows[0].cells.edit?.key, 'checklists.edit');
 assert.equal(matrix[1].rows[0].cells.create, null, 'no checklists.create in this catalog');
 assert.equal(matrix[1].rows[1].cells.delete, null);
+// A key with an action of its own is kept, not dropped (QR-locked places).
+const unlock = buildMatrix([{ ...perm('assignments.view', 'checklists', 75), key: 'assignments.unlock_place', action: 'unlock_place' }]);
+assert.deepEqual(unlock[0].rows[0].extra.map((p) => p.key), ['assignments.unlock_place']);
+assert.equal(unlock[0].rows[0].cells.view, null);
 
 // Defaults first, most privileged first; then custom roles by name.
 assert.deepEqual(

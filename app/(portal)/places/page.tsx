@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { PencilIcon, PlusIcon } from '@/components/icons';
+import { PencilIcon, PlusIcon, PrinterIcon } from '@/components/icons';
 import { listPlaces, listDepartments, templateItems } from '@/lib/db/places';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
 import { Button } from '@/components/ui/button';
+import { Tag } from '@/components/ui/tag';
 import { DeletePlaceButton } from '@/components/places/delete-place-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
 import { LinkPending } from '@/components/ui/link-pending';
@@ -58,15 +59,23 @@ export default async function PlacesPage({
         kicker={kicker}
         title={dict.navPlaces}
         actions={
-          canCreate ? (
-            <Button className="relative" nativeButton={false} render={<Link href="/places/new" />}>
-              <PlusIcon />
-              {dict.newPlace}
+          <div className="flex flex-wrap items-start gap-2">
+            {/* QR-locked places: every place's sticker on one printable sheet. */}
+            <Button variant="outline" className="relative" nativeButton={false} render={<Link href="/places/qr" />}>
+              <PrinterIcon />
+              {dict.printAllQr}
               <LinkPending />
             </Button>
-          ) : (
-            <DeniedAction dict={dict} icon={<PlusIcon />} label={dict.newPlace} />
-          )
+            {canCreate ? (
+              <Button className="relative" nativeButton={false} render={<Link href="/places/new" />}>
+                <PlusIcon />
+                {dict.newPlace}
+                <LinkPending />
+              </Button>
+            ) : (
+              <DeniedAction dict={dict} icon={<PlusIcon />} label={dict.newPlace} />
+            )}
+          </div>
         }
       >
         <SearchBox value={q} label={dict.search} />
@@ -104,6 +113,11 @@ export default async function PlacesPage({
                       </Link>
                       {/* A place with no site twin can never be assigned:
                           create_assignment requires p_site_id. */}
+                      {p.qr_required && (
+                        <div className="mt-1">
+                          <Tag tone="pending">{dict.qrRequired}</Tag>
+                        </div>
+                      )}
                       {!p.site_id && (
                         <div className="text-caption text-magenta">{dict.placeHasNoSite}</div>
                       )}

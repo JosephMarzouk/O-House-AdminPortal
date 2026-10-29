@@ -113,13 +113,19 @@ export function assignableEnabled(ticked: ReadonlySet<string>): boolean {
   return ticked.has('users.create') || ticked.has('users.edit');
 }
 
-export type MatrixRow ={ module: string; cells: Record<PermissionAction, Permission | null> };
+export type MatrixRow ={
+  module: string;
+  cells: Record<PermissionAction, Permission | null>;
+  /** Keys whose action is none of the four columns (assignments.unlock_place): one tick each, across the row. */
+  extra: Permission[];
+};
 export type MatrixSection = { section: string; rows: MatrixRow[] };
 
 /**
  * The catalog as the matrix draws it: sections, then one row per module, in
  * catalog order; a cell per action, null where the catalog has no such key
- * (drawn disabled, like "Delete" on Reports).
+ * (drawn disabled, like "Delete" on Reports). A key with an action of its
+ * own lands in `extra` rather than being dropped, so it can still be granted.
  */
 export function buildMatrix(catalog: Permission[]): MatrixSection[] {
   const sections: MatrixSection[] = [];
@@ -129,9 +135,10 @@ export function buildMatrix(catalog: Permission[]): MatrixSection[] {
     let row = section.rows.find((r) => r.module === p.module);
     if (!row) {
       const cells = Object.fromEntries(PERMISSION_ACTIONS.map((a) => [a, null])) as MatrixRow['cells'];
-      section.rows.push((row = { module: p.module, cells }));
+      section.rows.push((row = { module: p.module, cells, extra: [] }));
     }
-    row.cells[p.action] = p;
+    if ((PERMISSION_ACTIONS as readonly string[]).includes(p.action)) row.cells[p.action as PermissionAction] = p;
+    else row.extra.push(p);
   }
   return sections;
 }

@@ -15,6 +15,8 @@ export type PlaceInput = {
   nameEn: string;
   departmentId: string | null;
   items: TemplateItem[];
+  /** Requires QR scan. Read at checklist creation only, so it never locks one already handed out. */
+  qrRequired: boolean;
 };
 
 /**
@@ -67,6 +69,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
         title_en: nameEn,
         department_id: input.departmentId,
         items,
+        qr_required: input.qrRequired === true,
       })
       .eq('id', input.id)
       .select('id');
@@ -102,11 +105,26 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       department_id: input.departmentId,
       site_id: site.id,
       items,
+      qr_required: input.qrRequired === true,
     });
     if (error) return { ok: false, error: toErrorCode(error.message) };
   }
 
   revalidatePath('/places');
+  return { ok: true };
+}
+
+/**
+ * A new secret for the place's QR sticker: the printed one stops working at
+ * once (a lost or copied sticker). replace_place_qr checks places.edit again.
+ */
+export async function replacePlaceQr(id: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'places.edit')) return { ok: false, error: 'not_authorized' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('replace_place_qr', { p_template_id: id });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+  revalidatePath(`/places/${id}`);
+  revalidatePath('/places/qr');
   return { ok: true };
 }
 

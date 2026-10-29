@@ -5,6 +5,7 @@ import type {
   Assignment,
   AssignmentItem,
   EffectiveStatus,
+  PlaceScan,
   SubmissionEventRow,
 } from '@/lib/types/database';
 
@@ -321,6 +322,31 @@ export async function eventsFor(ids: string[]): Promise<Map<string, SubmissionEv
     if (error) throw new Error(`eventsFor: ${error.message}`);
     for (const e of data ?? []) {
       byTask.set(e.submission_id, [...(byTask.get(e.submission_id) ?? []), e]);
+    }
+  }
+  return byTask;
+}
+
+/**
+ * The scan log of QR-locked checklists, oldest first, keyed by checklist.
+ * Callers pass only qr_required ids: place_scans exists only once the QR
+ * migration is applied, and a checklist without the lock has no log to show.
+ */
+export async function scansFor(ids: string[]): Promise<Map<string, PlaceScan[]>> {
+  const byTask = new Map<string, PlaceScan[]>();
+  if (ids.length === 0) return byTask;
+
+  const supabase = await createClient();
+  const pages = await Promise.all(
+    chunks(ids).map((slice) =>
+      supabase.from('place_scans').select('*').in('assignment_id', slice).order('scanned_at'),
+    ),
+  );
+
+  for (const { data, error } of pages) {
+    if (error) throw new Error(`scansFor: ${error.message}`);
+    for (const s of data ?? []) {
+      byTask.set(s.assignment_id, [...(byTask.get(s.assignment_id) ?? []), s]);
     }
   }
   return byTask;

@@ -35,6 +35,8 @@ import {
   PaperPlaneTilt,
   PencilSimple,
   Plus,
+  Printer,
+  QrCode,
   ShieldCheck,
   SidebarSimple,
   SignOut,
@@ -89,6 +91,8 @@ export const MoonIcon = duotone(Moon);
 export const MoreIcon = duotone(DotsThreeVertical);
 export const PencilIcon = duotone(PencilSimple);
 export const PlusIcon = duotone(Plus);
+export const PrinterIcon = duotone(Printer);
+export const QrCodeIcon = duotone(QrCode);
 export const SearchIcon = duotone(MagnifyingGlass);
 export const ShieldIcon = duotone(ShieldCheck);
 export const SidebarIcon = duotone(SidebarSimple);

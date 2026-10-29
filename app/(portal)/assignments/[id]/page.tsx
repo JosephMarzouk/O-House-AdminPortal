@@ -6,7 +6,7 @@ import {
   StatusPendingIcon,
   StatusRejectedIcon,
 } from '@/components/icons';
-import { getAssignment, doneCount, eventsFor } from '@/lib/db/assignments';
+import { getAssignment, doneCount, eventsFor, scansFor } from '@/lib/db/assignments';
 import { listProfiles } from '@/lib/db/users';
 import { can, getProfile } from '@/lib/auth';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
@@ -18,6 +18,8 @@ import { listRefusals } from '@/lib/db/sync';
 import { SyncRefusals } from '@/components/sync-refusals';
 import { StatusBadge } from '@/components/status-badge';
 import { ReviewBar } from '@/components/assignments/review-bar';
+import { ScanLog } from '@/components/assignments/scan-log';
+import { UnlockPlaceButton } from '@/components/assignments/unlock-place-button';
 import { Card } from '@/components/ui/card';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
 import { Tag } from '@/components/ui/tag';
@@ -40,6 +42,8 @@ export default async function AssignmentDetailPage({
     getProfile(),
   ]);
   if (!a) notFound();
+  // QR-locked places: the scan log exists only for a checklist with the lock.
+  const scans = a.qr_required ? ((await scansFor([id])).get(id) ?? []) : [];
   const names = new Map(profiles.map((p) => [p.id, p.name]));
   const several = (a.assignee_ids ?? []).length > 1;
 
@@ -138,6 +142,18 @@ export default async function AssignmentDetailPage({
             <span className="me-2 text-label uppercase">{dict.rejectReason}</span>
             {a.review_note}
           </p>
+        )}
+
+        {/* QR-locked places: who scanned, a bad code, a supervisor's unlock.
+            Unlock is offered while it is locked and not yet handed in. */}
+        {a.qr_required && (
+          <section className="space-y-2">
+            <h2 className="text-heading">{dict.placeScan}</h2>
+            <ScanLog scans={scans} names={names} dict={dict} locale={locale} className="space-y-1 text-sm" />
+            {!a.unlocked && a.effective_status !== 'submitted' && a.effective_status !== 'approved' && (
+              <UnlockPlaceButton assignmentId={a.id!} may={can(me, 'assignments.unlock_place')} dict={dict} />
+            )}
+          </section>
         )}
 
         {refusals.length > 0 && (

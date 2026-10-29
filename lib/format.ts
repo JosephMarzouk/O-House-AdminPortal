@@ -35,6 +35,16 @@ export function fmtDateTime(iso: string | null | undefined, locale: Locale): str
   });
 }
 
+/** "14:50", Cairo time — a scan in the place's scan log. */
+export function fmtTime(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleTimeString(localeTag(locale), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: CLUB_TZ,
+  });
+}
+
 /** A task's day, or "23 Sep 2026 – 25 Sep 2026" when it runs over several. */
 export function fmtPeriod(
   start: string | null | undefined,

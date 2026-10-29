@@ -43,6 +43,7 @@ export default async function EditPlacePage({ params }: { params: Promise<{ id: 
             nameEn: place.title_en,
             departmentId: place.department_id,
             items: templateItems(place.items),
+            qrRequired: place.qr_required === true,
           }}
           departments={toDepartmentOptions(departments)}
         />

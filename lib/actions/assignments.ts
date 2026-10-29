@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { templateItems } from '@/lib/template-items';
-import type { TemplateItem } from '@/lib/types/database';
+import type { TaskGroupPlace, TemplateItem } from '@/lib/types/database';
+import { isUuid } from '@/lib/rounds';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 import { can, getProfile } from '@/lib/auth';
 
@@ -26,6 +27,11 @@ function friendly(message: string): string {
   if (/New deadline must be in the future/i.test(message)) return 'deadline_must_be_future';
   if (/INVALID_END_DATE/.test(message)) return 'invalid_end_date';
   if (/REASON_REQUIRED/.test(message)) return 'reason_required';
+  // create_task_group (QR-locked places).
+  if (/TITLE_REQUIRED/.test(message)) return 'title_en_required';
+  if (/INVALID_PLACES/.test(message)) return 'round_places_invalid';
+  if (/DUPLICATE_PLACE/.test(message)) return 'duplicate_place';
+  if (/Place not found/.test(message)) return 'place_not_found';
   return toErrorCode(message);
 }
 
@@ -100,6 +106,88 @@ export async function createAssignment(
 
   revalidatePath('/assignments');
   return { ok: true, id: data as unknown as string };
+}
+
+export type NewTaskGroupInput = {
+  /** In walk order. A place without its own window gets the task's. */
+  places: TaskGroupPlace[];
+  assigneeIds: string[];
+  titleAr: string;
+  titleEn: string;
+  scheduledDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  taskNote?: string;
+};
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * A task over several places (QR-locked places): create_task_group makes one
+ * checklist per place, each with that place's own title and subtasks, tied by
+ * a shared task_group_id the way schedule_rounds ties a round's. The form
+ * offers no item editing here — the places' own lists are what each gets.
+ *
+ * The places are re-checked rather than trusted (a Server Action is an HTTP
+ * endpoint): real ids, no place twice, every window two distinct "HH:MM".
+ * The form always sends a window per place, so the RPC never has to guess one.
+ */
+export async function createTaskGroup(
+  input: NewTaskGroupInput,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (!can(await getProfile(), 'checklists.create')) return { ok: false, error: 'not_authorized' };
+  const ids = input.places.map((p) => p.template_id);
+  if (
+    input.places.length < 2 ||
+    new Set(ids).size !== ids.length ||
+    !input.places.every(
+      (p) =>
+        isUuid(p.template_id) &&
+        HHMM.test(p.window_start) &&
+        HHMM.test(p.window_end) &&
+        p.window_start !== p.window_end,
+    )
+  ) {
+    return { ok: false, error: 'round_places_invalid' };
+  }
+  if (input.assigneeIds.length === 0 || !input.scheduledDate) return { ok: false, error: 'fields_required' };
+  // task_groups.title_en is the push's title: create_task_group needs it.
+  if (!input.titleEn.trim()) return { ok: false, error: 'title_en_required' };
+  if (input.endDate && input.endDate < input.scheduledDate) return { ok: false, error: 'invalid_end_date' };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('create_task_group', {
+    p_title_en: input.titleEn.trim(),
+    p_title_ar: input.titleAr.trim(),
+    p_places: input.places.map(({ template_id, window_start, window_end }) => ({
+      template_id,
+      window_start,
+      window_end,
+    })),
+    p_assignee_ids: input.assigneeIds,
+    p_scheduled_date: input.scheduledDate,
+    p_end_date: input.endDate || null,
+    p_task_note: input.taskNote?.trim() || null,
+  });
+  if (error) return { ok: false, error: friendly(error.message) };
+
+  revalidatePath('/assignments');
+  revalidatePath('/tracker');
+  return { ok: true, id: data as unknown as string };
+}
+
+/**
+ * A supervisor opens a QR-locked place without a scan (a missing or damaged
+ * sticker). unlock_place checks the permission and the reviewers' scope again
+ * and logs the unlock under the caller's name.
+ */
+export async function unlockPlace(id: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'assignments.unlock_place')) return { ok: false, error: 'not_authorized' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('unlock_place', { p_assignment_id: id });
+  if (error) return { ok: false, error: friendly(error.message) };
+
+  revalidatePath(`/assignments/${id}`);
+  return { ok: true };
 }
 
 export async function approveAssignment(id: string, score?: number): Promise<ActionResult> {

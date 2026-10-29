@@ -7,6 +7,7 @@ import {
   itemsFor,
   nearestDaysWithTasks,
   parseOne,
+  scansFor,
 } from '@/lib/db/assignments';
 import { listDepartments } from '@/lib/db/places';
 import { reportRows } from '@/lib/db/report';
@@ -27,6 +28,7 @@ import { isUuid } from '@/lib/rounds';
 import { reportEnd, reportScore, workDuration } from '@/lib/report';
 import { StatusBadge } from '@/components/status-badge';
 import { StatusTimeline } from '@/components/status-timeline';
+import { ScanLog } from '@/components/assignments/scan-log';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { LinkPending } from '@/components/ui/link-pending';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
@@ -87,7 +89,12 @@ export default async function DailyReportPage({
   const nearby = rows.length === 0 ? await nearestDaysWithTasks(day) : null;
 
   const ids = rows.map((a) => a.id!).filter(Boolean);
-  const [items, events] = await Promise.all([itemsFor(ids), eventsFor(ids)]);
+  // The scan log only for QR-locked checklists (nothing else has one).
+  const [items, events, scans] = await Promise.all([
+    itemsFor(ids),
+    eventsFor(ids),
+    scansFor(rows.filter((a) => a.qr_required).map((a) => a.id!)),
+  ]);
 
   // Signed links, only for tasks that have evidence to show. One API call per
   // such task; the links last an hour, which outlives any print.
@@ -205,6 +212,15 @@ export default async function DailyReportPage({
                           <TableCell className="whitespace-normal">
                             <div className="font-semibold">{title(a)}</div>
                             {place(a) && <div className="text-caption text-text/55">{place(a)}</div>}
+                            {a.qr_required && (
+                              <ScanLog
+                                scans={scans.get(a.id!) ?? []}
+                                names={names}
+                                dict={dict}
+                                locale={locale}
+                                className="text-caption"
+                              />
+                            )}
                           </TableCell>
                           <TableCell className="tabular-nums" dir="ltr">
                             {fmtWindow(a.window_start, a.window_end) ?? dict.none}
@@ -270,6 +286,14 @@ export default async function DailyReportPage({
                         {n(sc.done)} / {n(sc.total)} ({n(sc.pct)}%)
                       </dd>
                     </div>
+                    {a.qr_required && (
+                      <div>
+                        <dt className="section-label">{dict.placeScan}</dt>
+                        <dd className="mt-1">
+                          <ScanLog scans={scans.get(a.id!) ?? []} names={names} dict={dict} locale={locale} />
+                        </dd>
+                      </div>
+                    )}
                     <div>
                       <dt className="section-label">{dict.duration}</dt>
                       <dd className="mt-1 tabular-nums">

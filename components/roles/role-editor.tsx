@@ -29,7 +29,7 @@ import {
 import { errorMessage } from '@/lib/errors';
 import { fmtNum } from '@/lib/format';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
-import { PERMISSION_ACTIONS, ROLE_SCOPES, type RoleScope } from '@/lib/types/database';
+import { PERMISSION_ACTIONS, ROLE_SCOPES, type Permission, type RoleScope } from '@/lib/types/database';
 import type { DepartmentOption } from '@/lib/options';
 import { cn } from '@/lib/utils';
 
@@ -77,6 +77,8 @@ const MODULE_LABEL: Record<string, keyof Dictionary> = {
   phones: 'permPhones',
   roles: 'permRoles',
   club_settings: 'permClubSettings',
+  // assignments.unlock_place (QR-locked places)
+  assignments: 'permUnlockPlace',
 };
 
 function flip(set: Set<string>, id: string, on: boolean): Set<string> {
@@ -167,8 +169,26 @@ export function RoleEditor({
   const sectionLabel = (s: string) => (SECTION_LABEL[s] ? dict[SECTION_LABEL[s]] : s);
   const moduleLabel = (row: MatrixRow) => {
     if (MODULE_LABEL[row.module]) return dict[MODULE_LABEL[row.module]];
-    const first = PERMISSION_ACTIONS.map((a) => row.cells[a]).find(Boolean);
+    const first = PERMISSION_ACTIONS.map((a) => row.cells[a]).find(Boolean) ?? row.extra[0];
     return first ? bilingual(locale, first.label_ar, first.label_en) : row.module;
+  };
+  /** One permission's tick. */
+  const tick = (p: Permission, className?: string) => {
+    const checked = perms.has(p.key);
+    const label = bilingual(locale, p.label_ar, p.label_en);
+    const live = cellEnabled(me, p.key, checked, editable);
+    return (
+      <Checkbox
+        className={className}
+        aria-label={label}
+        // Greyed on an editable role: a permission I don't
+        // hold myself. A read-only role has its banner.
+        title={!live && editable ? dict.noPermission : label}
+        checked={checked}
+        disabled={!live}
+        onCheckedChange={(v) => setPerms(flip(perms, p.key, v === true))}
+      />
+    );
   };
   const readOnlyNote =
     readOnly === 'locked'
@@ -372,7 +392,9 @@ export function RoleEditor({
                     </TableCell>
                   </TableRow>
                   {s.rows.map((row) => (
-                    <TableRow key={row.module}>
+                    <Fragment key={row.module}>
+                    {PERMISSION_ACTIONS.some((a) => row.cells[a]) && (
+                    <TableRow>
                       <TableCell className="whitespace-normal font-semibold">{moduleLabel(row)}</TableCell>
                       {PERMISSION_ACTIONS.map((a) => {
                         const p = row.cells[a];
@@ -388,25 +410,29 @@ export function RoleEditor({
                             </TableCell>
                           );
                         }
-                        const checked = perms.has(p.key);
-                        const label = bilingual(locale, p.label_ar, p.label_en);
-                        const live = cellEnabled(me, p.key, checked, editable);
                         return (
                           <TableCell key={a}>
-                            <Checkbox
-                              className="mx-auto"
-                              aria-label={label}
-                              // Greyed on an editable role: a permission I don't
-                              // hold myself. A read-only role has its banner.
-                              title={!live && editable ? dict.noPermission : label}
-                              checked={checked}
-                              disabled={!live}
-                              onCheckedChange={(v) => setPerms(flip(perms, p.key, v === true))}
-                            />
+                            {tick(p, 'mx-auto')}
                           </TableCell>
                         );
                       })}
                     </TableRow>
+                    )}
+                    {/* A key that is none of the four actions
+                        (assignments.unlock_place): its own row, one tick
+                        under View, its label beside it. */}
+                    {row.extra.map((p) => (
+                      <TableRow key={p.key}>
+                        <TableCell className="whitespace-normal font-semibold">{moduleLabel(row)}</TableCell>
+                        <TableCell colSpan={4}>
+                          <span className="flex items-center gap-3">
+                            {tick(p, 'ms-7 shrink-0')}
+                            <span className="text-caption text-text/55">{bilingual(locale, p.label_ar, p.label_en)}</span>
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    </Fragment>
                   ))}
                 </Fragment>
               ))}
