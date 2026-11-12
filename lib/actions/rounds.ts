@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { can, getProfile } from '@/lib/auth';
 import { parseDay } from '@/lib/format';
-import { isUuid, roundPlaces, type PlanCell } from '@/lib/rounds';
+import { isUuid, placeWindowOverlaps, roundPlaces, type PlanCell } from '@/lib/rounds';
 import type { RoundPlace, ScheduleResult } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 
@@ -44,6 +44,8 @@ export async function saveRoundTemplate(
   const places = roundPlaces(input.places);
   if (places.length === 0) return { ok: false, error: 'need_at_least_one_place' };
   if (places.length !== input.places.length) return { ok: false, error: 'round_places_invalid' };
+  // A place may repeat, each time in its own period (a trigger checks the same).
+  if (placeWindowOverlaps(places).size > 0) return { ok: false, error: 'place_window_overlap' };
 
   const supabase = await createClient();
   const row = { title_ar: titleAr, title_en: titleEn, active: input.active === true, places };
@@ -53,7 +55,10 @@ export async function saveRoundTemplate(
   const { data, error } = input.id
     ? await supabase.from('round_templates').update(row).eq('id', input.id).select('id')
     : await supabase.from('round_templates').insert(row).select('id');
-  if (error) return { ok: false, error: toErrorCode(error.message) };
+  if (error) {
+    const code = /PLACE_WINDOW_OVERLAP/.test(error.message) ? 'place_window_overlap' : toErrorCode(error.message);
+    return { ok: false, error: code };
+  }
   if (!data?.length) return { ok: false, error: 'nothing_changed' };
 
   revalidatePath('/rounds');

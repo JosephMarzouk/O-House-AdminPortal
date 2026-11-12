@@ -24,23 +24,65 @@ function hhmm(v: unknown): string | null {
  * A place survives only with a real template id and a window whose ends
  * differ. Equal ends would be a zero-length window that expires the moment it
  * opens; an end BEFORE the start is fine — it is an overnight window
- * (23:00–01:00), which assignments_v rolls into the next day. A place listed
- * twice keeps its first entry: schedule_rounds() creates one task per place
- * per round, so a second entry could never produce anything.
+ * (23:00–01:00), which assignments_v rolls into the next day. A place may be
+ * listed more than once (the bathrooms four times in a morning round), each
+ * time in its own period: schedule_rounds() creates one task per entry, and
+ * placeWindowOverlaps() refuses two overlapping periods for the same place.
  */
 export function roundPlaces(raw: unknown): RoundPlace[] {
   if (!Array.isArray(raw)) return [];
-  const seen = new Set<string>();
   return raw.flatMap((p): RoundPlace[] => {
     if (!p || typeof p !== 'object') return [];
     const o = p as Record<string, unknown>;
     const id = typeof o.template_id === 'string' ? o.template_id.toLowerCase() : '';
     const start = hhmm(o.window_start);
     const end = hhmm(o.window_end);
-    if (!UUID.test(id) || !start || !end || start === end || seen.has(id)) return [];
-    seen.add(id);
+    if (!UUID.test(id) || !start || !end || start === end) return [];
     return [{ template_id: id, window_start: start, window_end: end }];
   });
+}
+
+const minutes = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+
+/**
+ * Do two windows ("HH:MM") overlap? An end at or before its start runs
+ * overnight. Back to back (08:00–09:00, 09:00–10:00) is not an overlap. The
+ * same rule as private.place_windows_overlap() in the database.
+ */
+export function windowsOverlap(
+  a: { window_start: string; window_end: string },
+  b: { window_start: string; window_end: string },
+): boolean {
+  const span = (w: { window_start: string; window_end: string }) => {
+    const s = minutes(w.window_start);
+    const e = minutes(w.window_end);
+    return [s, e <= s ? e + 1440 : e] as const;
+  };
+  const [s1, e1] = span(a);
+  const [s2, e2] = span(b);
+  return [-1440, 0, 1440].some((k) => s1 < e2 + k && s2 + k < e1);
+}
+
+/**
+ * The indexes of entries whose window overlaps another entry for the same
+ * place (both are returned). Entries without a place or a full window are
+ * left to the other checks.
+ */
+export function placeWindowOverlaps(
+  places: { template_id: string; window_start: string; window_end: string }[],
+): Set<number> {
+  const ok = (p: (typeof places)[number]) =>
+    !!p.template_id && HHMM.test(p.window_start.slice(0, 5)) && HHMM.test(p.window_end.slice(0, 5));
+  const bad = new Set<number>();
+  places.forEach((a, i) => {
+    places.forEach((b, j) => {
+      if (j > i && ok(a) && ok(b) && a.template_id === b.template_id && windowsOverlap(a, b)) {
+        bad.add(i);
+        bad.add(j);
+      }
+    });
+  });
+  return bad;
 }
 
 export function isUuid(v: unknown): v is string {

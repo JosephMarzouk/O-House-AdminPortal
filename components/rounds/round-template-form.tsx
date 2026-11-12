@@ -17,9 +17,10 @@ import { fmtNum } from '@/lib/format';
 import { errorMessage } from '@/lib/errors';
 import type { RoundPlace } from '@/lib/types/database';
 import type { RoundPlaceOption } from '@/lib/round-options';
+import { placeWindowOverlaps } from '@/lib/rounds';
 
 type Row = RoundPlace & { key: string };
-type RowError = 'place' | 'window' | 'duplicate';
+type RowError = 'place' | 'window' | 'overlap';
 
 /**
  * A round template: its name, and the places it walks through in order, each
@@ -86,13 +87,12 @@ export function RoundTemplateForm({
    *  admin sees which one is wrong instead of a row silently disappearing. */
   function validate(): Record<string, RowError> {
     const bad: Record<string, RowError> = {};
-    const seen = new Set<string>();
-    for (const r of rows) {
+    const overlapping = placeWindowOverlaps(rows);
+    rows.forEach((r, i) => {
       if (!r.template_id) bad[r.key] = 'place';
       else if (!r.window_start || !r.window_end || r.window_start === r.window_end) bad[r.key] = 'window';
-      else if (seen.has(r.template_id)) bad[r.key] = 'duplicate';
-      seen.add(r.template_id);
-    }
+      else if (overlapping.has(i)) bad[r.key] = 'overlap';
+    });
     return bad;
   }
 
@@ -135,7 +135,7 @@ export function RoundTemplateForm({
   const rowErrorText: Record<RowError, string> = {
     place: dict.selectPlace,
     window: dict.windowInvalid,
-    duplicate: dict.duplicatePlace,
+    overlap: dict.placeWindowOverlap,
   };
 
   return (
@@ -184,7 +184,7 @@ export function RoundTemplateForm({
                   <Select
                     compact
                     aria-label={dict.place}
-                    aria-invalid={err === 'place' || err === 'duplicate' || undefined}
+                    aria-invalid={err === 'place' || undefined}
                     value={r.template_id}
                     onChange={(e) => patch(r.key, { template_id: e.target.value })}
                   >
@@ -202,7 +202,7 @@ export function RoundTemplateForm({
                       type="time"
                       className="w-32"
                       aria-label={dict.windowStart}
-                      aria-invalid={err === 'window' || undefined}
+                      aria-invalid={err === 'window' || err === 'overlap' || undefined}
                       value={r.window_start}
                       onChange={(e) => patch(r.key, { window_start: e.target.value })}
                     />
@@ -212,7 +212,7 @@ export function RoundTemplateForm({
                       type="time"
                       className="w-32"
                       aria-label={dict.windowEnd}
-                      aria-invalid={err === 'window' || undefined}
+                      aria-invalid={err === 'window' || err === 'overlap' || undefined}
                       value={r.window_end}
                       onChange={(e) => patch(r.key, { window_end: e.target.value })}
                     />

@@ -18,8 +18,7 @@ import { ACCESS_COOKIE } from '@/lib/session';
  */
 export type MediaLookup = (stored: string | null | undefined) => string | null;
 
-/** A camera clip rather than a photo: `….mp4`, before any signed-link query. */
-export const isVideo = (url: string) => /\.mp4(\?|$)/i.test(url);
+export { isVideo } from '@/lib/evidence';
 
 export async function roundMedia(assignmentId: string): Promise<MediaLookup> {
   // The sign-in cookie is only forwarded: the API verifies it, reads the

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { templateItems } from '@/lib/template-items';
 import type { TaskGroupPlace, TemplateItem } from '@/lib/types/database';
-import { isUuid } from '@/lib/rounds';
+import { isUuid, placeWindowOverlaps } from '@/lib/rounds';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 import { can, getProfile } from '@/lib/auth';
 
@@ -33,7 +33,7 @@ function friendly(message: string): string {
   // create_task_group (QR-locked places).
   if (/TITLE_REQUIRED/.test(message)) return 'title_en_required';
   if (/INVALID_PLACES/.test(message)) return 'round_places_invalid';
-  if (/DUPLICATE_PLACE/.test(message)) return 'duplicate_place';
+  if (/PLACE_WINDOW_OVERLAP/.test(message)) return 'place_window_overlap';
   if (/Place not found/.test(message)) return 'place_not_found';
   return toErrorCode(message);
 }
@@ -131,17 +131,16 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
  * offers no item editing here — the places' own lists are what each gets.
  *
  * The places are re-checked rather than trusted (a Server Action is an HTTP
- * endpoint): real ids, no place twice, every window two distinct "HH:MM".
+ * endpoint): real ids, every window two distinct "HH:MM", and a place listed
+ * more than once only in periods that don't overlap.
  * The form always sends a window per place, so the RPC never has to guess one.
  */
 export async function createTaskGroup(
   input: NewTaskGroupInput,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if (!can(await getProfile(), 'checklists.create')) return { ok: false, error: 'not_authorized' };
-  const ids = input.places.map((p) => p.template_id);
   if (
     input.places.length < 2 ||
-    new Set(ids).size !== ids.length ||
     !input.places.every(
       (p) =>
         isUuid(p.template_id) &&
@@ -152,6 +151,8 @@ export async function createTaskGroup(
   ) {
     return { ok: false, error: 'round_places_invalid' };
   }
+  // A place may repeat, each time in its own period (create_task_group checks the same).
+  if (placeWindowOverlaps(input.places).size > 0) return { ok: false, error: 'place_window_overlap' };
   if (input.assigneeIds.length === 0 || !input.scheduledDate) return { ok: false, error: 'fields_required' };
   // task_groups.title_en is the push's title: create_task_group needs it.
   if (!input.titleEn.trim()) return { ok: false, error: 'title_en_required' };

@@ -31,7 +31,7 @@ import {
   sortRoles,
   type Access,
 } from '../lib/access';
-import { changedCells, fillFromLastWeek, roundPlaces } from '../lib/rounds';
+import { changedCells, fillFromLastWeek, placeWindowOverlaps, roundPlaces } from '../lib/rounds';
 import { allowedMoves, COLUMN_OF, MOVE_PERMISSION } from '../lib/tracker';
 import { errorMessage } from '../lib/errors';
 import { refusalLabel } from '../lib/refusals';
@@ -210,15 +210,24 @@ assert.deepEqual(
     { template_id: 'not-a-uuid', window_start: '07:30', window_end: '08:00' },
     { template_id: P, window_start: '08:00', window_end: '08:00' }, // zero-length
     { template_id: P, window_start: '23:00', window_end: '01:00' }, // overnight is fine
-    { template_id: G, window_start: '09:00', window_end: '10:00' }, // a place twice
+    { template_id: G, window_start: '09:00', window_end: '10:00' }, // a place twice, own period: kept
     { template_id: P, window_start: '25:00', window_end: '26:00' },
   ]),
   [
     { template_id: G, window_start: '07:00', window_end: '07:30' },
     { template_id: P, window_start: '23:00', window_end: '01:00' },
+    { template_id: G, window_start: '09:00', window_end: '10:00' },
   ],
 );
 assert.deepEqual(roundPlaces('nope'), []);
+
+// The same place in overlapping periods is refused; back to back is fine.
+const w = (template_id: string, window_start: string, window_end: string) => ({ template_id, window_start, window_end });
+assert.deepEqual([...placeWindowOverlaps([w(G, '08:00', '09:00'), w(G, '09:00', '10:00'), w(P, '08:30', '09:30')])], []);
+assert.deepEqual([...placeWindowOverlaps([w(G, '08:00', '09:30'), w(P, '08:00', '09:30'), w(G, '09:00', '10:00')])], [0, 2]);
+assert.deepEqual([...placeWindowOverlaps([w(G, '22:00', '02:00'), w(G, '01:00', '03:00')])], [0, 1]); // overnight
+assert.deepEqual([...placeWindowOverlaps([w(G, '22:00', '02:00'), w(G, '02:00', '03:00')])], []);
+assert.deepEqual([...placeWindowOverlaps([w(G, '23:00', '00:30'), w(G, '00:00', '01:00')])], [0, 1]); // across midnight
 
 // Save sends only what changed; a cleared cell is an explicit unassign.
 assert.deepEqual(

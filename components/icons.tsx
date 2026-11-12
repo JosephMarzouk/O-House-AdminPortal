@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowsClockwise,
+  ArrowSquareOut,
   Buildings,
   CalendarDots,
   Camera,
@@ -34,6 +35,7 @@ import {
   Moon,
   PaperPlaneTilt,
   PencilSimple,
+  Play,
   Plus,
   Printer,
   QrCode,
@@ -89,7 +91,9 @@ export const LockIcon = duotone(Lock);
 export const MapPinIcon = duotone(MapPin);
 export const MoonIcon = duotone(Moon);
 export const MoreIcon = duotone(DotsThreeVertical);
+export const OpenExternalIcon = duotone(ArrowSquareOut);
 export const PencilIcon = duotone(PencilSimple);
+export const PlayIcon = duotone(Play);
 export const PlusIcon = duotone(Plus);
 export const PrinterIcon = duotone(Printer);
 export const QrCodeIcon = duotone(QrCode);

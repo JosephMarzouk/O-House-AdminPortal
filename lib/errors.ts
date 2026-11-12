@@ -49,7 +49,7 @@ export function errorMessage(dict: Dictionary, code: string): string {
     invalid_end_date: dict.invalidEndDate,
     // multi-place tasks (create_task_group)
     title_en_required: dict.titleEnRequired,
-    duplicate_place: dict.duplicatePlaceInTask,
+    place_window_overlap: dict.placeWindowOverlap,
     place_not_found: dict.placeNotFound,
     // rounds + week plan (0013)
     need_at_least_one_place: dict.needAtLeastOnePlace,

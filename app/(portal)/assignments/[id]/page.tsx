@@ -13,7 +13,8 @@ import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { assigneeNames, fmtDateTime, fmtPeriod, fmtWindow } from '@/lib/format';
 import { StatusTimeline } from '@/components/status-timeline';
 import { answerLabel, correctLabel } from '@/lib/answers';
-import { isVideo, roundMedia } from '@/lib/media';
+import { roundMedia } from '@/lib/media';
+import { EvidenceGallery } from '@/components/assignments/evidence-gallery';
 import { listRefusals } from '@/lib/db/sync';
 import { SyncRefusals } from '@/components/sync-refusals';
 import { StatusBadge } from '@/components/status-badge';
@@ -224,37 +225,8 @@ export default async function AssignmentDetailPage({
                       {item.reject_note && <p className="text-sm text-magenta">{item.reject_note}</p>}
                     </div>
 
-                    {/* Photo evidence is permanent: view only, never a delete control. */}
-                    {photos.length > 0 && (
-                      <div className="flex gap-2">
-                        {photos.map((url) =>
-                          // A camera clip (the app's "Record a video"). The
-                          // signed link keeps the stored .mp4 path.
-                          isVideo(url) ? (
-                            <video
-                              key={url}
-                              src={url}
-                              controls
-                              preload="metadata"
-                              className="h-thumb max-w-64 rounded-card bg-ink"
-                            />
-                          ) : (
-                            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                              {/* Plain <img>: these are 5MB+ camera JPEGs from a
-                                  public bucket, and next/image would proxy every
-                                  one through the optimizer for a thumbnail. */}
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt={dict.photo}
-                                loading="lazy"
-                                className="size-thumb rounded-card object-cover"
-                              />
-                            </a>
-                          ),
-                        )}
-                      </div>
-                    )}
+                    {/* Photos and camera clips; each opens a large viewer. */}
+                    {photos.length > 0 && <EvidenceGallery urls={photos} dict={dict} locale={locale} />}
                   </Card>
                   </li>
                 );

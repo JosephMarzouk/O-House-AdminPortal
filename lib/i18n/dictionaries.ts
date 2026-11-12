@@ -258,6 +258,12 @@ export const dictionaries = {
     minutesShort: '{n} د',
     question: 'السؤال',
     video: 'فيديو',
+    playVideo: 'تشغيل الفيديو',
+    openPhoto: 'فتح الصورة',
+    openInNewTab: 'فتح في علامة تبويب جديدة',
+    previous: 'السابق',
+    next: 'التالي',
+    close: 'إغلاق',
 
     // places (templates)
     newPlace: 'مكان جديد',
@@ -354,7 +360,7 @@ export const dictionaries = {
     moveUp: 'تحريك لأعلى',
     moveDown: 'تحريك لأسفل',
     windowInvalid: 'حدّد بداية ونهاية مختلفتين.',
-    duplicatePlace: 'هذا المكان موجود بالفعل في الجولة.',
+    placeWindowOverlap: 'هذا المكان مضاف في وقت متداخل. غيّر أحد الوقتين.',
     placeSubtaskCount: '{n} مهمة فرعية',
     placeNotSchedulable:
       'لا توجد مهام فرعية لهذا المكان (أو غير مرتبط بموقع) — سيتم تخطيه عند الجدولة.',
@@ -469,7 +475,6 @@ export const dictionaries = {
     multiPlaceHint:
       'عدة أماكن: يحصل كل مكان على قائمته الخاصة بمهامه الفرعية من شاشة الأماكن، ولا يمكن تعديلها هنا. وقت المهمة يسري على كل مكان ما لم يُحدَّد له وقت خاص.',
     placeOwnWindow: 'وقت خاص (اختياري)',
-    duplicatePlaceInTask: 'هذا المكان موجود بالفعل في المهمة.',
     titleEnRequired: 'أدخل عنوان المهمة بالإنجليزية: يظهر في الإشعار.',
     placeNotFound: 'أحد الأماكن لم يعد موجودًا — حدّث الصفحة.',
     placeNotReady: 'لا توجد مهام فرعية لهذا المكان (أو غير مرتبط بموقع) — أضفها من شاشة الأماكن أولًا.',
@@ -736,6 +741,12 @@ export const dictionaries = {
     minutesShort: '{n} min',
     question: 'Question',
     video: 'Video',
+    playVideo: 'Play video',
+    openPhoto: 'Open photo',
+    openInNewTab: 'Open in a new tab',
+    previous: 'Previous',
+    next: 'Next',
+    close: 'Close',
 
     newPlace: 'New place',
     placeNameAr: 'Name (Arabic)',
@@ -829,7 +840,7 @@ export const dictionaries = {
     moveUp: 'Move up',
     moveDown: 'Move down',
     windowInvalid: 'Set a start and an end that differ.',
-    duplicatePlace: 'This place is already in the round.',
+    placeWindowOverlap: 'This place is already in an overlapping time. Change one of the times.',
     placeSubtaskCount: '{n} subtasks',
     placeNotSchedulable:
       'This place has no subtasks (or no linked site) — it will be skipped when scheduling.',
@@ -944,7 +955,6 @@ export const dictionaries = {
     multiPlaceHint:
       'Several places: each place gets its own checklist with its subtasks from the Places screen; they can’t be edited here. The task’s time applies to every place unless a place has its own.',
     placeOwnWindow: 'Own time (optional)',
-    duplicatePlaceInTask: 'This place is already in the task.',
     titleEnRequired: 'Enter the task title in English: the notification shows it.',
     placeNotFound: 'One of the places no longer exists — refresh the page.',
     placeNotReady: 'This place has no subtasks (or no linked site) — add them on the Places screen first.',

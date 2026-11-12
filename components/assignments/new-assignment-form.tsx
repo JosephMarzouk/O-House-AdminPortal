@@ -17,6 +17,7 @@ import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries
 import type { TemplateItem } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
 import { fmtNum } from '@/lib/format';
+import { placeWindowOverlaps } from '@/lib/rounds';
 
 export type PlaceOption = {
   id: string;
@@ -36,7 +37,7 @@ type FieldKey = 'place' | 'assignee' | 'title' | 'titleEn' | 'date' | 'endDate' 
  * client-only, because rows reorder (see round-template-form.tsx).
  */
 type PlaceRow = { key: string; templateId: string; windowStart: string; windowEnd: string };
-type RowError = 'place' | 'duplicate' | 'window' | 'not_ready';
+type RowError = 'place' | 'overlap' | 'window' | 'not_ready';
 
 const newRow = (): PlaceRow => ({ key: crypto.randomUUID(), templateId: '', windowStart: '', windowEnd: '' });
 
@@ -112,22 +113,29 @@ export function NewAssignmentForm({
     changeRows(next);
   }
 
+  /** The window a row is sent with: its own, else the task's From–To. */
+  const windowOf = (r: PlaceRow) =>
+    r.windowStart && r.windowEnd
+      ? { window_start: r.windowStart, window_end: r.windowEnd }
+      : { window_start: from, window_end: to };
+
   /** Several places: each row's own rules, named per row. */
   function validateRows(): Record<string, RowError> {
     const bad: Record<string, RowError> = {};
     if (!multi) return bad;
-    const seen = new Set<string>();
-    for (const r of rows) {
+    // A place may repeat, each time in its own period: compare the windows
+    // each row will really get (its own, else the task's From–To).
+    const overlapping = placeWindowOverlaps(rows.map((r) => ({ template_id: r.templateId, ...windowOf(r) })));
+    rows.forEach((r, i) => {
       const p = placeById.get(r.templateId);
       const own = r.windowStart || r.windowEnd;
       if (!p) bad[r.key] = 'place';
-      else if (seen.has(r.templateId)) bad[r.key] = 'duplicate';
       // create_task_group copies the place's own subtasks: none would be a
       // 0/0 checklist the phone can never submit.
       else if (!p.siteId || p.items.length === 0) bad[r.key] = 'not_ready';
       else if (own && (!r.windowStart || !r.windowEnd || r.windowStart === r.windowEnd)) bad[r.key] = 'window';
-      seen.add(r.templateId);
-    }
+      else if (overlapping.has(i)) bad[r.key] = 'overlap';
+    });
     return bad;
   }
   // The task's From–To is every place's window, unless each has its own.
@@ -190,11 +198,7 @@ export function NewAssignmentForm({
       startTransition(async () => {
         const res = await createTaskGroup({
           // Always a window per place, so create_task_group never guesses one.
-          places: rows.map((r) => ({
-            template_id: r.templateId,
-            window_start: (r.windowStart && r.windowEnd ? r.windowStart : from),
-            window_end: (r.windowStart && r.windowEnd ? r.windowEnd : to),
-          })),
+          places: rows.map((r) => ({ template_id: r.templateId, ...windowOf(r) })),
           assigneeIds,
           titleAr,
           titleEn,
@@ -254,7 +258,7 @@ export function NewAssignmentForm({
   const invalid = (k: FieldKey) => errors.has(k) || undefined;
   const rowErrorText: Record<RowError, string> = {
     place: dict.selectPlace,
-    duplicate: dict.duplicatePlaceInTask,
+    overlap: dict.placeWindowOverlap,
     window: dict.windowInvalid,
     not_ready: dict.placeNotReady,
   };
@@ -275,7 +279,9 @@ export function NewAssignmentForm({
                     <Select
                       id={i === 0 ? 'place' : undefined}
                       aria-label={i === 0 ? undefined : dict.place}
-                      aria-invalid={(multi ? !!rowErr && rowErr !== 'window' : invalid('place')) || undefined}
+                      aria-invalid={
+                        (multi ? !!rowErr && rowErr !== 'window' && rowErr !== 'overlap' : invalid('place')) || undefined
+                      }
                       value={r.templateId}
                       // One place: changeRows seeds the title and subtasks from it.
                       onChange={(e) => patchRow(r.key, { templateId: e.target.value })}
@@ -330,7 +336,7 @@ export function NewAssignmentForm({
                           type="time"
                           className="w-32"
                           aria-label={dict.windowStart}
-                          aria-invalid={rowErr === 'window' || undefined}
+                          aria-invalid={rowErr === 'window' || rowErr === 'overlap' || undefined}
                           value={r.windowStart}
                           onChange={(e) => patchRow(r.key, { windowStart: e.target.value })}
                         />
@@ -340,7 +346,7 @@ export function NewAssignmentForm({
                           type="time"
                           className="w-32"
                           aria-label={dict.windowEnd}
-                          aria-invalid={rowErr === 'window' || undefined}
+                          aria-invalid={rowErr === 'window' || rowErr === 'overlap' || undefined}
                           value={r.windowEnd}
                           onChange={(e) => patchRow(r.key, { windowEnd: e.target.value })}
                         />
