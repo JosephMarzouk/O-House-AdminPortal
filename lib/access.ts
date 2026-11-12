@@ -161,6 +161,20 @@ export function mayManageUser(me: Caller, user: { id: string; roleId: string }):
 }
 
 /**
+ * May I change this report-mail list ('all' or a department id)? set_report_mail's
+ * own rule: club_settings.edit + reports.view (the PDFs are rendered as the saver),
+ * and a department in my scope. 'all' also stands for the frequency and sender:
+ * whole-club scope only, since every department's PDF is rendered as whoever saved them.
+ */
+export function mayEditReportMail(me: Caller, list: string): boolean {
+  const a = me?.access;
+  if (!a || !can(me, 'club_settings.edit') || !can(me, 'reports.view')) return false;
+  if (a.scope === 'all') return true;
+  if (list === 'all') return false;
+  return a.scope === 'team' || (a.scope === 'departments' && a.departments.includes(list));
+}
+
+/**
  * Who is offered as someone's manager: people whose role sees a team or the
  * whole club and either manages staff (users.edit) or follows checklists
  * (checklists.view). A manager_id only widens what a 'team' role sees; 'all'

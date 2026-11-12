@@ -58,14 +58,16 @@ export async function setClubLocation(coords: string, radius: number): Promise<A
  * per club, whoever is signed in), and each department's addresses as typed
  * (one textarea each, keyed by department id, plus 'all': one email with
  * every department, e.g. the general manager). set_report_mail() is the
- * guard (club_settings.edit + reports.view) and replaces the whole list.
+ * guard (club_settings.edit + reports.view) and replaces only the lists in
+ * the caller's scope; frequency and sender need whole-club scope.
  */
 export async function saveReportMail(
   frequency: ReportMailFrequency,
   sender: string,
   recipients: Record<string, string>,
 ): Promise<ActionResult> {
-  if (!can(await getProfile(), 'club_settings.edit')) return { ok: false, error: 'not_authorized' };
+  const me = await getProfile();
+  if (!can(me, 'club_settings.edit') || !can(me, 'reports.view')) return { ok: false, error: 'not_authorized' };
   if (!REPORT_MAIL_FREQUENCIES.includes(frequency)) return { ok: false, error: 'error_generic' };
   const from = parseEmails(String(sender ?? ''));
   if (from.bad || from.emails.length > 1) return { ok: false, error: 'email_invalid' };

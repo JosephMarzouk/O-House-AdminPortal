@@ -27,6 +27,9 @@ function friendly(message: string): string {
   if (/New deadline must be in the future/i.test(message)) return 'deadline_must_be_future';
   if (/INVALID_END_DATE/.test(message)) return 'invalid_end_date';
   if (/REASON_REQUIRED/.test(message)) return 'reason_required';
+  // REVIEW-04: approved (or never submitted) can't be sent back.
+  if (/NOT_REVIEWABLE/.test(message)) return 'not_in_submitted_state';
+  if (/NO_ITEMS/.test(message)) return 'no_items_selected';
   // create_task_group (QR-locked places).
   if (/TITLE_REQUIRED/.test(message)) return 'title_en_required';
   if (/INVALID_PLACES/.test(message)) return 'round_places_invalid';

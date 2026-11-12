@@ -1,4 +1,5 @@
 import { can, getProfile } from '@/lib/auth';
+import { mayEditReportMail } from '@/lib/access';
 import { NoPermission } from '@/components/no-permission';
 import { createClient } from '@/lib/supabase/server';
 import { bilingual, getDictionary, getLocale } from '@/lib/i18n';
@@ -15,8 +16,9 @@ import { CLUB_PAGE_KEYS } from '@/lib/types/database';
 /**
  * Club settings: the club's location (set once, then read-only), the report
  * emails, and the staff app's About and Policies text. club_settings.view
- * opens it and club_settings.edit edits the text and the report emails
- * (set_club_page and set_report_mail check the same). The
+ * opens it and club_settings.edit edits the text (set_club_page checks the
+ * same); the report emails also need reports.view and the caller's scope
+ * (mayEditReportMail, as set_report_mail). The
  * location is not a grantable permission: only the Admin role sets it
  * (set_club_location).
  */
@@ -75,6 +77,7 @@ export default async function ClubSettingsPage() {
             ? dict.reportMailFailed.replace('{date}', at).replace('{error}', last.error ?? '')
             : dict.reportMailSending,
       failed: last?.status === 'failed',
+      locked: !mayEditReportMail(profile, d.id ?? 'all'),
     };
   });
 
@@ -130,7 +133,7 @@ export default async function ClubSettingsPage() {
           frequency={mail.data?.frequency ?? 'off'}
           sender={mail.data?.sender ?? ''}
           departments={mailDepartments}
-          readOnly={!canEditText}
+          settingsLocked={!mayEditReportMail(profile, 'all')}
         />
         <section className="space-y-4">
           <p className="max-w-3xl text-sm text-text/55">{dict.clubPagesHint}</p>

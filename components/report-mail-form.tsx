@@ -24,16 +24,25 @@ export function ReportMailForm({
   frequency,
   sender,
   departments,
-  readOnly,
+  settingsLocked,
 }: {
   dict: Dictionary;
   frequency: ReportMailFrequency;
   /** The club mailbox the reports come from; one per club. */
   sender: string;
   /** One list per department, and first the 'all' list (every department in one email). */
-  departments: { id: string; name: string; hint: string | null; emails: string[]; last: string | null; failed: boolean }[];
-  /** Without club_settings.edit: the settings, but no way to change them. */
-  readOnly: boolean;
+  departments: {
+    id: string;
+    name: string;
+    hint: string | null;
+    emails: string[];
+    last: string | null;
+    failed: boolean;
+    /** Outside what I may change (mayEditReportMail): shown, never sent. */
+    locked: boolean;
+  }[];
+  /** Frequency and sender: whole-club scope only (mayEditReportMail 'all'). */
+  settingsLocked: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -41,6 +50,7 @@ export function ReportMailForm({
   const [freq, setFreq] = useState(frequency);
   const [from, setFrom] = useState(sender);
   const [lists, setLists] = useState<Record<string, string>>(initial);
+  const readOnly = settingsLocked && departments.every((d) => d.locked);
   const dirty =
     freq !== frequency || from !== sender || departments.some((d) => (lists[d.id] ?? '') !== initial[d.id]);
 
@@ -55,7 +65,9 @@ export function ReportMailForm({
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
-            const res = await saveReportMail(freq, from, lists);
+            // Only my lists: set_report_mail refuses the rest and leaves them as they are.
+            const mine = Object.fromEntries(departments.filter((d) => !d.locked).map((d) => [d.id, lists[d.id] ?? '']));
+            const res = await saveReportMail(freq, from, mine);
             if (res.ok) {
               alert.success(dict.saved);
               router.refresh();
@@ -70,7 +82,7 @@ export function ReportMailForm({
           <Select
             id="report-mail-frequency"
             className="max-w-xs"
-            disabled={readOnly}
+            disabled={settingsLocked}
             value={freq}
             onChange={(e) => setFreq(e.target.value as ReportMailFrequency)}
           >
@@ -87,7 +99,7 @@ export function ReportMailForm({
             dir="ltr"
             className="max-w-md"
             placeholder="reports@club.com"
-            readOnly={readOnly}
+            readOnly={settingsLocked}
             value={from}
             onChange={(e) => setFrom(e.target.value)}
           />
@@ -102,7 +114,7 @@ export function ReportMailForm({
               dir="ltr"
               rows={3}
               placeholder={dict.reportMailRecipients}
-              readOnly={readOnly}
+              readOnly={d.locked}
               value={lists[d.id] ?? ''}
               onChange={(e) => setLists({ ...lists, [d.id]: e.target.value })}
             />
