@@ -15,9 +15,11 @@ import { STATUS } from '@/components/status-badge';
 export async function GET(request: NextRequest) {
   if (!can(await getProfile(), 'reports.view')) return new Response('Forbidden', { status: 403 });
   const params = reportParams(request.nextUrl.searchParams);
-  if (!params) return new Response('Bad request', { status: 400 });
+  // The summary is a range's; a single checklist (id) has none.
+  if (!params || params.id || !params.date || !params.to) return new Response('Bad request', { status: 400 });
 
-  const { rows } = await reportRows(params.date, params.to, params.dept === 'all' ? null : params.dept);
+  const { q, place, user, status } = params;
+  const { rows } = await reportRows(params.date, params.to, params.dept === 'all' ? null : params.dept, { q, place, user, status });
   const summary = reportSummary(rows);
   return Response.json(
     {

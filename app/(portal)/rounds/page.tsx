@@ -93,7 +93,7 @@ export default async function RoundsPage({
   // The assignable staff, plus anyone already holding a cell who no longer
   // is (deactivated, or moved to another role) — so the picker can still show
   // their name rather than an empty cell that looks unplanned.
-  const assignable = assignableStaff(profiles, staffRoles);
+  const assignable = assignableStaff(profiles, staffRoles, me);
   const assignableIds = new Set(assignable.map((p) => p.id));
   const holders = new Set(Object.values(initial).flat());
   const staff = [

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { PROFILE_COLUMNS, type PortalProfile } from '@/lib/types/database';
+import { mayAssignTo, type Access } from '@/lib/access';
 
 /**
  * Every profile the caller may see, minus the phone number.
@@ -82,7 +83,16 @@ export async function staffAppRoles(): Promise<Set<string>> {
 
 /** Who a checklist can be given to: active people whose role holds
  *  staff_app.view — the same test create_assignment and schedule_rounds
- *  make (check_assignees). `roles` is staffAppRoles(). */
-export function assignableStaff(profiles: PortalProfile[], roles: Set<string>): PortalProfile[] {
-  return profiles.filter((p) => p.active && roles.has(p.role_id));
+ *  make (check_assignees). `roles` is staffAppRoles(). With `me`, also only
+ *  the people the signed-in user may assign to (mayAssignTo: their own
+ *  department for team/own scope, the role's departments, or everyone). */
+export function assignableStaff(
+  profiles: PortalProfile[],
+  roles: Set<string>,
+  me?: { id: string; department_id: string | null; access: Access | null } | null,
+): PortalProfile[] {
+  // undefined: no caller rule asked for. null: nobody is signed in, so nobody.
+  return profiles.filter(
+    (p) => p.active && roles.has(p.role_id) && (me === undefined || (me !== null && mayAssignTo(me, p))),
+  );
 }

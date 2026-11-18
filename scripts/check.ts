@@ -25,6 +25,7 @@ import {
   canManageRoles,
   cellEnabled,
   mayDeleteRole,
+  mayAssignTo,
   mayManageUser,
   parseAccess,
   roleReadOnly,
@@ -37,7 +38,7 @@ import { errorMessage } from '../lib/errors';
 import { refusalLabel } from '../lib/refusals';
 import { ilikePattern, matchesQuery } from '../lib/search';
 import { parseLocation } from '../lib/club-location';
-import { daysFromTasks, parseEmails, reportEnd, reportParams, reportScore, reportSummary, roundDepartment, workDuration } from '../lib/report';
+import { daysFromTasks, matchesReportFilter, parseEmails, reportEnd, reportParams, reportScore, reportSummary, roundDepartment, workDuration } from '../lib/report';
 import { dictionaries } from '../lib/i18n/dictionaries';
 import { refreshOutcome } from '../lib/session';
 import type { Assignment } from '../lib/types/database';
@@ -466,6 +467,45 @@ assert.equal(reportEnd('2026-10-10', undefined), '2026-10-10');
   assert.equal(p('date=2026-10-10&to=bad'), null);
   assert.equal(p('date=2026-10-10&dept=x'), null);
   assert.equal(p('dept=all'), null);
+  // Optional id: a single checklist, the date optional then; old shape untouched.
+  const ID = '0b5c9f7a-1111-4222-8333-444455556666';
+  assert.deepEqual(p(`id=${ID}`), { date: undefined, to: undefined, dept: 'all', id: ID });
+  assert.deepEqual(p(`id=${ID}&date=2026-10-10`), { date: '2026-10-10', to: '2026-10-10', dept: 'all', id: ID });
+  assert.equal(p('id=nope&date=2026-10-10'), null, 'id must be a uuid');
+  assert.equal(p(`id=${ID}&date=bad`), null, 'a given date is still checked');
+  // Filters: only the set ones appear; empty (a GET form sends them) = absent.
+  assert.deepEqual(p(`date=2026-10-10&q=%20Gym%20&place=${HK}&user=${ID}&status=approved`), {
+    date: '2026-10-10', to: '2026-10-10', dept: 'all', q: 'Gym', place: HK, user: ID, status: 'approved',
+  });
+  assert.deepEqual(p('date=2026-10-10&q=&place=&user=&status='), { date: '2026-10-10', to: '2026-10-10', dept: 'all' });
+  assert.equal(p('date=2026-10-10&place=x'), null);
+  assert.equal(p('date=2026-10-10&user=x'), null);
+  assert.equal(p('date=2026-10-10&status=done'), null);
+  assert.equal(p(`date=2026-10-10&q=${'x'.repeat(101)}`), null);
+}
+// matchesReportFilter: the one rule behind the list, the view, the PDF and the summary.
+{
+  const row = {
+    effective_status: 'approved' as const, template_id: 'p1', source_template_id: null,
+    inspector_id: 'u1', assignee_ids: ['u2', 'u3'],
+    title_en: 'Gym Opening', title_ar: 'فتح الصالة', template_title_en: '', template_title_ar: '',
+  };
+  assert.equal(matchesReportFilter(row, undefined), true);
+  assert.equal(matchesReportFilter(row, {}), true);
+  assert.equal(matchesReportFilter(row, { q: 'gym' }), true, 'case-insensitive');
+  assert.equal(matchesReportFilter(row, { q: 'الصالة' }), true, 'Arabic title');
+  assert.equal(matchesReportFilter(row, { q: 'pool' }), false);
+  assert.equal(matchesReportFilter({ ...row, title_en: '', template_title_en: 'Pool' }, { q: 'pool' }), true, 'template title');
+  assert.equal(matchesReportFilter(row, { place: 'p1' }), true);
+  assert.equal(matchesReportFilter({ ...row, template_id: null, source_template_id: 'p9' }, { place: 'p9' }), true, 'source place');
+  assert.equal(matchesReportFilter(row, { place: 'p2' }), false);
+  assert.equal(matchesReportFilter(row, { user: 'u1' }), true, 'inspector');
+  assert.equal(matchesReportFilter(row, { user: 'u3' }), true, 'assignee');
+  assert.equal(matchesReportFilter({ ...row, assignee_ids: [] }, { user: 'u3' }), false);
+  assert.equal(matchesReportFilter(row, { status: 'approved' }), true);
+  assert.equal(matchesReportFilter(row, { status: 'pending' }), false);
+  assert.equal(matchesReportFilter(row, { q: 'gym', place: 'p1', user: 'u2', status: 'approved' }), true, 'all together');
+  assert.equal(matchesReportFilter(row, { q: 'gym', status: 'pending' }), false, 'every filter must match');
 }
 // The email's summary: statuses most-first, who handed in, whose are not done.
 // Done follows the status, so the brief never contradicts its own counts.
@@ -497,6 +537,7 @@ assert.equal(parseEmails('a@club').bad, 'a@club');
   const task = (id: string, from: string, to: string | null, status: 'approved' | 'pending' | null, place: string | null, owner: string | null) => ({
     id, scheduled_date: from, end_date: to, effective_status: status,
     template_id: place, source_template_id: null, inspector_id: owner, assignee_ids: owner ? [owner] : [],
+    title_en: id === 'c' ? 'Locker sweep' : 'Gym check', title_ar: '', template_title_en: '', template_title_ar: '',
   });
   const tasks = [
     task('a', '2026-09-28', '2026-10-02', 'pending', 'p-pool', null), // runs past today
@@ -512,6 +553,15 @@ assert.equal(parseEmails('a@club').bad, 'a@club');
   assert.deepEqual(daysFromTasks(tasks, '2026-09-29', 'd-gym', placeDept, personDept).map((d) => d.day), ['2026-09-28']);
   assert.deepEqual(daysFromTasks(tasks, '2026-09-29', 'd-pool', placeDept, personDept).map((d) => [d.day, d.total]), [['2026-09-29', 1], ['2026-09-28', 1], ['2026-09-24', 1]]);
   assert.deepEqual(daysFromTasks(tasks, '2026-09-23', null, placeDept, personDept), [], 'nothing before it started');
+  // A filter narrows the counts by the same rule as the report's rows.
+  const f = (flt: Parameters<typeof daysFromTasks>[5], dept: string | null = null) => daysFromTasks(tasks, '2026-09-29', dept, placeDept, personDept, flt);
+  assert.deepEqual(f({ status: 'approved' }).map((d) => [d.day, d.total]), [['2026-09-28', 1]]);
+  assert.deepEqual(f({ q: 'locker' }).map((d) => [d.day, d.total]), [['2026-09-24', 1]]);
+  assert.deepEqual(f({ place: 'p-pool' }).map((d) => [d.day, d.total]), [['2026-09-29', 1], ['2026-09-28', 1], ['2026-09-24', 1]]);
+  assert.deepEqual(f({ user: 'u-gym' }).map((d) => [d.day, d.total]), [['2026-09-28', 1]]);
+  assert.deepEqual(f({ place: 'p-pool', status: 'approved' }), [], 'filters combine');
+  assert.deepEqual(f({ q: 'gym' }, 'd-pool').map((d) => d.day), ['2026-09-29', '2026-09-28'], 'with a department too');
+  assert.deepEqual(f({}).map((d) => d.day), all.map((d) => d.day), 'an empty filter is no filter');
 }
 
 // --- list search ----------------------------------------------------------
@@ -543,6 +593,27 @@ assert.equal(refreshOutcome(401), 'ended');
 assert.equal(refreshOutcome(400), 'ended');
 for (const s of [429, 500, 502, 503, 504]) assert.equal(refreshOutcome(s), 'unavailable', String(s));
 
+
+// Who the signed-in person may assign (mirrors check_assignees).
+{
+  const D1 = 'dept-1';
+  const D2 = 'dept-2';
+  const mgr = { id: 'u-m', department_id: D1, access: access({ scope: 'team' }) };
+  assert.ok(mayAssignTo(mgr, { id: 'u-a', department_id: D1 }), 'team: own department');
+  assert.ok(!mayAssignTo(mgr, { id: 'u-b', department_id: D2 }), 'team: other department');
+  assert.ok(!mayAssignTo(mgr, { id: 'u-c', department_id: null }), 'team: no department');
+  assert.ok(mayAssignTo(mgr, { id: 'u-m', department_id: D1 }), 'team: himself');
+  const lone = { id: 'u-l', department_id: null, access: access({ scope: 'own' }) };
+  assert.ok(!mayAssignTo(lone, { id: 'u-c', department_id: null }), 'no department: nobody but himself');
+  assert.ok(mayAssignTo(lone, { id: 'u-l', department_id: null }), 'no department: himself');
+  const deps = { id: 'u-d', department_id: D1, access: access({ scope: 'departments', departments: [D2] }) };
+  assert.ok(mayAssignTo(deps, { id: 'u-b', department_id: D2 }), 'departments: the role\'s');
+  assert.ok(!mayAssignTo(deps, { id: 'u-a', department_id: D1 }), 'departments: not his own unless listed');
+  const all = { id: 'u-x', department_id: null, access: access({ scope: 'all' }) };
+  assert.ok(mayAssignTo(all, { id: 'u-b', department_id: null }), 'all: anyone');
+  const none = { id: 'u-n', department_id: D1, access: null };
+  assert.ok(!mayAssignTo(none, { id: 'u-b', department_id: D2 }), 'no access: never beyond own department');
+}
 console.log(
   'ok — phone + dashboard + template-item + correct-answer + round + tracker + role + refusal + search + location rules hold',
 );

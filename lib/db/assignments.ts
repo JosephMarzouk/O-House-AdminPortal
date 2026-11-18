@@ -286,7 +286,7 @@ export async function reportDays(today: string): Promise<ReportTask[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('assignments_v')
-    .select('id, scheduled_date, end_date, effective_status, template_id, source_template_id, inspector_id, assignee_ids')
+    .select('id, scheduled_date, end_date, effective_status, template_id, source_template_id, inspector_id, assignee_ids, title_en, title_ar, template_title_en, template_title_ar')
     .lte('scheduled_date', today)
     .order('scheduled_date', { ascending: false })
     // ponytail: the newest 1000 tasks (the Data API's own cap), no paging —

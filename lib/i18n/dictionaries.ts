@@ -249,6 +249,16 @@ export const dictionaries = {
     reportNoDays: 'لا توجد أيام بها مهام بعد.',
     noPermission: 'ليست لديك صلاحية للقيام بذلك.',
     reportGeneratedBy: 'أعدّه',
+    // report filters + single-checklist PDF
+    checklistName: 'اسم المهمة',
+    person: 'الشخص',
+    allPlaces: 'كل الأماكن',
+    allPeople: 'كل الأشخاص',
+    allStatuses: 'كل الحالات',
+    reportFilteredBy: 'مصفّى حسب',
+    checklistReport: 'تقرير المهمة',
+    downloadPdf: 'تنزيل PDF',
+    // end report filters
     reportSummary: 'الملخص',
     totalChecklists: 'عدد المهام',
     reportNoRounds: 'لا توجد مهام لهذا القسم في هذا اليوم.',
@@ -389,7 +399,7 @@ export const dictionaries = {
     planRemoved: 'حُذفت {n}',
     planKept: 'بقيت {n} لأنها بدأت',
     planSkipped: 'تم تخطي {n} مكان بلا مهام فرعية أو فترة',
-    invalidAssignee: 'يمكن تكليف الموظفين النشطين الذين يستخدم دورهم تطبيق الموظفين فقط (ومن أقسامك إن كان دورك مقصورًا عليها).',
+    invalidAssignee: 'لا يمكنك تكليف هذا الشخص. يمكن تكليف الموظفين النشطين الذين يستخدم دورهم تطبيق الموظفين فقط، ومن قسمك أنت (أو من الأقسام المسموحة لدورك).',
     pastDate: 'لا يمكن تعديل الأيام الماضية.',
     invalidPlan: 'الخطة غير صالحة — حدّث الصفحة وحاول مرة أخرى.',
 
@@ -732,6 +742,16 @@ export const dictionaries = {
     reportNoDays: 'No days with checklists yet.',
     noPermission: 'You don’t have permission to do that.',
     reportGeneratedBy: 'Prepared by',
+    // report filters + single-checklist PDF
+    checklistName: 'Checklist name',
+    person: 'Person',
+    allPlaces: 'All places',
+    allPeople: 'All people',
+    allStatuses: 'All statuses',
+    reportFilteredBy: 'Filtered by',
+    checklistReport: 'Checklist report',
+    downloadPdf: 'Download PDF',
+    // end report filters
     reportSummary: 'Summary',
     totalChecklists: 'Checklists',
     reportNoRounds: 'No tasks for this department on this day.',
@@ -869,7 +889,7 @@ export const dictionaries = {
     planRemoved: '{n} removed',
     planKept: '{n} kept — already started',
     planSkipped: '{n} places skipped — no subtasks or window',
-    invalidAssignee: 'Only active staff whose role uses the staff app can be assigned (from your departments, if your role is limited to some).',
+    invalidAssignee: "You can't assign this person. Only active staff whose role uses the staff app can be assigned, from your own department (or the departments your role allows).",
     pastDate: 'Past days cannot be changed.',
     invalidPlan: 'The plan is invalid — refresh the page and try again.',
 

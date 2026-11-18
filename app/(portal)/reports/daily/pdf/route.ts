@@ -1,9 +1,10 @@
 import type { NextRequest } from 'next/server';
 import puppeteer, { type Browser } from 'puppeteer-core';
 import { can, getProfile } from '@/lib/auth';
+import { getAssignment } from '@/lib/db/assignments';
 import { listDepartments } from '@/lib/db/places';
 import { LOCALE_COOKIE } from '@/lib/i18n';
-import { reportParams } from '@/lib/report';
+import { reportParams, reportQuery } from '@/lib/report';
 import { ACCESS_COOKIE } from '@/lib/session';
 
 /**
@@ -60,18 +61,36 @@ export async function GET(request: NextRequest) {
   // A day, or a range up to a week (the weekly email).
   const params = reportParams(request.nextUrl.searchParams);
   if (!params) return new Response('Bad request', { status: 400 });
-  const { date, to, dept } = params;
+  const { date, to, dept, id, q, place, user, status } = params;
 
   const origin = reportOrigin(request);
-  const target = `${origin}/reports/daily?date=${date}${to !== date ? `&to=${to}` : ''}&dept=${dept}`;
+  const ascii = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  // "daily-report-2026-09-24-house-keeping.pdf", "weekly-report-2026-10-10_2026-10-16-….pdf":
-  // ASCII, so every browser keeps it.
-  const deptName =
-    dept === 'all' ? '' : ((await listDepartments()).find((d) => d.id === dept)?.name_en ?? '');
-  const slug = deptName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const period = to !== date ? `weekly-report-${date}_${to}` : `daily-report-${date}`;
-  const filename = `${period}${dept === 'all' ? '' : `-${slug || dept}`}.pdf`;
+  let target: string;
+  let filename: string;
+  if (id) {
+    // One checklist. RLS decides whether the caller sees it; if not, 404 as a
+    // checklist page would. The date and department are the checklist's own.
+    const a = await getAssignment(id);
+    if (!a) return new Response('Not found', { status: 404 });
+    target = `${origin}/reports/daily?id=${id}`;
+    // "checklist-2026-11-02-gym-opening.pdf"; an Arabic-only title has no ASCII
+    // slug, so the id's first part stands in.
+    const slug = ascii(a.title_en || a.template_title_en || '') || id.slice(0, 8);
+    filename = `checklist-${a.scheduled_date ? `${a.scheduled_date}-` : ''}${slug}.pdf`;
+  } else {
+    // date and to are always set without an id (reportParams).
+    const filters = reportQuery({ q, place, user, status });
+    target = `${origin}/reports/daily?date=${date}${to !== date ? `&to=${to}` : ''}&dept=${dept}${filters ? `&${filters}` : ''}`;
+
+    // "daily-report-2026-09-24-house-keeping.pdf", "weekly-report-2026-10-10_2026-10-16-….pdf":
+    // ASCII, so every browser keeps it.
+    const deptName =
+      dept === 'all' ? '' : ((await listDepartments()).find((d) => d.id === dept)?.name_en ?? '');
+    const slug = ascii(deptName);
+    const period = to !== date ? `weekly-report-${date}_${to}` : `daily-report-${date}`;
+    filename = `${period}${dept === 'all' ? '' : `-${slug || dept}`}.pdf`;
+  }
 
   let context;
   try {

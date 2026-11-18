@@ -187,3 +187,23 @@ export function canBeManager(role: { scope: RoleScope; permissions: string[] }):
     (role.permissions.includes('users.edit') || role.permissions.includes('checklists.view'))
   );
 }
+
+/**
+ * May the caller hand a checklist to this person? The database's rule
+ * (check_assignees): scope all, anyone; scope departments, the role's
+ * departments; scope team or own, themselves and their own department (never
+ * on a missing department). Fails closed with no access.
+ */
+export function mayAssignTo(
+  me: { id: string; department_id: string | null; access: Access | null },
+  person: { id: string; department_id: string | null },
+): boolean {
+  const a = me.access;
+  if (!a) return false;
+  if (a.scope === 'all') return true;
+  if (a.scope === 'departments') {
+    return person.department_id !== null && a.departments.includes(person.department_id);
+  }
+  if (person.id === me.id) return true;
+  return me.department_id !== null && person.department_id === me.department_id;
+}

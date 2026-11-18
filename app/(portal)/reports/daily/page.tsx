@@ -1,15 +1,18 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { can, getProfile } from '@/lib/auth';
 import { currentClub } from '@/lib/club';
 import {
   EFFECTIVE_STATUSES,
   eventsFor,
+  getAssignment,
   itemsFor,
   nearestDaysWithTasks,
   parseOne,
   scansFor,
 } from '@/lib/db/assignments';
-import { listDepartments } from '@/lib/db/places';
+import { listDepartments, listPlaces } from '@/lib/db/places';
+import { listProfiles } from '@/lib/db/users';
 import { reportRows } from '@/lib/db/report';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import {
@@ -25,8 +28,8 @@ import {
 import { answerLabel } from '@/lib/answers';
 import { isVideo, roundMedia, type MediaLookup } from '@/lib/media';
 import { isUuid } from '@/lib/rounds';
-import { reportEnd, reportScore, workDuration } from '@/lib/report';
-import { StatusBadge } from '@/components/status-badge';
+import { reportEnd, reportFilterParams, reportQuery, reportScore, workDuration } from '@/lib/report';
+import { STATUS, StatusBadge } from '@/components/status-badge';
 import { StatusTimeline } from '@/components/status-timeline';
 import { ScanLog } from '@/components/assignments/scan-log';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
@@ -56,18 +59,24 @@ export default async function DailyReportPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sp = await searchParams;
-  const day = parseDay(sp.date) ?? todayInCairo();
-  // A range (the weekly email): Saturday to Friday at most. Absent: one day.
-  const to = reportEnd(day, parseDay(sp.to));
-  const ranged = to !== day;
+  const reqDay = parseDay(sp.date) ?? todayInCairo();
   const deptParam = parseOne(sp.dept);
   const deptId = isUuid(deptParam) ? deptParam : null; // anything else = all departments
+  // One checklist (?id=): its own date, ignoring the range, department and filters.
+  const idParam = parseOne(sp.id);
+  const checklistId = isUuid(idParam) ? idParam : null;
+  // The list's filters; a malformed one is ignored here (the routes refuse it).
+  const filter =
+    reportFilterParams(
+      new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (typeof v === 'string' ? [[k, v]] : []))),
+    ) ?? {};
+  const filterQuery = reportQuery({ q: filter.q, place: filter.place, user: filter.user, status: filter.status });
 
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
   if (!me || !can(me, 'reports.view')) {
     return (
       <>
-        <PageHeader kicker={fmtDate(day, locale)} title={dict.dailyReport} />
+        <PageHeader kicker={fmtDate(reqDay, locale)} title={dict.dailyReport} />
         <PageBody>
           <NoPermission page dict={dict} />
         </PageBody>
@@ -75,15 +84,47 @@ export default async function DailyReportPage({
     );
   }
 
-  const [club, report, departments] = await Promise.all([
+  // One checklist: read RLS-scoped; one the caller can't see is a 404.
+  let single: Awaited<ReturnType<typeof getAssignment>> = null;
+  if (checklistId) {
+    single = await getAssignment(checklistId);
+    if (!single) notFound();
+  }
+  const day = single?.scheduled_date ?? reqDay;
+  // A range (the weekly email): Saturday to Friday at most. Absent: one day.
+  const to = single ? day : reportEnd(day, parseDay(sp.to));
+  const ranged = to !== day;
+
+  const [club, report, departments, placeList] = await Promise.all([
     currentClub(),
-    reportRows(day, to, deptId),
+    single
+      ? listProfiles().then((profiles) => {
+          const { items: _items, ...row } = single;
+          return { rows: [row], total: 1, fetched: 1, profiles };
+        })
+      : reportRows(day, to, deptId, filter),
     listDepartments(),
+    !single && filter.place ? listPlaces() : [],
   ]);
 
   const { rows, profiles } = report;
   const names = new Map(profiles.map((p) => [p.id, p.name]));
-  const dept = deptId ? departments.find((d) => d.id === deptId) : undefined;
+  const dept = !single && deptId ? departments.find((d) => d.id === deptId) : undefined;
+  // What the filters were, said in the header so a PDF states it.
+  const filterNote = single
+    ? null
+    : [
+        filter.q && `${dict.checklistName}: ${filter.q}`,
+        filter.place &&
+          `${dict.place}: ${(() => {
+            const p = placeList.find((x) => x.id === filter.place);
+            return p ? bilingual(locale, p.title_ar, p.title_en) : filter.place;
+          })()}`,
+        filter.user && `${dict.person}: ${names.get(filter.user) ?? filter.user}`,
+        filter.status && `${dict.status}: ${dict[STATUS[filter.status].label]}`,
+      ]
+        .filter(Boolean)
+        .join(' · ');
 
   // An empty day is usually "the checklists are on other days" — offer them.
   const nearby = rows.length === 0 ? await nearestDaysWithTasks(day) : null;
@@ -133,14 +174,30 @@ export default async function DailyReportPage({
             <BackLink href="/reports" label={dict.back} />
           </span>
         }
-        title={`${ranged ? dict.weeklyReport : dict.dailyReport} — ${dept ? bilingual(locale, dept.name_ar, dept.name_en) : dict.allDepartments}`}
+        title={
+          single
+            ? `${title(single)} — ${dict.checklistReport}`
+            : `${ranged ? dict.weeklyReport : dict.dailyReport} — ${dept ? bilingual(locale, dept.name_ar, dept.name_en) : dict.allDepartments}`
+        }
         subtitle={[
           bilingual(locale, club.name.ar, club.name.en),
           ranged ? fmtPeriod(day, to, locale) : fmtDate(day, locale),
+          filterNote ? `${dict.reportFilteredBy}: ${filterNote}` : null,
           `${dict.reportGeneratedBy} ${me.name} · ${fmtDateTime(new Date().toISOString(), locale)}`,
-        ].join(' · ')}
+        ].filter(Boolean).join(' · ')}
         actions={
-          <DownloadPdfButton date={day} to={ranged ? to : undefined} dept={deptId ?? 'all'} label={dict.exportPdf} dict={dict} />
+          single ? (
+            <DownloadPdfButton id={single.id!} label={dict.exportPdf} dict={dict} />
+          ) : (
+            <DownloadPdfButton
+              date={day}
+              to={ranged ? to : undefined}
+              dept={deptId ?? 'all'}
+              filter={filter}
+              label={dict.exportPdf}
+              dict={dict}
+            />
+          )
         }
       />
 
@@ -177,7 +234,7 @@ export default async function DailyReportPage({
                 {[...nearby.before, ...nearby.after].map((d) => (
                   <Link
                     key={d}
-                    href={`/reports/daily?date=${d}&dept=${deptId ?? 'all'}`}
+                    href={`/reports/daily?date=${d}&dept=${deptId ?? 'all'}${filterQuery ? `&${filterQuery}` : ''}`}
                     className="relative [&_.link-hint]:-end-2 font-semibold text-cyan-dark hover:underline"
                   >
                     {fmtDate(d, locale)}
@@ -257,7 +314,12 @@ export default async function DailyReportPage({
               return (
                 <section key={a.id} className="space-y-4 print:break-before-page">
                   <div>
-                    <h2 className="text-heading">{title(a)}</h2>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <h2 className="text-heading">{title(a)}</h2>
+                      {/* Screen only (the button hides itself in print), and not for a
+                          report of this one checklist, which has its own at the top. */}
+                      {!single && <DownloadPdfButton id={a.id!} label={dict.downloadPdf} dict={dict} variant="outline" />}
+                    </div>
                     <p className="text-sm text-text/55">
                       {[place(a), fmtPeriod(a.scheduled_date, a.end_date, locale), fmtWindow(a.window_start, a.window_end)]
                         .filter(Boolean)

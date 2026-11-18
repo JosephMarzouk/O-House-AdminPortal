@@ -11,6 +11,7 @@ import { listProfiles } from '@/lib/db/users';
 import { can, getProfile } from '@/lib/auth';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { assigneeNames, fmtDateTime, fmtPeriod, fmtWindow } from '@/lib/format';
+import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { StatusTimeline } from '@/components/status-timeline';
 import { answerLabel, correctLabel } from '@/lib/answers';
 import { roundMedia } from '@/lib/media';
@@ -81,6 +82,12 @@ export default async function AssignmentDetailPage({
       <PageHeader
         kicker={<BackLink href="/assignments" label={dict.back} />}
         title={title || dict.none}
+        actions={
+          // The same permission the PDF route checks.
+          can(me, 'reports.view') ? (
+            <DownloadPdfButton id={a.id!} label={dict.downloadPdf} dict={dict} variant="outline" />
+          ) : undefined
+        }
         // round · place · date · window — the same subtitle the app builds
         subtitle={[
           bilingual(locale, a.round_title_ar, a.round_title_en),

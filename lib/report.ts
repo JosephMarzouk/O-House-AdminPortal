@@ -1,5 +1,6 @@
 import { addDays, parseDay } from '@/lib/format';
 import { isUuid } from '@/lib/rounds';
+import { matchesQuery } from '@/lib/search';
 import type { Assignment, EffectiveStatus, SubmissionEventRow } from '@/lib/types/database';
 
 /**
@@ -31,18 +32,115 @@ export function reportEnd(from: string, to: string | undefined): string {
   return to && to >= from && to <= addDays(from, MAX_REPORT_DAYS - 1) ? to : from;
 }
 
+/** assignments_v.effective_status values, as lib/db/assignments.ts lists them
+ *  (kept here because that module needs the database client). */
+export const REPORT_STATUSES = ['pending', 'in_progress', 'follow_up', 'submitted', 'approved', 'rejected', 'expired'] as const;
+
+/** The reports' optional filters. Every field absent = no filter. */
+export type ReportFilter = {
+  /** Checklist name, either language, case-insensitive. */
+  q?: string;
+  /** A place (templates row) id. */
+  place?: string;
+  /** A person's id: an assignee, the inspector (who took it / submitted it). */
+  user?: string;
+  status?: EffectiveStatus;
+};
+
+/** Longest checklist-name filter; more is certainly not a name. */
+const MAX_Q = 100;
+
 /**
- * A report's query string (?date=&to=&dept=), as the PDF and the summary
- * routes take it: null for anything malformed or a range past a week.
- * `to` is the same day for a one-day report.
+ * Parses the filter params (?q=&place=&user=&status=): null when one is
+ * present but malformed. Empty values count as absent, since a GET form
+ * sends every field. Only the filters that are set appear in the result.
  */
-export function reportParams(sp: URLSearchParams): { date: string; to: string; dept: string } | null {
-  const date = parseDay(sp.get('date') ?? undefined);
+export function reportFilterParams(sp: URLSearchParams): ReportFilter | null {
+  const f: ReportFilter = {};
+  const q = (sp.get('q') ?? '').trim();
+  if (q.length > MAX_Q) return null;
+  if (q) f.q = q;
+  for (const key of ['place', 'user'] as const) {
+    const v = sp.get(key) ?? '';
+    if (v === '') continue;
+    if (!isUuid(v)) return null;
+    f[key] = v;
+  }
+  const status = sp.get('status') ?? '';
+  if (status !== '') {
+    if (!(REPORT_STATUSES as readonly string[]).includes(status)) return null;
+    f.status = status as EffectiveStatus;
+  }
+  return f;
+}
+
+/** The columns matchesReportFilter reads. */
+export type ReportFilterRow = Pick<
+  Assignment,
+  | 'effective_status'
+  | 'template_id'
+  | 'source_template_id'
+  | 'inspector_id'
+  | 'assignee_ids'
+  | 'title_en'
+  | 'title_ar'
+  | 'template_title_en'
+  | 'template_title_ar'
+>;
+
+/**
+ * Whether a task passes the report's filters. The one rule behind the list's
+ * counts (daysFromTasks), the day's report (reportRows) and so the PDF and
+ * the summary, which is what keeps them in agreement.
+ */
+export function matchesReportFilter(row: ReportFilterRow, f: ReportFilter | undefined): boolean {
+  if (!f) return true;
+  if (f.status && row.effective_status !== f.status) return false;
+  if (f.place && (row.template_id ?? row.source_template_id) !== f.place) return false;
+  if (f.user && row.inspector_id !== f.user && !(row.assignee_ids ?? []).includes(f.user)) return false;
+  return matchesQuery(f.q, row.title_en, row.title_ar, row.template_title_en, row.template_title_ar);
+}
+
+/** The report URLs' query string; empty values are left out. */
+export function reportQuery(p: Record<string, string | undefined>): string {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) if (v) qs.set(k, v);
+  return qs.toString();
+}
+
+export type ReportParams = {
+  /** Absent only for a single-checklist report (`id`) without a date. */
+  date: string | undefined;
+  to: string | undefined;
+  dept: string;
+  /** One checklist, ignoring the range, the department and the filters. */
+  id?: string;
+} & ReportFilter;
+
+/**
+ * A report's query string (?date=&to=&dept=, plus the optional filters and
+ * ?id=), as the PDF and the summary routes take it: null for anything
+ * malformed or a range past a week. `to` is the same day for a one-day
+ * report. With `id` the date may be absent (the page uses the checklist's
+ * own); without it a date is required, as before.
+ */
+export function reportParams(sp: URLSearchParams): ReportParams | null {
+  const id = sp.get('id');
+  if (id !== null && !isUuid(id)) return null;
   const dept = sp.get('dept') ?? 'all';
-  if (!date || (dept !== 'all' && !isUuid(dept))) return null;
-  const to = sp.has('to') ? parseDay(sp.get('to') ?? undefined) : date;
-  if (!to || reportEnd(date, to) !== to) return null;
-  return { date, to, dept };
+  if (dept !== 'all' && !isUuid(dept)) return null;
+  const filter = reportFilterParams(sp);
+  if (!filter) return null;
+
+  let date: string | undefined;
+  let to: string | undefined;
+  if (sp.has('date') || id === null) {
+    date = parseDay(sp.get('date') ?? undefined) ?? undefined;
+    if (!date) return null;
+    to = sp.has('to') ? (parseDay(sp.get('to') ?? undefined) ?? undefined) : date;
+    if (!to || reportEnd(date, to) !== to) return null;
+  }
+  return { date, to, dept, ...(id ? { id } : {}), ...filter };
 }
 
 /** The email's few lines: what happened, and who did it. The PDF has the rest. */
@@ -110,12 +208,16 @@ export type ReportTask = Pick<
   | 'source_template_id'
   | 'inspector_id'
   | 'assignee_ids'
+  | 'title_en'
+  | 'title_ar'
+  | 'template_title_en'
+  | 'template_title_ar'
 >;
 
 /** roundDepartment() for one task, given who and what belongs where. The daily
  *  report and the list both filter with this, so their counts agree. */
 export function taskDepartment(
-  a: Omit<ReportTask, 'id' | 'scheduled_date' | 'end_date' | 'effective_status'>,
+  a: Pick<ReportTask, 'template_id' | 'source_template_id' | 'inspector_id' | 'assignee_ids'>,
   placeDept: Map<string, string | null>,
   personDept: Map<string, string | null>,
 ): string | null {
@@ -137,11 +239,13 @@ export function daysFromTasks(
   deptId: string | null,
   placeDept: Map<string, string | null>,
   personDept: Map<string, string | null>,
+  filter?: ReportFilter,
 ): ReportDay[] {
   const days = new Map<string, ReportDay>();
   for (const a of rows) {
     if (!a.scheduled_date) continue;
     if (deptId && taskDepartment(a, placeDept, personDept) !== deptId) continue;
+    if (!matchesReportFilter(a, filter)) continue;
     const end = a.end_date ?? a.scheduled_date;
     const last = end < today ? end : today;
     for (let d = a.scheduled_date; d <= last; d = addDays(d, 1)) {

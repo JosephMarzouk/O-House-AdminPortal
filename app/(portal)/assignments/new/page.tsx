@@ -47,7 +47,7 @@ export default async function NewAssignmentPage() {
             nameEn: p.title_en,
             items: templateItems(p.items),
           }))}
-          staff={assignableStaff(profiles, staffRoles).map((p) => ({ id: p.id, name: p.name }))}
+          staff={assignableStaff(profiles, staffRoles, me).map((p) => ({ id: p.id, name: p.name }))}
         />
       </PageBody>
     </>

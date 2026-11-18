@@ -7,11 +7,12 @@ import { listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { fmtDate, fmtDay, fmtNum, todayInCairo } from '@/lib/format';
 import { isUuid } from '@/lib/rounds';
-import { daysFromTasks } from '@/lib/report';
+import { daysFromTasks, reportFilterParams, reportQuery } from '@/lib/report';
 import { EyeIcon } from '@/components/icons';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
-import { StatusBadge } from '@/components/status-badge';
+import { STATUS, StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LinkPending } from '@/components/ui/link-pending';
 import { Select } from '@/components/ui/select';
@@ -36,8 +37,15 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const deptParam = parseOne((await searchParams).dept);
+  const sp = await searchParams;
+  const deptParam = parseOne(sp.dept);
   const deptId = isUuid(deptParam) ? deptParam : null; // anything else = all departments
+  // Name, place, person, status. A malformed one means no filter, like dept.
+  const filter =
+    reportFilterParams(
+      new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (typeof v === 'string' ? [[k, v]] : []))),
+    ) ?? {};
+  const filterQuery = reportQuery({ q: filter.q, place: filter.place, user: filter.user, status: filter.status });
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
   const today = todayInCairo();
   const kicker = fmtDate(today, locale);
@@ -55,12 +63,13 @@ export default async function ReportsPage({
     );
   }
 
-  // Places and people only matter to the department filter.
+  // Places and people feed the department rule and the place / person filters;
+  // both are RLS-scoped, so they offer only what the caller can already see.
   const [departments, tasks, places, profiles] = await Promise.all([
     listDepartments(),
     reportDays(today),
-    deptId ? listPlaces() : [],
-    deptId ? listProfiles() : [],
+    listPlaces(),
+    listProfiles(),
   ]);
   const days = daysFromTasks(
     tasks,
@@ -68,6 +77,7 @@ export default async function ReportsPage({
     deptId,
     new Map(places.map((p) => [p.id, p.department_id])),
     new Map(profiles.map((p) => [p.id, p.department_id])),
+    filter,
   );
   const n = (v: number) => fmtNum(v, locale);
 
@@ -75,7 +85,7 @@ export default async function ReportsPage({
     <>
       <PageHeader kicker={kicker} title={dict.navReports} subtitle={dict.reportsIntro} />
       <PageBody>
-        <Form action="/reports" className="flex max-w-xl flex-wrap items-end gap-3">
+        <Form action="/reports" className="flex max-w-4xl flex-wrap items-end gap-3">
           <div className="min-w-56 flex-1 space-y-1">
             <Label htmlFor="r-dept">{dict.department}</Label>
             <Select id="r-dept" name="dept" defaultValue={deptId ?? 'all'} compact>
@@ -83,6 +93,43 @@ export default async function ReportsPage({
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {bilingual(locale, d.name_ar, d.name_en)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-56 flex-1 space-y-1">
+            <Label htmlFor="r-q">{dict.checklistName}</Label>
+            <Input id="r-q" name="q" type="search" defaultValue={filter.q ?? ''} maxLength={100} compact />
+          </div>
+          <div className="min-w-56 flex-1 space-y-1">
+            <Label htmlFor="r-place">{dict.place}</Label>
+            <Select id="r-place" name="place" defaultValue={filter.place ?? ''} compact>
+              <option value="">{dict.allPlaces}</option>
+              {places.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {bilingual(locale, p.title_ar, p.title_en)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-56 flex-1 space-y-1">
+            <Label htmlFor="r-user">{dict.person}</Label>
+            <Select id="r-user" name="user" defaultValue={filter.user ?? ''} compact>
+              <option value="">{dict.allPeople}</option>
+              {profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-56 flex-1 space-y-1">
+            <Label htmlFor="r-status">{dict.status}</Label>
+            <Select id="r-status" name="status" defaultValue={filter.status ?? ''} compact>
+              <option value="">{dict.allStatuses}</option>
+              {EFFECTIVE_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {dict[STATUS[s].label]}
                 </option>
               ))}
             </Select>
@@ -125,7 +172,7 @@ export default async function ReportsPage({
                         className="relative"
                         variant="outline"
                         nativeButton={false}
-                        render={<Link href={`/reports/daily?date=${d.day}&dept=${deptId ?? 'all'}`} />}
+                        render={<Link href={`/reports/daily?date=${d.day}&dept=${deptId ?? 'all'}${filterQuery ? `&${filterQuery}` : ''}`} />}
                       >
                         <EyeIcon />
                         {dict.view}
@@ -134,6 +181,7 @@ export default async function ReportsPage({
                       <DownloadPdfButton
                         date={d.day}
                         dept={deptId ?? 'all'}
+                        filter={filter}
                         label={dict.download}
                         dict={dict}
                         variant="outline"
