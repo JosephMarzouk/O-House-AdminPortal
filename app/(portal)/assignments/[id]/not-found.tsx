@@ -10,7 +10,7 @@ export default function AssignmentNotFound() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
       <h1 className="text-heading">لم يتم العثور على القائمة أو ليس لديك صلاحية لعرضها</h1>
-      <p className="text-sm">This checklist was not found, or you don&apos;t have access to it.</p>
+      <p className="text-sm" dir="ltr">This checklist was not found, or you don&apos;t have access to it.</p>
       <Link href="/assignments" className={buttonVariants({ variant: 'outline' })}>
         العودة إلى المهام · Back to Assignments
       </Link>
