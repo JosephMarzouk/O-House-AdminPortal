@@ -1,4 +1,5 @@
 import { listPlaces, templateItems } from '@/lib/db/places';
+import { templateCategories } from '@/lib/template-items';
 import { listProfiles, assignableStaff, staffAppRoles } from '@/lib/db/users';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { NewAssignmentForm } from '@/components/assignments/new-assignment-form';
@@ -45,7 +46,8 @@ export default async function NewAssignmentPage() {
             siteId: p.site_id,
             nameAr: p.title_ar,
             nameEn: p.title_en,
-            items: templateItems(p.items),
+            items: templateItems(p.items, templateCategories(p.categories)),
+            categories: templateCategories(p.categories),
           }))}
           staff={assignableStaff(profiles, staffRoles, me).map((p) => ({ id: p.id, name: p.name }))}
         />

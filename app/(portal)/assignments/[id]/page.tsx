@@ -13,7 +13,7 @@ import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { assigneeNames, fmtDateTime, fmtPeriod, fmtWindow } from '@/lib/format';
 import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { StatusTimeline } from '@/components/status-timeline';
-import { answerLabel, correctLabel } from '@/lib/answers';
+import { answerLabel, correctLabel, groupByCategory } from '@/lib/answers';
 import { roundMedia } from '@/lib/media';
 import { EvidenceGallery } from '@/components/assignments/evidence-gallery';
 import { listRefusals } from '@/lib/db/sync';
@@ -176,12 +176,17 @@ export default async function AssignmentDetailPage({
             // deprecated submissions.answers jsonb instead.
             <p className="mt-4 text-text/55">{dict.noData}</p>
           ) : (
-            <ul className="mt-4 space-y-2">
-              {a.items.map((item) => {
+            <div className="mt-4 space-y-4">
+              {/* Category headings only when the checklist has categories (19 Nov). */}
+              {groupByCategory(a.items, locale).map((g) => (
+              <div key={g.key || '-'} className="space-y-2">
+              {g.title && <h3 className="section-label">{g.title}</h3>}
+            <ul className="space-y-2">
+              {g.items.map((item) => {
                 const photos = (item.photo_paths ?? [])
                   .map(media)
                   .filter((u): u is string => u !== null);
-                const rule = correctLabel(item.type, item.correct, dict, locale);
+                const rule = correctLabel(item.type, item.correct, dict, locale, item.options);
                 return (
                   <li key={item.id}>
                   <Card className="flex flex-wrap items-start gap-3">
@@ -203,7 +208,7 @@ export default async function AssignmentDetailPage({
                             <span>
                               <span className="text-text/55">{dict.answer}: </span>
                               <span className="font-semibold">
-                                {answerLabel(item.type, item.answer, dict)}
+                                {answerLabel(item.type, item.answer, dict, item.options, locale)}
                               </span>
                             </span>
                           )}
@@ -222,7 +227,7 @@ export default async function AssignmentDetailPage({
                           <span className="rounded-card bg-magenta-tint px-2 py-tag-y">
                             {dict.flaggedAnswer.replace(
                               '{answer}',
-                              answerLabel(item.type, item.flagged_answer, dict),
+                              answerLabel(item.type, item.flagged_answer, dict, item.options, locale),
                             )}{' '}
                             · {fmtDateTime(item.flagged_at, locale)}
                           </span>
@@ -239,6 +244,9 @@ export default async function AssignmentDetailPage({
                 );
               })}
             </ul>
+              </div>
+              ))}
+            </div>
           )}
         </section>
 

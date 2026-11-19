@@ -100,9 +100,25 @@ export function WeekPlanner({
     });
   }
 
-  function copyLastWeek() {
-    setCells((c) =>
-      fillFromLastWeek(c, lastWeek, rounds.map((r) => r.id), days, lastWeekDays, today),
+  /** Every round, or just one (the button on its row). Fills blanks only, from today on. */
+  function copyLastWeek(roundIds: string[] = rounds.map((r) => r.id)) {
+    setCells((c) => fillFromLastWeek(c, lastWeek, roundIds, days, lastWeekDays, today));
+  }
+
+  /** The row's own copy button: the same rule as the header's, for this round only. */
+  function copyRoundButton(r: (typeof rounds)[number]) {
+    return (
+      <span title={readOnly ? dict.noPermission : dict.copyRoundLastWeek} className="inline-flex">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={dict.copyRoundLastWeek}
+          disabled={pending || readOnly}
+          onClick={() => copyLastWeek([r.id])}
+        >
+          <CopyIcon />
+        </Button>
+      </span>
     );
   }
 
@@ -217,7 +233,7 @@ export function WeekPlanner({
             <CaretRightIcon className="rtl:-scale-x-100" />
           </Button>
           <span title={readOnly ? dict.noPermission : undefined} className="inline-flex">
-            <Button variant="outline" disabled={pending || readOnly} onClick={copyLastWeek}>
+            <Button variant="outline" disabled={pending || readOnly} onClick={() => copyLastWeek()}>
               <CopyIcon />
               {dict.copyLastWeek}
             </Button>
@@ -248,7 +264,10 @@ export function WeekPlanner({
                 {rounds.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="min-w-44 align-top">
-                      <div className="mb-2 font-semibold">{title(r)}</div>
+                      <div className="mb-2 flex items-center justify-between gap-1">
+                        <span className="font-semibold">{title(r)}</span>
+                        {copyRoundButton(r)}
+                      </div>
                       {wholeWeekPicker(r)}
                     </TableCell>
                     {days.map((d) => (
@@ -270,6 +289,7 @@ export function WeekPlanner({
               {rounds.map((r) => (
                 <div key={r.id} className="flex items-center gap-3">
                   <span className="min-w-0 flex-1 truncate">{title(r)}</span>
+                  {copyRoundButton(r)}
                   {wholeWeekPicker(r)}
                 </div>
               ))}

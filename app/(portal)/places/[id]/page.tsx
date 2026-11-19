@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getPlace, listDepartments, templateItems } from '@/lib/db/places';
+import { templateCategories } from '@/lib/template-items';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
 import { PlaceForm } from '@/components/places/place-form';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
@@ -23,6 +24,7 @@ export default async function EditPlacePage({ params }: { params: Promise<{ id: 
   const [place, departments] = await Promise.all([getPlace(id), listDepartments()]);
   if (!place) notFound();
   const canEdit = can(me, 'places.edit');
+  const categories = templateCategories(place.categories);
 
   return (
     <>
@@ -42,7 +44,8 @@ export default async function EditPlacePage({ params }: { params: Promise<{ id: 
             nameAr: place.title_ar,
             nameEn: place.title_en,
             departmentId: place.department_id,
-            items: templateItems(place.items),
+            items: templateItems(place.items, categories),
+            categories,
             qrRequired: place.qr_required === true,
           }}
           departments={toDepartmentOptions(departments)}

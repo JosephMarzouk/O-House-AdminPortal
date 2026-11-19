@@ -41,6 +41,10 @@ export function errorMessage(dict: Dictionary, code: string): string {
     default_role: dict.roleDefaultError,
     // assignments
     need_at_least_one_subtask: dict.needAtLeastOneSubtask,
+    // questions (19 Nov)
+    choice_options: dict.choiceNeedsOptions,
+    category_name_required: dict.categoryNameRequired,
+    no_items: dict.noItemsLeft,
     no_items_selected: dict.noItemsSelected,
     reason_required: dict.reasonRequired,
     not_in_submitted_state: dict.notInSubmittedState,

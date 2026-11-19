@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { SubtaskEditor } from '@/components/subtask-editor';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
-import type { TemplateItem } from '@/lib/types/database';
+import type { Category, TemplateItem } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
 import type { DepartmentOption } from '@/lib/options';
 
@@ -36,6 +36,7 @@ export function PlaceForm({
     nameEn: string;
     departmentId: string | null;
     items: TemplateItem[];
+    categories: Category[];
     qrRequired: boolean;
   };
   departments: DepartmentOption[];
@@ -49,6 +50,7 @@ export function PlaceForm({
   const [nameEn, setNameEn] = useState(place?.nameEn ?? '');
   const [departmentId, setDepartmentId] = useState(place?.departmentId ?? '');
   const [items, setItems] = useState<TemplateItem[]>(place?.items ?? []);
+  const [categories, setCategories] = useState<Category[]>(place?.categories ?? []);
   const [qrRequired, setQrRequired] = useState(place?.qrRequired ?? false);
 
   function submit() {
@@ -59,6 +61,7 @@ export function PlaceForm({
         nameEn,
         departmentId: departmentId || null,
         items,
+        categories,
         qrRequired,
       });
       if (res.ok) {
@@ -166,7 +169,14 @@ export function PlaceForm({
             are copies and are never rewritten. */}
         <p className="mt-1 text-sm text-text/55">{dict.subtasksFromPlace}</p>
         <div className="mt-4">
-          <SubtaskEditor items={items} onChange={setItems} dict={dict} disabled={readOnly} />
+          <SubtaskEditor
+            items={items}
+            onChange={setItems}
+            categories={categories}
+            onCategoriesChange={setCategories}
+            dict={dict}
+            disabled={readOnly}
+          />
         </div>
       </section>
 

@@ -16,7 +16,16 @@ import {
   todayInCairo,
   weekStart,
 } from '../lib/format';
-import { parseCorrect, parseDecimal, templateItems } from '../lib/template-items';
+import {
+  choiceOptions,
+  choiceProblem,
+  orderAndStamp,
+  parseCorrect,
+  parseDecimal,
+  templateCategories,
+  templateItems,
+} from '../lib/template-items';
+import { groupByCategory } from '../lib/answers';
 import {
   assignableEnabled,
   buildMatrix,
@@ -189,6 +198,86 @@ assert.equal(parseDecimal('1.'), undefined, 'half-typed is not a number yet');
 assert.equal(parseDecimal('abc'), undefined);
 assert.equal(parseDecimal(''), undefined);
 
+// --- multiple choice (19 Nov) -------------------------------------------------
+const opts = choiceOptions([
+  { id: 'o1', text_en: ' Clean ', text_ar: 'نظيف' },
+  { id: 'o2', text_en: 'Dirty', text_ar: '' },
+  { id: 'o1', text_en: 'Same id twice', text_ar: '' }, // a duplicated id gets a fresh one
+  { id: 'o4', text_en: ' ', text_ar: '' }, // no label in either language: dropped
+  'junk',
+]);
+assert.equal(opts.length, 3);
+assert.deepEqual(opts[0], { id: 'o1', text_en: 'Clean', text_ar: 'نظيف' });
+assert.ok(opts[2].id && opts[2].id !== 'o1');
+assert.deepEqual(parseCorrect('choice', { in: ['o2', 'gone', 'o2'] }, opts), { in: ['o2'] });
+assert.equal(parseCorrect('choice', { in: ['gone'] }, opts), undefined, 'no real option left = no rule');
+assert.equal(parseCorrect('choice', { eq: 'o1' }, opts), undefined);
+assert.equal(parseCorrect('yesno', { in: ['yes'] }), undefined, 'an in-rule only fits a choice item');
+
+const [choice, wasChoice] = templateItems([
+  { id: 'c', type: 'choice', options: [{ id: 'a', text_en: 'A' }, { id: 'b', text_en: 'B' }], correct: { in: ['b'] } },
+  { id: 'y', type: 'yesno', options: [{ id: 'a', text_en: 'A' }] }, // switched away from choice
+]);
+assert.equal(choice.type, 'choice');
+assert.deepEqual(choice.options, [{ id: 'a', text_en: 'A', text_ar: '' }, { id: 'b', text_en: 'B', text_ar: '' }]);
+assert.deepEqual(choice.correct, { in: ['b'] });
+assert.ok(!('options' in wasChoice), 'options only travel on a choice item');
+assert.ok(!choiceProblem([choice]));
+assert.ok(choiceProblem(templateItems([{ id: 'z', type: 'choice', options: [{ id: 'a', text_en: 'A' }] }])));
+
+// --- categories (19 Nov) ------------------------------------------------------
+const cats = templateCategories([
+  { id: 'k1', name_en: ' Floor ', name_ar: 'أرضية' },
+  { id: 'k2', name_en: 'Walls', name_ar: '' },
+  { id: 'k1', name_en: 'dup', name_ar: '' }, // a duplicated id keeps the first
+  { id: 'k3', name_en: '', name_ar: ' ' }, // nameless: dropped
+]);
+assert.deepEqual(cats, [
+  { id: 'k1', name_en: 'Floor', name_ar: 'أرضية' },
+  { id: 'k2', name_en: 'Walls', name_ar: '' },
+]);
+const catItems = templateItems(
+  [
+    { id: 'i1', category_id: 'k2' },
+    { id: 'i2' },
+    { id: 'i3', category_id: 'k1' },
+    { id: 'i4', category_id: 'gone' }, // its category was deleted: uncategorised
+    { id: 'i5', category_id: 'k2' },
+  ],
+  cats,
+);
+assert.ok(!('category_id' in catItems[3]));
+// The order and stamp of private.place_items(): uncategorised first, then by category order.
+const stamped = orderAndStamp(catItems, cats);
+assert.deepEqual(stamped.map((i) => i.id), ['i2', 'i4', 'i3', 'i1', 'i5']);
+assert.deepEqual(
+  [stamped[2].category_id, stamped[2].category_en, stamped[2].category_ar],
+  ['k1', 'Floor', 'أرضية'],
+);
+assert.ok(!('category_en' in stamped[0]));
+assert.deepEqual(orderAndStamp(catItems, cats, ['k1']).map((i) => i.id), ['i2', 'i4', 'i3']);
+// A plain place (no categories) keeps its order exactly.
+assert.deepEqual(orderAndStamp(templateItems([{ id: 'a' }, { id: 'b' }]), []).map((i) => i.id), ['a', 'b']);
+// templateItems never stores the stamped names on a place.
+assert.ok(!('category_en' in templateItems([{ id: 'x', category_id: 'k1', category_en: 'Floor' }], cats)[0]));
+
+// The checklist screens: runs of one category, a null title for uncategorised.
+const runs = groupByCategory(
+  [
+    { id: '1' },
+    { id: '2', category_id: 'k1', category_en: 'Floor', category_ar: 'أرضية' },
+    { id: '3', category_id: 'k1', category_en: 'Floor', category_ar: 'أرضية' },
+    { id: '4', category_id: 'k2', category_en: 'Walls', category_ar: null },
+  ],
+  'ar',
+);
+assert.deepEqual(
+  runs.map((r) => [r.title, r.items.length]),
+  [[null, 1], ['أرضية', 2], ['Walls', 1]],
+);
+const plainItems: { id: string; category_id?: string }[] = [{ id: '1' }, { id: '2' }];
+assert.equal(groupByCategory(plainItems, 'en').length, 1, 'no categories: one run, no heading');
+
 // --- calendar arithmetic for the planner and tracker ------------------------
 // Egypt's week starts on Saturday. 2026-09-25 is a Friday.
 assert.equal(weekStart('2026-09-25'), '2026-09-19');
@@ -256,6 +345,24 @@ assert.deepEqual(
     '2026-09-20',
   ),
   { [`${G}|2026-09-20`]: ['b', 'd'], [`${G}|2026-09-21`]: ['kept'] },
+);
+// The per-round button (19 Nov): the same rule for one round; the others stay as they were.
+assert.deepEqual(
+  fillFromLastWeek(
+    {},
+    { [`${G}|2026-09-13`]: ['b'], [`${P}|2026-09-13`]: ['p'] },
+    [P],
+    planDays,
+    prevDays,
+    '2026-09-20',
+  ),
+  { [`${P}|2026-09-20`]: ['p'] },
+);
+
+// A round entry keeps its category ticks; junk in them is dropped.
+assert.deepEqual(
+  roundPlaces([{ template_id: G, window_start: '07:00', window_end: '08:00', categories: ['k1', 7, 'k1', ''] }]),
+  [{ template_id: G, window_start: '07:00', window_end: '08:00', categories: ['k1'] }],
 );
 
 // --- the tracker ---------------------------------------------------------------

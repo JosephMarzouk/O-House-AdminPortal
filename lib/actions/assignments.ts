@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { templateItems } from '@/lib/template-items';
-import type { TaskGroupPlace, TemplateItem } from '@/lib/types/database';
+import { choiceProblem, orderAndStamp, templateCategories, templateItems } from '@/lib/template-items';
+import type { Category, TaskGroupPlace, TemplateItem } from '@/lib/types/database';
 import { isUuid, placeWindowOverlaps } from '@/lib/rounds';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 import { can, getProfile } from '@/lib/auth';
@@ -51,6 +51,8 @@ export type NewAssignmentInput = {
   windowStart: string; // HH:MM
   windowEnd: string; // HH:MM
   items: TemplateItem[];
+  /** The task's categories (seeded from the place, edited here). Their names are copied onto the checklist. */
+  categories: Category[];
   /** Optional instructions shown to the assignee on the task. */
   taskNote?: string;
 };
@@ -83,6 +85,15 @@ export async function createAssignment(
     return { ok: false, error: 'fields_required' };
   }
   if (input.items.length === 0) return { ok: false, error: 'need_at_least_one_subtask' };
+  if (
+    Array.isArray(input.categories) &&
+    input.categories.some((c) => !c?.name_ar?.trim() && !c?.name_en?.trim())
+  ) {
+    return { ok: false, error: 'category_name_required' };
+  }
+  const categories = templateCategories(input.categories);
+  const items = templateItems(input.items, categories);
+  if (choiceProblem(items)) return { ok: false, error: 'choice_options' };
   if (input.endDate && input.endDate < input.scheduledDate) {
     return { ok: false, error: 'invalid_end_date' };
   }
@@ -97,7 +108,9 @@ export async function createAssignment(
     ...(input.endDate ? { p_end_date: input.endDate } : {}),
     p_window_start: input.windowStart,
     p_window_end: input.windowEnd,
-    p_items: templateItems(input.items),
+    // Grouped by category in the task's order, each stamped with its
+    // category's names: create_assignment copies them onto the checklist.
+    p_items: orderAndStamp(items, categories),
     p_source_template_id: input.templateId,
     p_client_id: crypto.randomUUID(), // idempotency key for a retried submit
     // Omitted rather than sent empty: the RPC also turns '' into NULL, but an
@@ -162,17 +175,23 @@ export async function createTaskGroup(
   const { data, error } = await supabase.rpc('create_task_group', {
     p_title_en: input.titleEn.trim(),
     p_title_ar: input.titleAr.trim(),
-    p_places: input.places.map(({ template_id, window_start, window_end }) => ({
+    p_places: input.places.map(({ template_id, window_start, window_end, categories }) => ({
       template_id,
       window_start,
       window_end,
+      // Only real ids; absent = all of the place's categories.
+      ...(Array.isArray(categories)
+        ? { categories: categories.filter((c) => typeof c === 'string' && c.length <= 64) }
+        : {}),
     })),
     p_assignee_ids: input.assigneeIds,
     p_scheduled_date: input.scheduledDate,
     p_end_date: input.endDate || null,
     p_task_note: input.taskNote?.trim() || null,
   });
-  if (error) return { ok: false, error: friendly(error.message) };
+  if (error) {
+    return { ok: false, error: /NO_ITEMS/.test(error.message) ? 'no_items' : friendly(error.message) };
+  }
 
   revalidatePath('/assignments');
   revalidatePath('/tracker');

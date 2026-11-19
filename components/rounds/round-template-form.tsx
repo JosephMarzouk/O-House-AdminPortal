@@ -18,9 +18,10 @@ import { errorMessage } from '@/lib/errors';
 import type { RoundPlace } from '@/lib/types/database';
 import type { RoundPlaceOption } from '@/lib/round-options';
 import { placeWindowOverlaps } from '@/lib/rounds';
+import { CategoryTicks, keptItemCount } from '@/components/category-ticks';
 
 type Row = RoundPlace & { key: string };
-type RowError = 'place' | 'window' | 'overlap';
+type RowError = 'place' | 'window' | 'overlap' | 'no_items';
 
 /**
  * A round template: its name, and the places it walks through in order, each
@@ -92,6 +93,13 @@ export function RoundTemplateForm({
       if (!r.template_id) bad[r.key] = 'place';
       else if (!r.window_start || !r.window_end || r.window_start === r.window_end) bad[r.key] = 'window';
       else if (overlapping.has(i)) bad[r.key] = 'overlap';
+      // Every category unticked on a place with questions: schedule_rounds would skip it.
+      else {
+        const p = placeById.get(r.template_id);
+        if (p && p.itemCount > 0 && keptItemCount(p.items, p.categories, r.categories) === 0) {
+          bad[r.key] = 'no_items';
+        }
+      }
     });
     return bad;
   }
@@ -116,10 +124,11 @@ export function RoundTemplateForm({
         titleAr,
         titleEn,
         active,
-        places: rows.map(({ template_id, window_start, window_end }) => ({
+        places: rows.map(({ template_id, window_start, window_end, categories }) => ({
           template_id,
           window_start,
           window_end,
+          ...(categories ? { categories } : {}),
         })),
       });
       if (res.ok) {
@@ -136,6 +145,7 @@ export function RoundTemplateForm({
     place: dict.selectPlace,
     window: dict.windowInvalid,
     overlap: dict.placeWindowOverlap,
+    no_items: dict.noItemsLeft,
   };
 
   return (
@@ -251,6 +261,18 @@ export function RoundTemplateForm({
                     <XIcon />
                   </Button>
 
+                  {place && place.categories.length > 0 && (
+                    <div className="sm:col-span-full">
+                      <CategoryTicks
+                        categories={place.categories}
+                        value={r.categories}
+                        onChange={(next) => patch(r.key, { categories: next })}
+                        dict={dict}
+                        locale={locale}
+                      />
+                    </div>
+                  )}
+
                   {(err || place) && (
                     <div className="flex flex-wrap items-center gap-x-3 text-caption sm:col-span-full">
                       {err && <span className="text-magenta">{rowErrorText[err]}</span>}
@@ -258,7 +280,10 @@ export function RoundTemplateForm({
                         <>
                           <span className={place.schedulable ? 'text-text/55' : 'text-magenta'}>
                             {place.schedulable
-                              ? dict.placeSubtaskCount.replace('{n}', fmtNum(place.itemCount, locale))
+                              ? dict.placeSubtaskCount.replace(
+                                  '{n}',
+                                  fmtNum(keptItemCount(place.items, place.categories, r.categories), locale),
+                                )
                               : dict.placeNotSchedulable}
                           </span>
                           <Link

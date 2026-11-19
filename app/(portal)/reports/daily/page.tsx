@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { can, getProfile } from '@/lib/auth';
@@ -25,7 +26,7 @@ import {
   parseDay,
   todayInCairo,
 } from '@/lib/format';
-import { answerLabel } from '@/lib/answers';
+import { answerLabel, groupByCategory } from '@/lib/answers';
 import { isVideo, roundMedia, type MediaLookup } from '@/lib/media';
 import { isUuid } from '@/lib/rounds';
 import { reportEnd, reportFilterParams, reportQuery, reportScore, workDuration } from '@/lib/report';
@@ -384,7 +385,17 @@ export default async function DailyReportPage({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {its.map((i) => {
+                        {groupByCategory(its, locale).map((g) => (
+                        <Fragment key={g.key || '-'}>
+                        {/* A category heading row, only when the checklist has categories (19 Nov). */}
+                        {g.title && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="bg-text/5 font-semibold">
+                              {g.title}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {g.items.map((i) => {
                           const photos = (i.photo_paths ?? [])
                             .map(media)
                             .filter((u): u is string => u !== null);
@@ -395,7 +406,7 @@ export default async function DailyReportPage({
                                 {i.note && <div className="text-caption text-text/55">{i.note}</div>}
                                 {i.reject_note && <div className="text-caption text-magenta">{i.reject_note}</div>}
                               </TableCell>
-                              <TableCell>{i.answer ? answerLabel(i.type, i.answer, dict) : dict.none}</TableCell>
+                              <TableCell>{i.answer ? answerLabel(i.type, i.answer, dict, i.options, locale) : dict.none}</TableCell>
                               <TableCell className="text-end tabular-nums">{n(i.status === 'done' ? 1 : 0)}</TableCell>
                               <TableCell>
                                 {photos.length > 0 && (
@@ -416,6 +427,8 @@ export default async function DailyReportPage({
                             </TableRow>
                           );
                         })}
+                        </Fragment>
+                        ))}
                       </TableBody>
                     </Table>
                   )}

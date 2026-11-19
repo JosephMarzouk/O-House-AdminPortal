@@ -94,6 +94,8 @@ export type Database = {
           end_time: string | null;
           id: string;
           items: Json;
+          /** Category[] — the place's question categories, in order (19 Nov). Parse with templateCategories(). */
+          categories: Json;
           /**
            * QR-locked places: checklists created from now on lock on the phone
            * until this place's sticker is scanned. Copied onto each new
@@ -119,6 +121,7 @@ export type Database = {
           end_time?: string | null;
           id?: string;
           items?: Json;
+          categories?: Json;
           /** No qr_code here on purpose: its default makes it, replace_place_qr changes it. */
           qr_required?: boolean;
           site_id?: string | null;
@@ -193,6 +196,10 @@ export type Database = {
           /** The latest answer given (0013): 'yes'|'no', 'pass'|'fail', a number as text, or free text. */
           answer: string | null;
           assignment_id: string;
+          /** The category's id and names, copied from the place when the checklist was made (19 Nov). */
+          category_id: string | null;
+          category_en: string | null;
+          category_ar: string | null;
           /** The item's correct-answer rule, copied from the place (0013). Null = any answer is fine. */
           correct: Json | null;
           critical: boolean;
@@ -202,6 +209,8 @@ export type Database = {
           flagged_at: string | null;
           id: string;
           note: string | null;
+          /** ChoiceOption[] for a 'choice' item, copied from the place (19 Nov); null otherwise. */
+          options: Json | null;
           photo_paths: string[];
           reject_note: string | null;
           requires_photo: boolean;
@@ -766,13 +775,25 @@ export type SubmissionEvent =
 export type PlaceScanKind = 'scan' | 'bad_code' | 'unlock';
 
 /** One place of create_task_group's p_places, in walk order. Times are "HH:MM". */
-export type TaskGroupPlace = { template_id: string; window_start: string; window_end: string };
+export type TaskGroupPlace = {
+  template_id: string;
+  window_start: string;
+  window_end: string;
+  /** The place's categories this checklist includes (19 Nov). Absent = all. */
+  categories?: string[];
+};
 
 /** assignment_items.status. `follow_up`: answered, but not with the correct answer. */
 export type ItemStatus = 'pending' | 'done' | 'rejected' | 'follow_up';
 
-/** templates.items[].type — the four the builder emits. */
-export type ItemType = 'pass_fail' | 'yesno' | 'text' | 'number';
+/** templates.items[].type — the five the builder emits. 'choice': pick one of `options` (19 Nov). */
+export type ItemType = 'pass_fail' | 'yesno' | 'text' | 'number' | 'choice';
+
+/** One option of a 'choice' item. The answer stored is its id, so a rename never changes old answers. */
+export type ChoiceOption = { id: string; text_en: string; text_ar: string };
+
+/** One category of a place's questions (templates.categories). Order in the list is the order shown. */
+export type Category = { id: string; name_en: string; name_ar: string };
 
 /**
  * An item's correct answer (0013) — answer_ok() in the database is the judge.
@@ -780,7 +801,7 @@ export type ItemType = 'pass_fail' | 'yesno' | 'text' | 'number';
  * ignoring case and surrounding spaces); `min`/`max` for a number, either
  * bound optional, an exact value being min = max.
  */
-export type Correct = { eq: string } | { min?: number; max?: number };
+export type Correct = { eq: string } | { min?: number; max?: number } | { in: string[] };
 
 /** One entry of templates.items jsonb — also the shape create_assignment's p_items consumes. */
 export type TemplateItem = {
@@ -792,6 +813,16 @@ export type TemplateItem = {
   requires_photo: boolean;
   /** Absent = any answer is accepted. Setting one turns on follow-up for the item. */
   correct?: Correct;
+  /** A 'choice' item's options (2–10). Absent on every other type. */
+  options?: ChoiceOption[];
+  /** The place category this question sits in; absent = no category (listed first). */
+  category_id?: string;
+  /**
+   * The category's names, stamped only on the items sent to create_assignment
+   * (orderAndStamp), never stored on the place: the checklist keeps a copy.
+   */
+  category_en?: string;
+  category_ar?: string;
   /**
    * The legacy inspector web client's keys, carried through untouched so a
    * portal save no longer strips them. That client scores against `expected`
@@ -804,7 +835,13 @@ export type TemplateItem = {
 };
 
 /** One place in a round template. Times are "HH:MM"; the order is the walk order. */
-export type RoundPlace = { template_id: string; window_start: string; window_end: string };
+export type RoundPlace = {
+  template_id: string;
+  window_start: string;
+  window_end: string;
+  /** The place's categories this round includes (19 Nov). Absent = all of them. */
+  categories?: string[];
+};
 
 /** What schedule_rounds reports back for a save. */
 export type ScheduleResult = {

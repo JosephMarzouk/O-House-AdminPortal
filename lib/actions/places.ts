@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { templateItems } from '@/lib/db/places';
-import type { TemplateItem } from '@/lib/types/database';
+import { choiceProblem, templateCategories } from '@/lib/template-items';
+import type { Category, TemplateItem } from '@/lib/types/database';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
 import { can, getProfile } from '@/lib/auth';
 
@@ -15,6 +16,8 @@ export type PlaceInput = {
   nameEn: string;
   departmentId: string | null;
   items: TemplateItem[];
+  /** The place's question categories, in order (19 Nov). */
+  categories: Category[];
   /** Requires QR scan. Read at checklist creation only, so it never locks one already handed out. */
   qrRequired: boolean;
 };
@@ -52,7 +55,17 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
   // sent, verbatim, into a jsonb column the phone app reads without a guard of
   // its own. The read-side parser is already the whitelist; run writes through
   // it too, so only the six known fields can ever land in the column.
-  const items = templateItems(input.items);
+  // Every category needs a name: templateCategories() would otherwise drop
+  // a nameless one and quietly move its questions out of it.
+  if (
+    Array.isArray(input.categories) &&
+    input.categories.some((c) => !c?.name_ar?.trim() && !c?.name_en?.trim())
+  ) {
+    return { ok: false, error: 'category_name_required' };
+  }
+  const categories = templateCategories(input.categories);
+  const items = templateItems(input.items, categories);
+  if (choiceProblem(items)) return { ok: false, error: 'choice_options' };
 
   if (input.id) {
     const { data: existing, error: readErr } = await supabase
@@ -69,6 +82,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
         title_en: nameEn,
         department_id: input.departmentId,
         items,
+        categories,
         qr_required: input.qrRequired === true,
       })
       .eq('id', input.id)
@@ -105,6 +119,7 @@ export async function savePlace(input: PlaceInput): Promise<ActionResult> {
       department_id: input.departmentId,
       site_id: site.id,
       items,
+      categories,
       qr_required: input.qrRequired === true,
     });
     if (error) return { ok: false, error: toErrorCode(error.message) };

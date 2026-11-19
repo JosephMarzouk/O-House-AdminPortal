@@ -13,8 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { AssigneePicker } from '@/components/assignee-picker';
 import { SubtaskEditor } from '@/components/subtask-editor';
+import { CategoryTicks, keptItemCount } from '@/components/category-ticks';
 import { bilingual, type Dictionary, type Locale } from '@/lib/i18n/dictionaries';
-import type { TemplateItem } from '@/lib/types/database';
+import type { Category, TemplateItem } from '@/lib/types/database';
 import { errorMessage } from '@/lib/errors';
 import { fmtNum } from '@/lib/format';
 import { placeWindowOverlaps } from '@/lib/rounds';
@@ -25,6 +26,7 @@ export type PlaceOption = {
   nameAr: string;
   nameEn: string;
   items: TemplateItem[];
+  categories: Category[];
 };
 
 export type StaffOption = { id: string; name: string };
@@ -36,8 +38,15 @@ type FieldKey = 'place' | 'assignee' | 'title' | 'titleEn' | 'date' | 'endDate' 
  * optional (several places only): blank means the task's From–To. The key is
  * client-only, because rows reorder (see round-template-form.tsx).
  */
-type PlaceRow = { key: string; templateId: string; windowStart: string; windowEnd: string };
-type RowError = 'place' | 'overlap' | 'window' | 'not_ready';
+type PlaceRow = {
+  key: string;
+  templateId: string;
+  windowStart: string;
+  windowEnd: string;
+  /** The place's categories this checklist includes; undefined = all (CategoryTicks). */
+  categories?: string[];
+};
+type RowError = 'place' | 'overlap' | 'window' | 'not_ready' | 'no_items';
 
 const newRow = (): PlaceRow => ({ key: crypto.randomUUID(), templateId: '', windowStart: '', windowEnd: '' });
 
@@ -72,6 +81,7 @@ export function NewAssignmentForm({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [items, setItems] = useState<TemplateItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [taskNote, setTaskNote] = useState('');
   const [errors, setErrors] = useState<Set<FieldKey>>(new Set());
 
@@ -88,6 +98,7 @@ export function NewAssignmentForm({
     if (!p) return;
     setSeededFrom(id);
     setItems(p.items.map((i) => ({ ...i })));
+    setCategories(p.categories.map((c) => ({ ...c })));
     if (!titleAr) setTitleAr(p.nameAr);
     if (!titleEn) setTitleEn(p.nameEn);
   }
@@ -133,6 +144,8 @@ export function NewAssignmentForm({
       // create_task_group copies the place's own subtasks: none would be a
       // 0/0 checklist the phone can never submit.
       else if (!p.siteId || p.items.length === 0) bad[r.key] = 'not_ready';
+      // Every category unticked: nothing left to check (create_task_group refuses it too).
+      else if (keptItemCount(p.items, p.categories, r.categories) === 0) bad[r.key] = 'no_items';
       else if (own && (!r.windowStart || !r.windowEnd || r.windowStart === r.windowEnd)) bad[r.key] = 'window';
       else if (overlapping.has(i)) bad[r.key] = 'overlap';
     });
@@ -198,7 +211,11 @@ export function NewAssignmentForm({
       startTransition(async () => {
         const res = await createTaskGroup({
           // Always a window per place, so create_task_group never guesses one.
-          places: rows.map((r) => ({ template_id: r.templateId, ...windowOf(r) })),
+          places: rows.map((r) => ({
+            template_id: r.templateId,
+            ...windowOf(r),
+            ...(r.categories ? { categories: r.categories } : {}),
+          })),
           assigneeIds,
           titleAr,
           titleEn,
@@ -240,6 +257,7 @@ export function NewAssignmentForm({
         // correct answer travels with it. The server action runs these
         // through templateItems() before they reach the RPC.
         items: items.filter((i) => i.text_ar.trim() || i.text_en.trim()),
+        categories,
         taskNote,
       });
 
@@ -261,6 +279,7 @@ export function NewAssignmentForm({
     overlap: dict.placeWindowOverlap,
     window: dict.windowInvalid,
     not_ready: dict.placeNotReady,
+    no_items: dict.noItemsLeft,
   };
 
   return (
@@ -351,6 +370,17 @@ export function NewAssignmentForm({
                           onChange={(e) => patchRow(r.key, { windowEnd: e.target.value })}
                         />
                       </span>
+                    </div>
+                  )}
+                  {multi && placeById.get(r.templateId) && (
+                    <div className="ps-7">
+                      <CategoryTicks
+                        categories={placeById.get(r.templateId)!.categories}
+                        value={r.categories}
+                        onChange={(next) => patchRow(r.key, { categories: next })}
+                        dict={dict}
+                        locale={locale}
+                      />
                     </div>
                   )}
                   {multi && rowErr && <p className="ps-7 text-caption text-magenta">{rowErrorText[rowErr]}</p>}
@@ -479,7 +509,13 @@ export function NewAssignmentForm({
           <p className="mt-1 text-caption text-magenta">{dict.needAtLeastOneSubtask}</p>
         )}
         <div className="mt-4">
-          <SubtaskEditor items={items} onChange={setItems} dict={dict} />
+          <SubtaskEditor
+            items={items}
+            onChange={setItems}
+            categories={categories}
+            onCategoriesChange={setCategories}
+            dict={dict}
+          />
         </div>
       </section>
       )}

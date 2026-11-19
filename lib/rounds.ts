@@ -28,6 +28,9 @@ function hhmm(v: unknown): string | null {
  * listed more than once (the bathrooms four times in a morning round), each
  * time in its own period: schedule_rounds() creates one task per entry, and
  * placeWindowOverlaps() refuses two overlapping periods for the same place.
+ *
+ * `categories` (19 Nov) is kept only as a list of short strings: the place's
+ * category ids this entry includes. Absent = all of them.
  */
 export function roundPlaces(raw: unknown): RoundPlace[] {
   if (!Array.isArray(raw)) return [];
@@ -38,7 +41,17 @@ export function roundPlaces(raw: unknown): RoundPlace[] {
     const start = hhmm(o.window_start);
     const end = hhmm(o.window_end);
     if (!UUID.test(id) || !start || !end || start === end) return [];
-    return [{ template_id: id, window_start: start, window_end: end }];
+    const cats = Array.isArray(o.categories)
+      ? [...new Set(o.categories.filter((c): c is string => typeof c === 'string' && !!c && c.length <= 64))]
+      : null;
+    return [
+      {
+        template_id: id,
+        window_start: start,
+        window_end: end,
+        ...(cats ? { categories: cats } : {}),
+      },
+    ];
   });
 }
 
