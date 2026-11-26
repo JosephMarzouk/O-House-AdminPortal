@@ -64,6 +64,14 @@ export function errorMessage(dict: Dictionary, code: string): string {
     // club settings
     location_invalid: dict.locationInvalid,
     location_already_set: dict.locationAlreadySet,
+    // deletes and access (26 Nov)
+    already_submitted: dict.deleteAlreadySubmitted,
+    round_deleted: dict.roundWasDeleted,
+    own_account: dict.deleteOwnAccount,
+    last_admin: dict.deleteLastAdmin,
+    name_mismatch: dict.deleteNameMismatch,
+    invalid_access: dict.accessInvalid,
+    not_grantable: dict.permissionNotGrantable,
   };
   return map[code] ?? dict.errorGeneric;
 }

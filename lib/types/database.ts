@@ -39,6 +39,10 @@ export type Database = {
           role: string;
           /** The person's role (custom roles). Changed only through assign_role. */
           role_id: string;
+          /** Where they may sign in (26 Nov). Changed only through set_user_access. */
+          platform_access: PlatformAccess;
+          /** Set by delete_user; deleted people are left out of the Users screen. */
+          deleted_at: string | null;
         };
         Insert: {
           active?: boolean;
@@ -208,10 +212,13 @@ export type Database = {
           flagged_answer: string | null;
           flagged_at: string | null;
           id: string;
+          /** The staff member's comment on this question (500 characters at most). */
           note: string | null;
           /** ChoiceOption[] for a 'choice' item, copied from the place (19 Nov); null otherwise. */
           options: Json | null;
           photo_paths: string[];
+          /** Set when the nightly job deleted this item's photos/videos (over 3 months old, 26 Nov). */
+          media_purged_at: string | null;
           reject_note: string | null;
           requires_photo: boolean;
           sort_order: number;
@@ -284,6 +291,8 @@ export type Database = {
           places: Json;
           title_ar: string;
           title_en: string;
+          /** Set by delete_round_template; a deleted round is left out of the Rounds page. */
+          deleted_at: string | null;
         };
         Insert: {
           active?: boolean;
@@ -642,6 +651,7 @@ export type Database = {
           manager_id: string | null;
           active: boolean;
           must_change_password: boolean;
+          platform_access: PlatformAccess;
         }[];
       };
       /**
@@ -679,6 +689,18 @@ export type Database = {
       };
       /** Also raises DEFAULT_ROLE and ROLE_IN_USE. */
       delete_role: { Args: { p_role_id: string }; Returns: undefined };
+      /** checklists.delete; never submitted only (ALREADY_SUBMITTED). A multi-place task goes whole. Returns how many. */
+      delete_assignment: { Args: { p_assignment_id: string }; Returns: number };
+      /** planner.delete; its untouched checklists from today on go too. Returns how many checklists. */
+      delete_round_template: { Args: { p_template_id: string }; Returns: number };
+      /** users.delete (the built-in Admin only): what deleting this person takes with them. */
+      delete_user_preview: { Args: { p_user_id: string }; Returns: Json };
+      /** users.delete. Raises OWN_ACCOUNT, LAST_ADMIN, NAME_MISMATCH. */
+      delete_user: { Args: { p_user_id: string; p_confirm_name: string }; Returns: undefined };
+      /** can_manage_user(p_user_id). Raises INVALID_ACCESS. */
+      set_user_access: { Args: { p_user_id: string; p_access: PlatformAccess }; Returns: undefined };
+      /** club_settings.view: the evidence bucket's size in bytes (the 800 MB warning). */
+      media_storage_bytes: { Args: never; Returns: number };
       /** can_manage_user(p_user_id), and the new role one the caller may assign. */
       assign_role: { Args: { p_user_id: string; p_role_id: string }; Returns: undefined };
       can_assign_role: { Args: { p_role_id: string; p_department_id?: string | null }; Returns: boolean };
@@ -882,7 +904,11 @@ export type Profile = Tables<'profiles'>;
  * it reads.)
  */
 export const PROFILE_COLUMNS =
-  'id, name, email, role, role_id, created_at, department_id, manager_id, active, must_change_password, locale';
+  'id, name, email, role, role_id, created_at, department_id, manager_id, active, must_change_password, locale, platform_access, deleted_at';
+
+/** profiles.platform_access: where a person may sign in (26 Nov). */
+export const PLATFORM_ACCESS = ['portal', 'app', 'both'] as const;
+export type PlatformAccess = (typeof PLATFORM_ACCESS)[number];
 
 /** A profile as the portal can read it: everything but the phone number. */
 export type PortalProfile = Omit<Profile, 'phone'>;

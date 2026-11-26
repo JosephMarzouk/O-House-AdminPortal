@@ -37,6 +37,7 @@ import { DownloadPdfButton } from '@/components/download-pdf-button';
 import { LinkPending } from '@/components/ui/link-pending';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
 import { NoPermission } from '@/components/no-permission';
+import { NoteBox } from '@/components/note-box';
 import {
   Table,
   TableBody,
@@ -403,12 +404,24 @@ export default async function DailyReportPage({
                             <TableRow key={i.id}>
                               <TableCell className="whitespace-normal">
                                 {bilingual(locale, i.text_ar, i.text_en) || dict.none}
-                                {i.note && <div className="text-caption text-text/55">{i.note}</div>}
-                                {i.reject_note && <div className="text-caption text-magenta">{i.reject_note}</div>}
+                                {i.note && (
+                                  <NoteBox tone="staff" label={dict.itemComment} className="mt-1 text-caption">
+                                    {i.note}
+                                  </NoteBox>
+                                )}
+                                {i.reject_note && (
+                                  <NoteBox tone="manager" label={dict.rejectReason} className="mt-1 text-caption">
+                                    {i.reject_note}
+                                  </NoteBox>
+                                )}
                               </TableCell>
                               <TableCell>{i.answer ? answerLabel(i.type, i.answer, dict, i.options, locale) : dict.none}</TableCell>
                               <TableCell className="text-end tabular-nums">{n(i.status === 'done' ? 1 : 0)}</TableCell>
                               <TableCell>
+                                {/* Deleted after 3 months (26 Nov): say so, not a blank cell. */}
+                                {photos.length === 0 && i.media_purged_at && (
+                                  <span className="text-caption text-text/55">{dict.mediaPurged}</span>
+                                )}
                                 {photos.length > 0 && (
                                   <div className="flex flex-wrap gap-1">
                                     {photos.map((url) =>
@@ -433,25 +446,23 @@ export default async function DailyReportPage({
                     </Table>
                   )}
 
+                  {/* Coloured by who wrote it (components/note-box.tsx). */}
                   {(a.task_note || a.submit_note || a.review_note) && (
-                    <div className="space-y-1 text-sm">
+                    <div className="space-y-2">
                       {a.task_note && (
-                        <p>
-                          <span className="me-2 text-label uppercase">{dict.taskNote}</span>
+                        <NoteBox tone="info" label={dict.taskNote}>
                           {a.task_note}
-                        </p>
+                        </NoteBox>
                       )}
                       {a.submit_note && (
-                        <p>
-                          <span className="me-2 text-label uppercase">{dict.submitNote}</span>
+                        <NoteBox tone="staff" label={dict.submitNote}>
                           {a.submit_note}
-                        </p>
+                        </NoteBox>
                       )}
                       {a.review_note && (
-                        <p>
-                          <span className="me-2 text-label uppercase">{dict.reviewNote}</span>
+                        <NoteBox tone="manager" label={dict.reviewNote}>
                           {a.review_note}
-                        </p>
+                        </NoteBox>
                       )}
                     </div>
                   )}

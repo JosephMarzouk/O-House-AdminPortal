@@ -17,8 +17,13 @@ import { apiUrl } from '@/lib/club-registry';
  */
 export function refreshOutcome(status: number): 'renewed' | 'ended' | 'unavailable' {
   if (status === 200) return 'renewed';
-  return status === 401 || status === 400 ? 'ended' : 'unavailable';
+  // 403: the API refused this person (PLATFORM_DENIED: their Access is now
+  // app only; NO_ACCESS) — that is an answer about them, not an outage.
+  return status === 401 || status === 400 || status === 403 ? 'ended' : 'unavailable';
 }
+
+/** The API's code for "this account may not use the portal" (Access = app only). */
+export const PLATFORM_DENIED = 'PLATFORM_DENIED';
 
 export const ACCESS_COOKIE = 'oh_at';
 export const REFRESH_COOKIE = 'oh_rt';
@@ -63,7 +68,11 @@ export function expiresAt(token: string | undefined): number {
   }
 }
 
-/** POST to the API's public sign-in routes. Null body for 204. */
+/**
+ * POST to the API's public sign-in routes. Null body for 204. The portal key
+ * tells the API this sign-in is the portal's (the same key /auth/db-token
+ * asks for), so a person whose Access is "app only" is refused here.
+ */
 export async function authPost(
   clubSlug: string,
   path: '/auth/login' | '/auth/refresh' | '/auth/logout',
@@ -71,7 +80,11 @@ export async function authPost(
 ): Promise<{ status: number; data: (Tokens & { code?: string }) | null }> {
   const res = await fetch(`${apiUrl()}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Club': clubSlug },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Club': clubSlug,
+      'x-ohouse-portal-key': process.env.OHOUSE_GATEWAY_KEY ?? '',
+    },
     body: JSON.stringify(body),
     cache: 'no-store',
   });

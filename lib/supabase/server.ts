@@ -11,6 +11,13 @@ import type { Database } from '@/lib/types/database';
  * in their cookie plus this server's own key. Null when nobody is signed in
  * or the session is no longer good. cache(): one exchange per request.
  */
+/**
+ * Why this request's dbSession() came back empty, when the API said: e.g.
+ * PLATFORM_DENIED (the person's Access is now "app only"). Per request, like
+ * dbSession; the portal layout passes it on to /session-ended.
+ */
+export const dbSessionRefusal = cache((): { code: string | null } => ({ code: null }));
+
 export const dbSession = cache(async (): Promise<{ token: string; userId: string } | null> => {
   const access = (await cookies()).get(ACCESS_COOKIE)?.value;
   if (!access) return null;
@@ -26,6 +33,7 @@ export const dbSession = cache(async (): Promise<{ token: string; userId: string
       // will fail until the variables are fixed. Status and code only: never
       // the token or the key.
       console.error(`[auth] db-token refused: ${e.status} ${e.code ?? ''}`.trim());
+      dbSessionRefusal().code = e.code ?? null;
       return null;
     }
     throw e;

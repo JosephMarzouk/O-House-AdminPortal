@@ -17,6 +17,7 @@ export async function listRoundTemplates(): Promise<RoundTemplate[]> {
   const { data, error } = await supabase
     .from('round_templates')
     .select('*')
+    .is('deleted_at', null) // deleted ones (26 Nov) leave the page and the planner
     .order('created_at', { ascending: true });
   if (error) throw new Error(`listRoundTemplates: ${error.message}`);
   return data ?? [];
@@ -28,6 +29,7 @@ export async function getRoundTemplate(id: string): Promise<RoundTemplate | null
     .from('round_templates')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .maybeSingle();
   if (error) throw new Error(`getRoundTemplate: ${error.message}`);
   return data;

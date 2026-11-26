@@ -31,6 +31,12 @@
   --color-magenta: #aa0b56; /* RESERVED: rejected, overdue/expired, destructive, errors */
   --color-magenta-tint: #fff1f4; /* ground for the rejected/overdue tile and error banners */
   --color-magenta-deep: #4b1528; /* label text sitting on magenta-tint */
+  /* Staff notes (26 Nov): a question's comment and the sign-off note, in an
+     amber box so they stand out in the checklist, the report and the PDF.
+     Not an alarm (that is magenta), not the brand (cyan). */
+  --color-note-tint: #fff4d6; /* the box ground */
+  --color-note-edge: #d99a12; /* its start border; invariant, like a fill */
+  --color-note-deep: #4a3304; /* text on the tint, 10.9:1 */
   --color-danger-on-ink: #ff7a8a; /* destructive label on the ink drawer (sign out): magenta is only ~1.6:1 there, this is ~6:1 */
   --color-paper: #f3f2f2; /* the page ground */
   --color-surface: #eae9e9; /* input fill, cards, table header ground */
@@ -221,6 +227,8 @@
   --color-cyan-tint: #136370; /* secondary 900 (per club in lib/brand.ts) */
   --color-magenta-tint: #3a1020;
   --color-magenta-deep: #ffc0d0; /* 10.8:1 on the tint above */
+  --color-note-tint: #3a2a06;
+  --color-note-deep: #ffe2a3; /* 11.6:1 on the tint above */
 
   /* Ink-tinted shadows vanish on a dark ground, so the tint goes to black
      and deepens. See the note on --color-shade: this variable alone does

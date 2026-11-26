@@ -4,6 +4,7 @@ import {
   ACCESS_COOKIE,
   authPost,
   expiresAt,
+  PLATFORM_DENIED,
   REFRESH_COOKIE,
   refreshOutcome,
   sessionCookies,
@@ -46,6 +47,7 @@ export async function proxy(request: NextRequest) {
   const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
   let signedIn = expiresAt(access) > Date.now() + REFRESH_EARLY_MS;
   let fresh: ReturnType<typeof sessionCookies> | null = null;
+  let platformDenied = false;
 
   if (!signedIn && refresh) {
     try {
@@ -54,6 +56,8 @@ export async function proxy(request: NextRequest) {
       if (outcome === 'renewed' && res.data) {
         fresh = sessionCookies(res.data);
         signedIn = true;
+      } else if (outcome === 'ended') {
+        platformDenied = res.data?.code === PLATFORM_DENIED;
       } else if (outcome === 'unavailable') {
         // The API answered but is unwell: don't sign anyone out for it (F-28).
         return new NextResponse('Service temporarily unavailable', { status: 503 });
@@ -69,6 +73,8 @@ export async function proxy(request: NextRequest) {
   if (!signedIn && !isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    // Their Access became "app only": the login page says so.
+    if (platformDenied) url.search = '?ended=platform';
     response = NextResponse.redirect(url);
   } else if (signedIn && isLogin) {
     const url = request.nextUrl.clone();

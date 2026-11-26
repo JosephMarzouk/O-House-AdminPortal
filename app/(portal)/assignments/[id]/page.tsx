@@ -25,6 +25,8 @@ import { UnlockPlaceButton } from '@/components/assignments/unlock-place-button'
 import { Card } from '@/components/ui/card';
 import { BackLink, PageBody, PageHeader } from '@/components/ui/page-header';
 import { Tag } from '@/components/ui/tag';
+import { NoteBox } from '@/components/note-box';
+import { DeleteAssignmentButton } from '@/components/assignments/delete-assignment-button';
 import type { AssignmentItem } from '@/lib/types/database';
 
 export default async function AssignmentDetailPage({
@@ -54,6 +56,8 @@ export default async function AssignmentDetailPage({
     bilingual(locale, a.template_title_ar, a.template_title_en);
   const place = bilingual(locale, a.site_name_ar, a.site_name_en);
   const signature = media(a.signature_url);
+  // Never submitted: pending or in progress and never sent back (delete_assignment's rule).
+  const deletable = (a.status === 'pending' || a.status === 'in_progress') && !a.reviewed_at;
 
   // A checklist item has four states; they borrow the assignment tones so
   // "done" reads as approved-cyan, "rejected" as solid magenta and a
@@ -83,9 +87,25 @@ export default async function AssignmentDetailPage({
         kicker={<BackLink href="/assignments" label={dict.back} />}
         title={title || dict.none}
         actions={
-          // The same permission the PDF route checks.
-          can(me, 'reports.view') ? (
-            <DownloadPdfButton id={a.id!} label={dict.downloadPdf} dict={dict} variant="outline" />
+          deletable || can(me, 'reports.view') ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* The same permission the PDF route checks. */}
+              {can(me, 'reports.view') && (
+                <DownloadPdfButton id={a.id!} label={dict.downloadPdf} dict={dict} variant="outline" />
+              )}
+              {/* Only while nobody has submitted it (26 Nov). Greyed without
+                  checklists.delete, the portal's "you can see it, not use it". */}
+              {deletable && (
+                <DeleteAssignmentButton
+                  id={a.id!}
+                  summary={[title, assigneeNames(a), fmtPeriod(a.scheduled_date, a.end_date, locale)].filter(Boolean).join(' · ')}
+                  group={a.group_size !== null && a.group_size > 1 && !a.round_id}
+                  denied={!can(me, 'checklists.delete')}
+                  after="/assignments"
+                  dict={dict}
+                />
+              )}
+            </div>
           ) : undefined
         }
         // round · place · date · window — the same subtitle the app builds
@@ -131,25 +151,23 @@ export default async function AssignmentDetailPage({
           </div>
         </dl>
 
+        {/* Coloured by who wrote it (components/note-box.tsx). */}
         {a.task_note && (
-          <p className="max-w-2xl rounded-card bg-surface px-3 py-2 text-sm">
-            <span className="me-2 text-label uppercase">{dict.taskNote}</span>
+          <NoteBox tone="info" label={dict.taskNote}>
             {a.task_note}
-          </p>
+          </NoteBox>
         )}
 
         {a.submit_note && (
-          <p className="max-w-2xl rounded-card bg-surface px-3 py-2 text-sm">
-            <span className="me-2 text-label uppercase">{dict.submitNote}</span>
+          <NoteBox tone="staff" label={dict.submitNote}>
             {a.submit_note}
-          </p>
+          </NoteBox>
         )}
 
         {a.review_note && (
-          <p className="max-w-2xl rounded-card bg-magenta-tint px-3 py-2 text-sm text-magenta-deep">
-            <span className="me-2 text-label uppercase">{dict.rejectReason}</span>
+          <NoteBox tone="manager" label={dict.rejectReason}>
             {a.review_note}
-          </p>
+          </NoteBox>
         )}
 
         {/* QR-locked places: who scanned, a bad code, a supervisor's unlock.
@@ -233,8 +251,24 @@ export default async function AssignmentDetailPage({
                           </span>
                         </p>
                       )}
-                      {item.note && <p className="text-sm text-text/55">{item.note}</p>}
-                      {item.reject_note && <p className="text-sm text-magenta">{item.reject_note}</p>}
+                      {item.note && (
+                        <NoteBox tone="staff" label={dict.itemComment} className="mt-2">
+                          {item.note}
+                        </NoteBox>
+                      )}
+                      {item.reject_note && (
+                        <NoteBox tone="manager" label={dict.rejectReason} className="mt-2">
+                          {item.reject_note}
+                        </NoteBox>
+                      )}
+                      {/* Evidence over 3 months old is deleted (26 Nov); say so
+                          rather than look as if no photo was ever taken. */}
+                      {item.media_purged_at && (
+                        <p className="inline-flex items-center gap-1 text-caption text-text/55">
+                          <CameraIcon className="size-icon-sm" />
+                          {dict.mediaPurged}
+                        </p>
+                      )}
                     </div>
 
                     {/* Photos and camera clips; each opens a large viewer. */}

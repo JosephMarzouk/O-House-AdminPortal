@@ -24,6 +24,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // Set by app/session-ended: the portal signed this user out because their
   // profile would not load. Without a word here it looks like a random logout.
   const ended = sp.ended === '1';
+  // Their Access is "app only" now (proxy.ts or app/session-ended).
+  const platform = sp.ended === 'platform';
 
   return (
     // grid + place-items-center does the centring and needs no mx-auto, so it
@@ -57,6 +59,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {ended && (
           <p className="mt-6 rounded-card bg-cyan-tint px-3 py-2 text-sm text-text" role="status">
             {dict.sessionEnded}
+          </p>
+        )}
+        {platform && (
+          <p className="mt-6 rounded-card bg-cyan-tint px-3 py-2 text-sm text-text" role="status">
+            {dict.platformAppOnly}
           </p>
         )}
 

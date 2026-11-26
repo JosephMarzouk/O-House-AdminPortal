@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { currentClub } from '@/lib/club';
-import { ACCESS_COOKIE, authPost, REFRESH_COOKIE, sessionCookies } from '@/lib/session';
+import { ACCESS_COOKIE, authPost, PLATFORM_DENIED, REFRESH_COOKIE, sessionCookies } from '@/lib/session';
 
 /**
  * Sign in through the API: phone or email, one box. The API tells "no such
@@ -12,7 +12,7 @@ import { ACCESS_COOKIE, authPost, REFRESH_COOKIE, sessionCookies } from '@/lib/s
 export async function signIn(
   login: string,
   password: string,
-): Promise<{ ok: true } | { ok: false; error: 'invalid' | 'locked' | 'no_access' | 'unavailable' }> {
+): Promise<{ ok: true } | { ok: false; error: 'invalid' | 'locked' | 'no_access' | 'platform' | 'unavailable' }> {
   const club = await currentClub();
   let res;
   try {
@@ -26,6 +26,7 @@ export async function signIn(
     return { ok: true };
   }
   if (res.status === 429) return { ok: false, error: 'locked' };
+  if (res.status === 403 && res.data?.code === PLATFORM_DENIED) return { ok: false, error: 'platform' };
   if (res.status === 403) return { ok: false, error: 'no_access' };
   if (res.status === 401 || res.status === 400) return { ok: false, error: 'invalid' };
   return { ok: false, error: 'unavailable' };

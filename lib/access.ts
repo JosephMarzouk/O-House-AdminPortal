@@ -89,7 +89,15 @@ export function mayDeleteRole(
  */
 export const STAFF_APP = 'staff_app.view';
 
+/**
+ * Held by the built-in Admin role alone and never given to another role
+ * (26 Nov; save_role refuses it: NOT_GRANTABLE). The Roles screen shows it,
+ * never as tickable.
+ */
+export const NOT_GRANTABLE = new Set(['users.delete']);
+
 export function mayGrant(me: Caller, key: string): boolean {
+  if (NOT_GRANTABLE.has(key)) return false;
   return key === STAFF_APP || can(me, key);
 }
 
@@ -181,6 +189,18 @@ export function mayEditReportMail(me: Caller, list: string): boolean {
  * roles stay on the list because Admins were managers before custom roles.
  * Kept simple on purpose: set_user_manager accepts anyone.
  */
+/**
+ * The Access a new person starts with, from their role (26 Nov; the migration
+ * back-filled everyone the same way): portal.view and staff_app.view → both,
+ * one of them → that one, neither → both. The form pre-fills it; the admin
+ * may change it.
+ */
+export function defaultAccessFor(permissions: readonly string[]): 'portal' | 'app' | 'both' {
+  const portal = permissions.includes('portal.view');
+  const app = permissions.includes(STAFF_APP);
+  return portal && !app ? 'portal' : app && !portal ? 'app' : 'both';
+}
+
 export function canBeManager(role: { scope: RoleScope; permissions: string[] }): boolean {
   return (
     (role.scope === 'team' || role.scope === 'all') &&

@@ -112,6 +112,37 @@ export function weekStart(ymd: string): string {
   return addDays(ymd, -((dow + 1) % 7));
 }
 
+/** The date filters' quick buttons (26 Nov). */
+export const DATE_PRESETS = ['today', 'week', 'month'] as const;
+export type DatePreset = (typeof DATE_PRESETS)[number];
+
+/**
+ * A quick button's From/To, both included: today; this week, Saturday to
+ * Friday (weekStart, the planner's and the weekly email's week); this
+ * calendar month. `today` is Cairo's (todayInCairo).
+ */
+export function presetRange(preset: DatePreset, today: string): { from: string; to: string } {
+  if (preset === 'today') return { from: today, to: today };
+  if (preset === 'week') {
+    const from = weekStart(today);
+    return { from, to: addDays(from, 6) };
+  }
+  const from = `${today.slice(0, 7)}-01`;
+  const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
+  // Day 0 of next month is this month's last day (UTC, a calendar date).
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { from, to: `${today.slice(0, 7)}-${String(last).padStart(2, '0')}` };
+}
+
+/** Which quick button a From/To pair is, if any (to show it as chosen). */
+export function presetOf(from: string | undefined, to: string | undefined, today: string): DatePreset | null {
+  if (!from || !to) return null;
+  return DATE_PRESETS.find((p) => {
+    const r = presetRange(p, today);
+    return r.from === from && r.to === to;
+  }) ?? null;
+}
+
 /** "Sat 19 Sep" — a planner column heading. Read in UTC because `ymd` is a
  *  calendar date, not an instant; any other zone could shift it a day. */
 export function fmtWeekday(ymd: string, locale: Locale): string {

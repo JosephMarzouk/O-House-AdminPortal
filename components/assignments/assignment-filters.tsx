@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { DatePresetButtons } from '@/components/date-preset-buttons';
+import { presetOf, presetRange, type DatePreset } from '@/lib/format';
 
 export type FilterValues = {
   status?: string;
@@ -36,11 +38,14 @@ export function AssignmentFilters({
   values,
   sites,
   staff,
+  today,
   labels,
 }: {
   values: FilterValues;
   sites: Option[];
   staff: Option[];
+  /** Cairo's today (todayInCairo), for the quick buttons. */
+  today: string;
   labels: {
     place: string;
     assignee: string;
@@ -48,12 +53,15 @@ export function AssignmentFilters({
     to: string;
     all: string;
     reset: string;
+    presets: Record<DatePreset, string>;
   };
 }) {
   const router = useRouter();
 
-  const set = (key: keyof FilterValues, value: string) => {
-    const next: FilterValues = { ...values, [key]: value || undefined };
+  const set = (key: keyof FilterValues, value: string) => setMany({ [key]: value || undefined });
+
+  const setMany = (changes: Partial<FilterValues>) => {
+    const next: FilterValues = { ...values, ...changes };
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(next)) if (v) qs.set(k, v);
     const q = qs.toString();
@@ -111,6 +119,13 @@ export function AssignmentFilters({
           onChange={(e) => set('to', e.target.value)}
         />
       </label>
+
+      {/* Today / This week (Sat–Fri) / This month: they fill From and To. */}
+      <DatePresetButtons
+        chosen={presetOf(values.from, values.to, today)}
+        labels={labels.presets}
+        onPick={(p) => setMany(presetRange(p, today))}
+      />
 
       {hasAny && (
         <button

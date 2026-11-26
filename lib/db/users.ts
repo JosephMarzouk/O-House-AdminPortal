@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { PROFILE_COLUMNS, type PortalProfile } from '@/lib/types/database';
+import { PROFILE_COLUMNS, type PlatformAccess, type PortalProfile } from '@/lib/types/database';
 import { mayAssignTo, type Access } from '@/lib/access';
 
 /**
@@ -40,6 +40,8 @@ export type StaffRow = {
   manager_id: string | null;
   active: boolean;
   must_change_password: boolean;
+  /** Where they may sign in (26 Nov). */
+  platform_access: PlatformAccess;
 };
 
 /**

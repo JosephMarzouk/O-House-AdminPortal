@@ -16,6 +16,7 @@ import { SearchBox } from '@/components/search-box';
 import { DeniedAction, NoPermission } from '@/components/no-permission';
 import { parseOne } from '@/lib/db/assignments';
 import { matchesQuery } from '@/lib/search';
+import { DeleteRoundButton } from '@/components/rounds/delete-round-button';
 import {
   Table,
   TableBody,
@@ -216,6 +217,7 @@ export default async function RoundsPage({
                           </Tag>
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-1">
                           {canEdit ? (
                             <Button
                               variant="ghost"
@@ -233,6 +235,14 @@ export default async function RoundsPage({
                               </Button>
                             </span>
                           )}
+                          {/* 26 Nov: greyed without planner.delete. */}
+                          <DeleteRoundButton
+                            id={t.id}
+                            name={bilingual(locale, t.title_ar, t.title_en) || dict.none}
+                            denied={!can(me, 'planner.delete')}
+                            dict={dict}
+                          />
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

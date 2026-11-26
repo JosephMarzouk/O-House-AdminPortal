@@ -2,7 +2,7 @@ import { adminStaffList } from '@/lib/db/users';
 import { listDepartments } from '@/lib/db/places';
 import { listRoles } from '@/lib/db/roles';
 import { can, getProfile } from '@/lib/auth';
-import { canBeManager } from '@/lib/access';
+import { canBeManager, defaultAccessFor } from '@/lib/access';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { fmtDate, todayInCairo } from '@/lib/format';
 import { UsersManager } from '@/components/users/users-manager';
@@ -59,6 +59,7 @@ export default async function UsersPage({
             nameAr: r.name_ar,
             nameEn: r.name_en,
             canManage: canBeManager(r),
+            defaultAccess: defaultAccessFor(r.permissions),
           }))}
           users={users.map((u) => ({
             id: u.id,
@@ -68,7 +69,9 @@ export default async function UsersPage({
             roleId: u.role_id,
             departmentId: u.department_id,
             managerId: u.manager_id,
+            access: u.platform_access ?? 'both',
           }))}
+          mayDelete={can(me, 'users.delete')}
           departments={toDepartmentOptions(departments)}
         />
       </PageBody>

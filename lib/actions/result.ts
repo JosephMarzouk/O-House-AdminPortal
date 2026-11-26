@@ -23,6 +23,14 @@ export function toErrorCode(message: string): string {
   if (/LOCATION_ALREADY_SET/.test(message)) return 'location_already_set';
   // create_assignment and schedule_rounds: the person's role can't be given checklists.
   if (/INVALID_ASSIGNEE/.test(message)) return 'invalid_assignee';
+  // Deletes, access (26 Nov).
+  if (/ALREADY_SUBMITTED/.test(message)) return 'already_submitted';
+  if (/ROUND_DELETED/.test(message)) return 'round_deleted';
+  if (/OWN_ACCOUNT/.test(message)) return 'own_account';
+  if (/LAST_ADMIN/.test(message)) return 'last_admin';
+  if (/NAME_MISMATCH/.test(message)) return 'name_mismatch';
+  if (/INVALID_ACCESS/.test(message)) return 'invalid_access';
+  if (/NOT_GRANTABLE/.test(message)) return 'not_grantable';
   // 23503. The department or place still has staff or assignments pointing at
   // it — the one driver failure a user can actually resolve, so it keeps a
   // message of its own rather than collapsing into the generic one.

@@ -213,6 +213,25 @@ export async function unlockPlace(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Delete a checklist nobody has submitted yet (26 Nov). A soft delete: it
+ * disappears from every screen, report and phone, and the database keeps it
+ * with who and when. A multi-place task's other unsubmitted places go too.
+ * delete_assignment checks checklists.delete, the scope (or creator) and the
+ * status again; ALREADY_SUBMITTED if someone submitted it meanwhile.
+ */
+export async function deleteAssignment(id: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'checklists.delete')) return { ok: false, error: 'not_authorized' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('delete_assignment', { p_assignment_id: id });
+  if (error) return { ok: false, error: friendly(error.message) };
+
+  revalidatePath('/assignments');
+  revalidatePath('/tracker');
+  revalidatePath('/');
+  return { ok: true };
+}
+
 export async function approveAssignment(id: string, score?: number): Promise<ActionResult> {
   if (!can(await getProfile(), 'review.edit')) return { ok: false, error: 'not_authorized' };
   const supabase = await createClient();

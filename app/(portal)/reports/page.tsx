@@ -5,7 +5,8 @@ import { EFFECTIVE_STATUSES, parseOne, reportDays } from '@/lib/db/assignments';
 import { listDepartments, listPlaces } from '@/lib/db/places';
 import { listProfiles } from '@/lib/db/users';
 import { getDictionary, getLocale, bilingual } from '@/lib/i18n';
-import { fmtDate, fmtDay, fmtNum, todayInCairo } from '@/lib/format';
+import { fmtDate, fmtDay, fmtNum, presetOf, presetRange, todayInCairo } from '@/lib/format';
+import { DatePresetButtons } from '@/components/date-preset-buttons';
 import { isUuid } from '@/lib/rounds';
 import { daysFromTasks, reportFilterParams, reportQuery } from '@/lib/report';
 import { EyeIcon } from '@/components/icons';
@@ -48,6 +49,18 @@ export default async function ReportsPage({
   const filterQuery = reportQuery({ q: filter.q, place: filter.place, user: filter.user, status: filter.status });
   const [dict, locale, me] = await Promise.all([getDictionary(), getLocale(), getProfile()]);
   const today = todayInCairo();
+  // From / To (26 Nov): which days the list shows. A malformed one is no limit.
+  const ymd = (v: string | undefined) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+  const from = ymd(parseOne(sp.from));
+  const to = ymd(parseOne(sp.to));
+  // The same URL with other From/To: the quick buttons are links, like the form is GET.
+  const listHref = (range: { from: string; to: string }) => {
+    const qs = new URLSearchParams(filterQuery);
+    if (deptId) qs.set('dept', deptId);
+    qs.set('from', range.from);
+    qs.set('to', range.to);
+    return `/reports?${qs}`;
+  };
   const kicker = fmtDate(today, locale);
 
   // Courtesy, not the control: the report reads through RLS, so a caller only
@@ -67,7 +80,7 @@ export default async function ReportsPage({
   // both are RLS-scoped, so they offer only what the caller can already see.
   const [departments, tasks, places, profiles] = await Promise.all([
     listDepartments(),
-    reportDays(today),
+    reportDays(today, { from, to }),
     listPlaces(),
     listProfiles(),
   ]);
@@ -78,7 +91,7 @@ export default async function ReportsPage({
     new Map(places.map((p) => [p.id, p.department_id])),
     new Map(profiles.map((p) => [p.id, p.department_id])),
     filter,
-  );
+  ).filter((d) => (!from || d.day >= from) && (!to || d.day <= to));
   const n = (v: number) => fmtNum(v, locale);
 
   return (
@@ -134,10 +147,25 @@ export default async function ReportsPage({
               ))}
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="r-from">{dict.dateFrom}</Label>
+            <Input id="r-from" name="from" type="date" dir="ltr" defaultValue={from ?? ''} compact />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="r-to">{dict.dateTo}</Label>
+            <Input id="r-to" name="to" type="date" dir="ltr" defaultValue={to ?? ''} compact />
+          </div>
           <Button type="submit" variant="outline">
             {dict.applyFilter}
           </Button>
         </Form>
+
+        {/* Today / This week (Sat–Fri) / This month: links that set From and To. */}
+        <DatePresetButtons
+          chosen={presetOf(from, to, today)}
+          labels={{ today: dict.presetToday, week: dict.presetWeek, month: dict.presetMonth }}
+          hrefFor={(p) => listHref(presetRange(p, today))}
+        />
 
         {days.length === 0 ? (
           <p className="text-text/55">{dict.reportNoDays}</p>

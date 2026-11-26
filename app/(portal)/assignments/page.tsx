@@ -22,6 +22,7 @@ import {
 } from '@/lib/format';
 import { STATUS, StatusBadge } from '@/components/status-badge';
 import { AssignmentFilters } from '@/components/assignments/assignment-filters';
+import { DeleteAssignmentButton } from '@/components/assignments/delete-assignment-button';
 import { SearchBox } from '@/components/search-box';
 import { DeniedAction, NoPermission } from '@/components/no-permission';
 import { can, getProfile } from '@/lib/auth';
@@ -90,6 +91,7 @@ export default async function AssignmentsPage({
   );
 
   const n = (v: number) => fmtNum(v, locale);
+  const mayDelete = can(me, 'checklists.delete');
   const chipHref = (s: EffectiveStatus | 'all') => {
     const qs = new URLSearchParams();
     if (s !== 'all') qs.set('status', s);
@@ -128,6 +130,7 @@ export default async function AssignmentsPage({
                   <TableHead>{dict.window}</TableHead>
                   <TableHead className="text-end">{dict.progress}</TableHead>
                   <TableHead>{dict.status}</TableHead>
+                  {mayDelete && <TableHead className="w-0"><span className="sr-only">{dict.actions}</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>{data.rows.map((a) => row(a, counts.get(a.id!)))}</TableBody>
@@ -194,6 +197,22 @@ export default async function AssignmentsPage({
         <TableCell>
           <StatusBadge status={a.effective_status} dict={dict} extended={a.was_extended} />
         </TableCell>
+        {/* Delete (26 Nov): only for a checklist nobody has submitted, and only
+            shown to people who hold checklists.delete — a column of greyed
+            icons would be noise. Its own page shows the greyed control. */}
+        {mayDelete && (
+          <TableCell className="text-end">
+            {(a.status === 'pending' || a.status === 'in_progress') && !a.reviewed_at && (
+              <DeleteAssignmentButton
+                id={a.id!}
+                summary={[title, assigneeNames(a), fmtPeriod(a.scheduled_date, a.end_date, locale)].filter(Boolean).join(' · ')}
+                group={a.group_size !== null && a.group_size > 1 && !a.round_id}
+                iconOnly
+                dict={dict}
+              />
+            )}
+          </TableCell>
+        )}
       </TableRow>
     );
   }
@@ -260,6 +279,7 @@ export default async function AssignmentsPage({
               label: bilingual(locale, s.name_ar, s.name_en) || s.id,
             }))}
             staff={assignableStaff(profiles, staffRoles).map((p) => ({ value: p.id, label: p.name }))}
+            today={todayInCairo()}
             labels={{
               place: dict.place,
               assignee: dict.assignee,
@@ -267,6 +287,7 @@ export default async function AssignmentsPage({
               to: dict.dateTo,
               all: dict.filterAll,
               reset: dict.filterReset,
+              presets: { today: dict.presetToday, week: dict.presetWeek, month: dict.presetMonth },
             }}
           />
         </div>

@@ -3,14 +3,17 @@
 import { Fragment, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { alert } from '@/components/ui/alert-dialog';
-import { KeyIcon, PlusIcon } from '@/components/icons';
+import { KeyIcon, PlusIcon, TrashIcon } from '@/components/icons';
 import {
   setUserRole,
   setUserDepartment,
   setUserManager,
+  setUserAccess,
   createStaff,
   resetStaffPassword,
 } from '@/lib/actions/users';
+import { PLATFORM_ACCESS, type PlatformAccess } from '@/lib/types/database';
+import { DeleteUserDialog } from '@/components/users/delete-user-dialog';
 import { normalizePhone, phoneToE164 } from '@/lib/phone';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,10 +51,20 @@ export type UserRow = {
   roleId: string;
   departmentId: string | null;
   managerId: string | null;
+  /** Where they may sign in (26 Nov). */
+  access: PlatformAccess;
 };
 
-/** A role as this screen needs it. `canManage`: offered as someone's manager (canBeManager). */
-export type RoleOption = { id: string; key: string | null; nameAr: string; nameEn: string; canManage: boolean };
+/** A role as this screen needs it. `canManage`: offered as someone's manager (canBeManager).
+ *  `defaultAccess`: what the new-person form pre-fills for it (defaultAccessFor). */
+export type RoleOption = {
+  id: string;
+  key: string | null;
+  nameAr: string;
+  nameEn: string;
+  canManage: boolean;
+  defaultAccess: PlatformAccess;
+};
 
 /** Mirrors MIN_PASSWORD in lib/actions/users.ts. Duplicated rather than
  *  imported because that module is 'use server' and may export nothing but
@@ -67,7 +80,10 @@ export function UsersManager({
   dict,
   locale,
   me,
+  mayDelete,
 }: {
+  /** users.delete: the built-in Admin role alone (26 Nov). */
+  mayDelete: boolean;
   /** The page's ?q= search. It narrows the table only: the manager picker
    *  in each row still offers every manager. */
   query?: string;
@@ -107,6 +123,18 @@ export function UsersManager({
   const defaultRole = (assignable.find((r) => r.key === 'cleaner') ?? assignable[0])?.id ?? '';
   const [roleId, setRoleId] = useState(defaultRole);
   const [departmentId, setDepartmentId] = useState(myDepartments?.[0]?.id ?? '');
+  // Where the new person may sign in: pre-filled from the role, re-filled when
+  // the role changes, and the admin may change it (26 Nov).
+  const accessOf = (id: string): PlatformAccess => roles.find((r) => r.id === id)?.defaultAccess ?? 'both';
+  const [access, setAccess] = useState<PlatformAccess>(accessOf(defaultRole));
+  const accessLabel: Record<PlatformAccess, string> = {
+    portal: dict.accessPortal,
+    app: dict.accessApp,
+    both: dict.accessBoth,
+  };
+
+  // The delete dialog's person (users.delete).
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
 
   // The password dialog: which user, and which of its two beats we are on.
   // One dialog at the root rather than one per row — the table runs to every
@@ -172,6 +200,7 @@ export function UsersManager({
                 password,
                 roleId,
                 ...(myDepartments ? { departmentId } : {}),
+                access,
               });
               if (res.ok) {
                 alert.success(dict.staffCreated);
@@ -180,6 +209,7 @@ export function UsersManager({
                 setEmail('');
                 setPassword('');
                 setRoleId(defaultRole);
+                setAccess(accessOf(defaultRole));
                 router.refresh();
               } else {
                 report(res);
@@ -242,10 +272,28 @@ export function UsersManager({
             {/* Only the roles this caller may give — never Admin. createStaff
                 and the API re-check (can_assign_role); this select is the
                 convenience, not the boundary. */}
-            <Select id="s-role" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+            <Select
+              id="s-role"
+              value={roleId}
+              onChange={(e) => {
+                setRoleId(e.target.value);
+                setAccess(accessOf(e.target.value));
+              }}
+            >
               {assignable.map((r) => (
                 <option key={r.id} value={r.id}>
                   {roleName(r)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="min-w-44 flex-1 space-y-1">
+            <Label htmlFor="s-access">{dict.access}</Label>
+            {/* Required, always has a value: pre-filled from the role. */}
+            <Select id="s-access" value={access} onChange={(e) => setAccess(e.target.value as PlatformAccess)}>
+              {PLATFORM_ACCESS.map((a) => (
+                <option key={a} value={a}>
+                  {accessLabel[a]}
                 </option>
               ))}
             </Select>
@@ -297,9 +345,11 @@ export function UsersManager({
               {dict.phone} / {dict.email}
             </TableHead>
             <TableHead>{dict.role}</TableHead>
+            <TableHead>{dict.access}</TableHead>
             <TableHead>{dict.department}</TableHead>
             <TableHead>{dict.manager}</TableHead>
             <TableHead>{dict.password}</TableHead>
+            {mayDelete && <TableHead className="w-0"><span className="sr-only">{dict.deleteUser}</span></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -310,7 +360,7 @@ export function UsersManager({
                   in line down the whole page. Whitespace does the separating,
                   which is why this row carries no rule and no hover. */}
               <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={6} className={groupIndex > 0 ? 'pt-8 pb-1' : 'pb-1'}>
+                <TableCell colSpan={mayDelete ? 8 : 7} className={groupIndex > 0 ? 'pt-8 pb-1' : 'pb-1'}>
                   <span className="section-label">{label}</span>
                   <span className="ms-2 text-caption tabular-nums text-text/50">{rows.length}</span>
                 </TableCell>
@@ -362,6 +412,30 @@ export function UsersManager({
                     {roleOptions.map((r) => (
                       <option key={r.id} value={r.id}>
                         {roleName(r)}
+                      </option>
+                    ))}
+                  </Select>
+                </TableCell>
+
+                <TableCell>
+                  {/* Portal / app / both (26 Nov). set_user_access applies the
+                      same rule as the role select (can_manage_user); the API
+                      signs them out of a platform they lost within a minute. */}
+                  <Select
+                    compact
+                    className="min-w-32"
+                    aria-label={dict.access}
+                    defaultValue={u.access}
+                    disabled={pending || !manageable}
+                    onChange={(e) =>
+                      startTransition(async () =>
+                        report(await setUserAccess(u.id, e.target.value as PlatformAccess)),
+                      )
+                    }
+                  >
+                    {PLATFORM_ACCESS.map((a) => (
+                      <option key={a} value={a}>
+                        {accessLabel[a]}
                       </option>
                     ))}
                   </Select>
@@ -436,6 +510,23 @@ export function UsersManager({
                     <KeyIcon />
                   </Button>
                 </TableCell>
+                {/* Delete (26 Nov): the built-in Admin only, never yourself. */}
+                {mayDelete && (
+                  <TableCell>
+                    {u.id !== me.id && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-magenta hover:bg-magenta/10"
+                        aria-label={dict.deleteUser}
+                        disabled={pending}
+                        onClick={() => setDeleting(u)}
+                      >
+                        <TrashIcon />
+                      </Button>
+                    )}
+                  </TableCell>
+                )}
                   </TableRow>
                 );
               })}
@@ -515,6 +606,9 @@ export function UsersManager({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Keyed by person: a fresh preview and an empty name box each time. */}
+      <DeleteUserDialog key={deleting?.id ?? 'none'} user={deleting} onClose={() => setDeleting(null)} dict={dict} />
     </>
   );
 }

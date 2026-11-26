@@ -65,6 +65,27 @@ export async function saveRoundTemplate(
   return { ok: true, id: data[0].id };
 }
 
+/**
+ * Delete a round template (26 Nov), with planner.delete. A soft delete: it
+ * leaves the Rounds page and the planner, and its untouched checklists from
+ * today on go with it; past checklists and anything already started stay.
+ * Returns how many checklists went.
+ */
+export async function deleteRoundTemplate(
+  id: string,
+): Promise<{ ok: true; removed: number } | { ok: false; error: string }> {
+  if (!can(await getProfile(), 'planner.delete')) return { ok: false, error: 'not_authorized' };
+  if (!isUuid(id)) return { ok: false, error: 'not_found' };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('delete_round_template', { p_template_id: id });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+
+  revalidatePath('/rounds');
+  revalidatePath('/tracker');
+  revalidatePath('/assignments');
+  return { ok: true, removed: data ?? 0 };
+}
+
 /** schedule_rounds() raises these by name; everything else goes through the shared mapper. */
 function scheduleError(message: string): string {
   if (/PAST_DATE/.test(message)) return 'past_date';

@@ -7,6 +7,7 @@ import { can, getProfile } from '@/lib/auth';
 import { ApiError, apiPost } from '@/lib/club';
 import { ACCESS_COOKIE } from '@/lib/session';
 import { toErrorCode, type ActionResult } from '@/lib/actions/result';
+import { PLATFORM_ACCESS, type PlatformAccess } from '@/lib/types/database';
 
 export type { ActionResult };
 
@@ -72,6 +73,7 @@ const STAFF_ERRORS: Record<string, string> = {
   LOGIN_TAKEN: 'login_taken',
   NOT_AUTHORIZED: 'not_authorized',
   NO_LOGIN: 'not_authorized',
+  ACCESS_INVALID: 'invalid_access',
 };
 
 /** The caller's access token, for the API's staff routes (it checks who may do what). */
@@ -103,6 +105,8 @@ export async function createStaff(input: {
   password: string;
   roleId: string;
   departmentId?: string;
+  /** Where they may sign in: required (the form pre-fills it from the role). */
+  access: PlatformAccess;
 }): Promise<ActionResult> {
   const caller = await getProfile();
   const access = caller?.access;
@@ -115,6 +119,7 @@ export async function createStaff(input: {
     return { ok: false, error: 'department_required' };
   }
   if (!input.phone?.trim() && !input.email?.trim()) return { ok: false, error: 'fields_required' };
+  if (!PLATFORM_ACCESS.includes(input.access)) return { ok: false, error: 'invalid_access' };
 
   return staffCall('/admin/staff', {
     name: input.name.trim(),
@@ -123,7 +128,57 @@ export async function createStaff(input: {
     password: input.password,
     roleId: input.roleId,
     ...(input.departmentId ? { departmentId: input.departmentId } : {}),
+    access: input.access,
   });
+}
+
+/**
+ * Where someone may sign in: portal, app or both (26 Nov). set_user_access
+ * applies assign_role's rule (users.edit over this person); the API signs
+ * them out of the platform they lost within a minute.
+ */
+export async function setUserAccess(targetUserId: string, access: PlatformAccess): Promise<ActionResult> {
+  if (!can(await getProfile(), 'users.edit')) return { ok: false, error: 'not_authorized' };
+  if (!PLATFORM_ACCESS.includes(access)) return { ok: false, error: 'invalid_access' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_user_access', { p_user_id: targetUserId, p_access: access });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+  revalidatePath('/users');
+  return { ok: true };
+}
+
+/** What deleting this person takes with them, for the confirm dialog. */
+export type DeleteUserPreview = { checklists: number; shared: number; rounds: number; reports: number };
+
+export async function deleteUserPreview(
+  targetUserId: string,
+): Promise<{ ok: true; preview: DeleteUserPreview } | { ok: false; error: string }> {
+  if (!can(await getProfile(), 'users.delete')) return { ok: false, error: 'not_authorized' };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('delete_user_preview', { p_user_id: targetUserId });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+  const p = (data ?? {}) as Partial<DeleteUserPreview>;
+  return {
+    ok: true,
+    preview: { checklists: p.checklists ?? 0, shared: p.shared ?? 0, rounds: p.rounds ?? 0, reports: p.reports ?? 0 },
+  };
+}
+
+/**
+ * Delete a person (26 Nov): the built-in Admin role only (users.delete, which
+ * no other role can be given). A soft delete — they can't sign in and leave
+ * every list, their name stays on past checklists, their phone and email are
+ * free for a new account. `typedName` is what the admin typed to confirm; the
+ * database compares it again (NAME_MISMATCH).
+ */
+export async function deleteUser(targetUserId: string, typedName: string): Promise<ActionResult> {
+  if (!can(await getProfile(), 'users.delete')) return { ok: false, error: 'not_authorized' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('delete_user', { p_user_id: targetUserId, p_confirm_name: typedName });
+  if (error) return { ok: false, error: toErrorCode(error.message) };
+  revalidatePath('/users');
+  revalidatePath('/assignments');
+  return { ok: true };
 }
 
 /**

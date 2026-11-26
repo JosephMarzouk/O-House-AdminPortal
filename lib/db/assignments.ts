@@ -282,12 +282,20 @@ export async function nearestDaysWithTasks(
  *
  * `today` MUST come through todayInCairo() or parseDay() (lib/format.ts).
  */
-export async function reportDays(today: string): Promise<ReportTask[]> {
+export async function reportDays(today: string, range: { from?: string; to?: string } = {}): Promise<ReportTask[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  // From / To (26 Nov), both YYYY-MM-DD, checked by the page. A multi-day
+  // task counts from its first day to its end_date, so it belongs to the
+  // range when it starts by `to` and ends on or after `from`.
+  const last = range.to && range.to < today ? range.to : today;
+  let query = supabase
     .from('assignments_v')
     .select('id, scheduled_date, end_date, effective_status, template_id, source_template_id, inspector_id, assignee_ids, title_en, title_ar, template_title_en, template_title_ar')
-    .lte('scheduled_date', today)
+    .lte('scheduled_date', last);
+  if (range.from) {
+    query = query.or(`end_date.gte.${range.from},and(end_date.is.null,scheduled_date.gte.${range.from})`);
+  }
+  const { data, error } = await query
     .order('scheduled_date', { ascending: false })
     // ponytail: the newest 1000 tasks (the Data API's own cap), no paging —
     // months of one club. Past it the oldest listed day can come up short and

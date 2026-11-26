@@ -36,7 +36,9 @@ export function LoginForm({ dict }: { dict: Dictionary }) {
           ? dict.signInLocked
           : res.error === 'no_access'
             ? dict.notAuthorized
-            : res.error === 'unavailable'
+            : res.error === 'platform'
+              ? dict.platformAppOnly
+              : res.error === 'unavailable'
               ? dict.errorGeneric
               : dict.signInError,
       );

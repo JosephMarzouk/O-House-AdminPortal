@@ -3,6 +3,7 @@ import { can, getProfile } from '@/lib/auth';
 import { NoPermission } from '@/components/no-permission';
 import { getDashboardData } from '@/lib/dashboard';
 import { listRefusals } from '@/lib/db/sync';
+import { mediaStorageBytes } from '@/lib/db/storage';
 import { SyncRefusals } from '@/components/sync-refusals';
 import { getDictionary, getLocale } from '@/lib/i18n';
 import { fmtDate, fmtNum, todayInCairo } from '@/lib/format';
@@ -18,6 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+/** 80% of the free plan's 1 GB of file storage. */
+const STORAGE_WARN_BYTES = 800_000_000;
 
 const FIRST_PAGES: [string, string][] = [
   ['/rounds', 'planner.view'],
@@ -45,7 +49,12 @@ export default async function DashboardPage() {
       </>
     );
   }
-  const [d, refusals] = await Promise.all([getDashboardData(locale, dict.none), listRefusals()]);
+  const [d, refusals, storageBytes] = await Promise.all([
+    getDashboardData(locale, dict.none),
+    listRefusals(),
+    // The evidence bucket's size, for whoever runs the club's settings (26 Nov).
+    can(me, 'club_settings.view') ? mediaStorageBytes() : Promise.resolve(null),
+  ]);
 
   const n = (v: number) => fmtNum(v, locale);
   const rate = (v: number | null) => (v === null ? dict.none : `${n(v)}%`);
@@ -81,6 +90,15 @@ export default async function DashboardPage() {
 
         {/* Only when there is something to act on: an empty table is noise. */}
         {refusals.length > 0 && <SyncRefusals rows={refusals} dict={dict} locale={locale} />}
+
+        {/* Photos and videos past 800 MB of the free plan's 1 GB (26 Nov). The
+            nightly job deletes evidence over 3 months old; this says when that
+            is no longer enough. Magenta: it needs someone to act. */}
+        {storageBytes !== null && storageBytes > STORAGE_WARN_BYTES && (
+          <p className="max-w-2xl rounded-card bg-magenta-tint px-3 py-2 text-sm text-magenta-deep" role="status">
+            {dict.storageWarning.replace('{mb}', n(Math.round(storageBytes / 1e6)))}
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
           {tiles.map((t) => (

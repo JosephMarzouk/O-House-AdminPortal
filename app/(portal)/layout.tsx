@@ -5,6 +5,8 @@ import { brandFor } from '@/lib/brand';
 import { requestClub } from '@/lib/club';
 import { bilingual, getDictionary, getLocale } from '@/lib/i18n';
 import { parseTheme, THEME_COOKIE } from '@/lib/theme';
+import { PLATFORM_DENIED } from '@/lib/session';
+import { dbSessionRefusal } from '@/lib/supabase/server';
 import { PortalSidebar, SIDEBAR_COOKIE } from '@/components/portal-sidebar';
 import { SignOutButton } from '@/components/sign-out-button';
 import { PageBody, PageHeader } from '@/components/ui/page-header';
@@ -24,7 +26,8 @@ export default async function PortalLayout({ children }: { children: React.React
   // Not '/login': the proxy let this request through because the access cookie
   // has not expired, and it would send /login straight back here, forever.
   // /session-ended ends the session first (app/session-ended/route.ts).
-  if (!profile) redirect('/session-ended');
+  // PLATFORM_DENIED: their Access became "app only"; the login page says so.
+  if (!profile) redirect(dbSessionRefusal().code === PLATFORM_DENIED ? '/session-ended?why=platform' : '/session-ended');
 
   // Role gate lives here, not in the proxy: reading the role on the edge
   // would mean a query per request, including every asset. No access at all

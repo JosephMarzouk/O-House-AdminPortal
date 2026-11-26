@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import type { NextRequest } from 'next/server';
 import { signOut } from '@/lib/actions/session';
 
 /**
@@ -17,10 +18,13 @@ import { signOut } from '@/lib/actions/session';
  * and the login page says why the user is there. A Route Handler, not the
  * layout, because a Server Component cannot change cookies.
  *
+ * ?why=platform: the API refused because the person's Access is now "app
+ * only" (26 Nov); the login page says that instead.
+ *
  * GET because it is the target of a redirect. Anyone can link here and so
  * sign a visitor out, which costs that visitor a sign-in and nothing else.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   await signOut();
-  redirect('/login?ended=1');
+  redirect(request.nextUrl.searchParams.get('why') === 'platform' ? '/login?ended=platform' : '/login?ended=1');
 }
